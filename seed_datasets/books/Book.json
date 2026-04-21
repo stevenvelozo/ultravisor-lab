@@ -1,0 +1,86 @@
+[
+  {
+    "IDBook": 1,
+    "IDAuthor": 1,
+    "Title": "The Left Hand of Darkness",
+    "Year": 1969,
+    "Pages": 304
+  },
+  {
+    "IDBook": 2,
+    "IDAuthor": 1,
+    "Title": "The Dispossessed",
+    "Year": 1974,
+    "Pages": 387
+  },
+  {
+    "IDBook": 3,
+    "IDAuthor": 2,
+    "Title": "Kindred",
+    "Year": 1979,
+    "Pages": 287
+  },
+  {
+    "IDBook": 4,
+    "IDAuthor": 2,
+    "Title": "Parable of the Sower",
+    "Year": 1993,
+    "Pages": 299
+  },
+  {
+    "IDBook": 5,
+    "IDAuthor": 3,
+    "Title": "The Fifth Season",
+    "Year": 2015,
+    "Pages": 512
+  },
+  {
+    "IDBook": 6,
+    "IDAuthor": 4,
+    "Title": "Small Gods",
+    "Year": 1992,
+    "Pages": 388
+  },
+  {
+    "IDBook": 7,
+    "IDAuthor": 4,
+    "Title": "Night Watch",
+    "Year": 2002,
+    "Pages": 480
+  },
+  {
+    "IDBook": 8,
+    "IDAuthor": 5,
+    "Title": "The Player of Games",
+    "Year": 1988,
+    "Pages": 307
+  },
+  {
+    "IDBook": 9,
+    "IDAuthor": 5,
+    "Title": "Use of Weapons",
+    "Year": 1990,
+    "Pages": 411
+  },
+  {
+    "IDBook": 10,
+    "IDAuthor": 6,
+    "Title": "The Long Way to a Small, Angry Planet",
+    "Year": 2014,
+    "Pages": 441
+  },
+  {
+    "IDBook": 11,
+    "IDAuthor": 7,
+    "Title": "Ancillary Justice",
+    "Year": 2013,
+    "Pages": 386
+  },
+  {
+    "IDBook": 12,
+    "IDAuthor": 8,
+    "Title": "All Systems Red",
+    "Year": 2017,
+    "Pages": 149
+  }
+]

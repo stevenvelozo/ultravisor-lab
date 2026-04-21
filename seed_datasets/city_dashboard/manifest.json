@@ -1,0 +1,53 @@
+{
+  "Hash": "city-dashboard",
+  "Name": "City Dashboard (target)",
+  "Description": "Empty target entity.  Exists so users have an ETL destination for the correlated city data produced by a retold-data-mapper run.",
+  "Entities": [
+    {
+      "Name": "CityRecord",
+      "FileName": "CityRecord.json",
+      "RowCount": 0,
+      "Schema": {
+        "Columns": [
+          {
+            "Name": "IDCityRecord",
+            "Type": "AutoIdentity"
+          },
+          {
+            "Name": "CityName",
+            "Type": "String",
+            "Size": 128
+          },
+          {
+            "Name": "CanonicalCityName",
+            "Type": "String",
+            "Size": 128
+          },
+          {
+            "Name": "Population",
+            "Type": "Integer"
+          },
+          {
+            "Name": "MedianIncome",
+            "Type": "Integer"
+          },
+          {
+            "Name": "AvgYearRoundTempF",
+            "Type": "Integer"
+          },
+          {
+            "Name": "TransitDailyRiders",
+            "Type": "Integer"
+          },
+          {
+            "Name": "Region",
+            "Type": "String",
+            "Size": 32
+          }
+        ]
+      }
+    }
+  ],
+  "OperationHash": "seed-city-dashboard",
+  "Correlation": "n/a (target)"
+}

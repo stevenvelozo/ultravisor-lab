@@ -1,0 +1,227 @@
+[
+  {
+    "IDTransitSystem": 1,
+    "SystemName": "NYC",
+    "CityServed": "NYC",
+    "SystemType": "Bus",
+    "TotalRoutes": 3,
+    "DailyRidership": 1169340,
+    "AnnualBudgetMillions": 1086
+  },
+  {
+    "IDTransitSystem": 2,
+    "SystemName": "LA Metro",
+    "CityServed": "LA Metro",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 358724,
+    "AnnualBudgetMillions": 537
+  },
+  {
+    "IDTransitSystem": 3,
+    "SystemName": "CTA",
+    "CityServed": "CTA",
+    "SystemType": "Bus",
+    "TotalRoutes": 3,
+    "DailyRidership": 394817,
+    "AnnualBudgetMillions": 501
+  },
+  {
+    "IDTransitSystem": 4,
+    "SystemName": "METRO",
+    "CityServed": "METRO",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 186686,
+    "AnnualBudgetMillions": 428
+  },
+  {
+    "IDTransitSystem": 5,
+    "SystemName": "Valley Metro",
+    "CityServed": "Valley Metro",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 161063,
+    "AnnualBudgetMillions": 418
+  },
+  {
+    "IDTransitSystem": 6,
+    "SystemName": "SEPTA",
+    "CityServed": "SEPTA",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 253350,
+    "AnnualBudgetMillions": 280
+  },
+  {
+    "IDTransitSystem": 7,
+    "SystemName": "VIA",
+    "CityServed": "VIA",
+    "SystemType": "Bus",
+    "TotalRoutes": 3,
+    "DailyRidership": 259107,
+    "AnnualBudgetMillions": 321
+  },
+  {
+    "IDTransitSystem": 8,
+    "SystemName": "MTS",
+    "CityServed": "MTS",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 200904,
+    "AnnualBudgetMillions": 212
+  },
+  {
+    "IDTransitSystem": 9,
+    "SystemName": "DART",
+    "CityServed": "DART",
+    "SystemType": "Bus",
+    "TotalRoutes": 4,
+    "DailyRidership": 207033,
+    "AnnualBudgetMillions": 162
+  },
+  {
+    "IDTransitSystem": 10,
+    "SystemName": "VTA",
+    "CityServed": "VTA",
+    "SystemType": "Bus",
+    "TotalRoutes": 4,
+    "DailyRidership": 148110,
+    "AnnualBudgetMillions": 125
+  },
+  {
+    "IDTransitSystem": 11,
+    "SystemName": "CapMetro",
+    "CityServed": "CapMetro",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 55776,
+    "AnnualBudgetMillions": 239
+  },
+  {
+    "IDTransitSystem": 12,
+    "SystemName": "JTA",
+    "CityServed": "JTA",
+    "SystemType": "Bus",
+    "TotalRoutes": 3,
+    "DailyRidership": 164683,
+    "AnnualBudgetMillions": 167
+  },
+  {
+    "IDTransitSystem": 13,
+    "SystemName": "Trinity Metro",
+    "CityServed": "Trinity Metro",
+    "SystemType": "Bus",
+    "TotalRoutes": 3,
+    "DailyRidership": 177418,
+    "AnnualBudgetMillions": 194
+  },
+  {
+    "IDTransitSystem": 14,
+    "SystemName": "COTA",
+    "CityServed": "COTA",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 93325,
+    "AnnualBudgetMillions": 200
+  },
+  {
+    "IDTransitSystem": 15,
+    "SystemName": "IndyGo",
+    "CityServed": "IndyGo",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 107736,
+    "AnnualBudgetMillions": 166
+  },
+  {
+    "IDTransitSystem": 16,
+    "SystemName": "CATS",
+    "CityServed": "CATS",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 66313,
+    "AnnualBudgetMillions": 213
+  },
+  {
+    "IDTransitSystem": 17,
+    "SystemName": "Muni",
+    "CityServed": "Muni",
+    "SystemType": "Bus",
+    "TotalRoutes": 4,
+    "DailyRidership": 134321,
+    "AnnualBudgetMillions": 205
+  },
+  {
+    "IDTransitSystem": 18,
+    "SystemName": "Sound Transit",
+    "CityServed": "Sound Transit",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 72848,
+    "AnnualBudgetMillions": 113
+  },
+  {
+    "IDTransitSystem": 19,
+    "SystemName": "RTD",
+    "CityServed": "RTD",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 141340,
+    "AnnualBudgetMillions": 135
+  },
+  {
+    "IDTransitSystem": 20,
+    "SystemName": "WMATA",
+    "CityServed": "WMATA",
+    "SystemType": "Multimodal",
+    "TotalRoutes": 5,
+    "DailyRidership": 71270,
+    "AnnualBudgetMillions": 121
+  },
+  {
+    "IDTransitSystem": 21,
+    "SystemName": "MBTA",
+    "CityServed": "MBTA",
+    "SystemType": "Bus",
+    "TotalRoutes": 4,
+    "DailyRidership": 103103,
+    "AnnualBudgetMillions": 168
+  },
+  {
+    "IDTransitSystem": 22,
+    "SystemName": "WeGo",
+    "CityServed": "WeGo",
+    "SystemType": "Bus",
+    "TotalRoutes": 4,
+    "DailyRidership": 110773,
+    "AnnualBudgetMillions": 129
+  },
+  {
+    "IDTransitSystem": 23,
+    "SystemName": "TriMet",
+    "CityServed": "TriMet",
+    "SystemType": "Bus",
+    "TotalRoutes": 3,
+    "DailyRidership": 58296,
+    "AnnualBudgetMillions": 160
+  },
+  {
+    "IDTransitSystem": 24,
+    "SystemName": "RTC",
+    "CityServed": "RTC",
+    "SystemType": "Bus",
+    "TotalRoutes": 4,
+    "DailyRidership": 72575,
+    "AnnualBudgetMillions": 93
+  },
+  {
+    "IDTransitSystem": 25,
+    "SystemName": "DDOT",
+    "CityServed": "DDOT",
+    "SystemType": "Bus",
+    "TotalRoutes": 4,
+    "DailyRidership": 85138,
+    "AnnualBudgetMillions": 115
+  }
+]

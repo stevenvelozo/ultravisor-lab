@@ -1,0 +1,56 @@
+{
+	"name": "ultravisor-lab",
+	"version": "0.0.1",
+	"description": "Web-based orchestration and monitoring for dockerized DB engines, retold-databeacons, Ultravisor, and Facto instances",
+	"main": "lab.js",
+	"bin": {
+		"ultravisor-lab": "./lab.js"
+	},
+	"scripts": {
+		"start": "node lab.js",
+		"web": "node lab.js --web",
+		"build-bundle": "npx quack build && npx quack copy",
+		"test": "echo \"No tests yet\" && exit 0"
+	},
+	"copyFilesSettings": {
+		"whenFileExists": "overwrite"
+	},
+	"copyFiles": [
+		{
+			"from": "./web/html/*",
+			"to": "./web/dist/"
+		},
+		{
+			"from": "./web/css/*",
+			"to": "./web/dist/css/"
+		},
+		{
+			"from": "./node_modules/pict/dist/*",
+			"to": "./web/dist/js/"
+		}
+	],
+	"dependencies": {
+		"chance": "^1.1.13",
+		"fable": "^3.1.70",
+		"fable-serviceproviderbase": "^3.0.19",
+		"meadow-connection-sqlite": "^1.0.18",
+		"meadow-integration": "^1.0.32",
+		"orator": "^6.0.4",
+		"orator-conversion": "^1.0.9",
+		"orator-serviceserver-restify": "^2.0.10",
+		"pict": "^1.0.363",
+		"pict-application": "^1.0.33",
+		"pict-router": "^1.0.9",
+		"pict-section-modal": "^0.0.5",
+		"pict-view": "^1.0.68",
+		"retold-databeacon": "^0.0.6",
+		"ultravisor": "^1.0.23",
+		"ultravisor-beacon": "^0.0.11"
+	},
+	"devDependencies": {
+		"gulp": "^4.0.2",
+		"quackage": "^1.0.0"
+	},
+	"license": "MIT",
+	"author": "Steven Velozo <steven@velozo.com>"
+}

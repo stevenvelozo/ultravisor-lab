@@ -1,0 +1,46 @@
+{
+	"ProviderIdentifier": "PictRouter",
+
+	"AutoInitialize": true,
+	"AutoInitializeOrdinal": 0,
+
+	"Routes":
+	[
+		{ "path": "/view/overview",       "template": "{~LV:Pict.PictApplication.setActiveView(`Overview`)~}" },
+		{ "path": "/view/dbengines",      "template": "{~LV:Pict.PictApplication.setActiveView(`DBEngines`)~}" },
+		{ "path": "/view/ultravisor",     "template": "{~LV:Pict.PictApplication.setActiveView(`Ultravisor`)~}" },
+		{ "path": "/view/beacons",        "template": "{~LV:Pict.PictApplication.setActiveView(`Beacons`)~}" },
+		{ "path": "/view/seeddatasets",   "template": "{~LV:Pict.PictApplication.setActiveView(`SeedDatasets`)~}" },
+		{ "path": "/view/events",         "template": "{~LV:Pict.PictApplication.setActiveView(`Events`)~}" },
+
+		{ "path": "/system/reconcile",    "template": "{~LV:Pict.PictApplication.triggerReconcile()~}" },
+		{ "path": "/system/teardown",     "template": "{~LV:Pict.PictApplication.cleanEnvironment()~}" },
+
+		{ "path": "/dbengines/form/toggle",        "template": "{~LV:Pict.PictApplication.toggleEngineForm()~}" },
+		{ "path": "/dbengines/form/suggest-port",  "template": "{~LV:Pict.PictApplication.suggestEnginePortFromForm()~}" },
+		{ "path": "/dbengines/submit",             "template": "{~LV:Pict.PictApplication.submitEngineForm()~}" },
+		{ "path": "/dbengines/:id/start",   "template": "{~LV:Pict.PictApplication.startEngine(Record.data.id)~}" },
+		{ "path": "/dbengines/:id/stop",    "template": "{~LV:Pict.PictApplication.stopEngine(Record.data.id)~}" },
+		{ "path": "/dbengines/:id/remove",  "template": "{~LV:Pict.PictApplication.removeEngine(Record.data.id)~}" },
+		{ "path": "/dbengines/:id/reveal",  "template": "{~LV:Pict.PictApplication.toggleCredentialReveal(Record.data.id)~}" },
+		{ "path": "/dbengines/:id/databases/create",       "template": "{~LV:Pict.PictApplication.createDatabase(Record.data.id)~}" },
+		{ "path": "/dbengines/:id/databases/:dbid/drop",   "template": "{~LV:Pict.PictApplication.dropDatabase(Record.data.id, Record.data.dbid)~}" },
+
+		{ "path": "/ultravisor/form/toggle",  "template": "{~LV:Pict.PictApplication.toggleUltravisorForm()~}" },
+		{ "path": "/ultravisor/submit",       "template": "{~LV:Pict.PictApplication.submitUltravisorForm()~}" },
+		{ "path": "/ultravisor/:id/start",    "template": "{~LV:Pict.PictApplication.startUltravisor(Record.data.id)~}" },
+		{ "path": "/ultravisor/:id/stop",     "template": "{~LV:Pict.PictApplication.stopUltravisor(Record.data.id)~}" },
+		{ "path": "/ultravisor/:id/remove",   "template": "{~LV:Pict.PictApplication.removeUltravisor(Record.data.id)~}" },
+
+		{ "path": "/beacons/form/open/:type",  "template": "{~LV:Pict.PictApplication.openBeaconFormForType(Record.data.type)~}" },
+		{ "path": "/beacons/form/close",       "template": "{~LV:Pict.PictApplication.closeBeaconForm()~}" },
+		{ "path": "/beacons/form/suggest-port","template": "{~LV:Pict.PictApplication.suggestBeaconPortFromForm()~}" },
+		{ "path": "/beacons/submit",           "template": "{~LV:Pict.PictApplication.submitBeaconForm()~}" },
+		{ "path": "/beacons/:id/start",       "template": "{~LV:Pict.PictApplication.startBeacon(Record.data.id)~}" },
+		{ "path": "/beacons/:id/stop",        "template": "{~LV:Pict.PictApplication.stopBeacon(Record.data.id)~}" },
+		{ "path": "/beacons/:id/remove",      "template": "{~LV:Pict.PictApplication.removeBeacon(Record.data.id)~}" },
+
+		{ "path": "/seeds/:hash/run",           "template": "{~LV:Pict.PictApplication.runSeedDataset(Record.data.hash)~}" },
+		{ "path": "/seeds/:hash/seed-to-engine","template": "{~LV:Pict.PictApplication.seedDatasetToEngine(Record.data.hash)~}" }
+	]
+}

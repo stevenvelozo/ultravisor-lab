@@ -1,0 +1,90 @@
+{
+  "Hash": "transit-systems",
+  "Name": "Transit Systems",
+  "Description": "50 transit agencies with 3-5 routes each.  Correlates with demographics and weather_stations via a mangled city-name key.",
+  "Entities": [
+    {
+      "Name": "TransitSystem",
+      "FileName": "TransitSystem.json",
+      "RowCount": 25,
+      "Schema": {
+        "Columns": [
+          {
+            "Name": "IDTransitSystem",
+            "Type": "AutoIdentity"
+          },
+          {
+            "Name": "SystemName",
+            "Type": "String",
+            "Size": 128
+          },
+          {
+            "Name": "CityServed",
+            "Type": "String",
+            "Size": 128
+          },
+          {
+            "Name": "SystemType",
+            "Type": "String",
+            "Size": 64
+          },
+          {
+            "Name": "TotalRoutes",
+            "Type": "Integer"
+          },
+          {
+            "Name": "DailyRidership",
+            "Type": "Integer"
+          },
+          {
+            "Name": "AnnualBudgetMillions",
+            "Type": "Integer"
+          }
+        ]
+      }
+    },
+    {
+      "Name": "TransitRoute",
+      "FileName": "TransitRoute.json",
+      "RowCount": 106,
+      "Schema": {
+        "Columns": [
+          {
+            "Name": "IDTransitRoute",
+            "Type": "AutoIdentity"
+          },
+          {
+            "Name": "IDTransitSystem",
+            "Type": "Integer"
+          },
+          {
+            "Name": "RouteName",
+            "Type": "String",
+            "Size": 64
+          },
+          {
+            "Name": "RouteType",
+            "Type": "String",
+            "Size": 32
+          },
+          {
+            "Name": "DailyRiders",
+            "Type": "Integer"
+          },
+          {
+            "Name": "LengthMiles",
+            "Type": "Decimal",
+            "Precision": 6,
+            "Scale": 1
+          },
+          {
+            "Name": "StopsCount",
+            "Type": "Integer"
+          }
+        ]
+      }
+    }
+  ],
+  "OperationHash": "seed-transit-systems",
+  "Correlation": "CityServed / SystemName (abbrev, e.g. \"NYC\")"
+}

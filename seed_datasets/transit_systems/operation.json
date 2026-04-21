@@ -1,0 +1,301 @@
+{
+  "Hash": "seed-transit-systems",
+  "Name": "Seed Transit Systems",
+  "Description": "Parses and inserts the Transit Systems seed dataset via the lab's meadow-integration beacon.",
+  "Tags": [
+    "lab",
+    "seed"
+  ],
+  "Version": "1.0.0",
+  "Graph": {
+    "Nodes": [
+      {
+        "Hash": "start",
+        "Type": "start",
+        "X": 50,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "Start",
+        "Ports": [
+          {
+            "Hash": "start-out",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Out"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "parse-TransitSystem",
+        "Type": "beacon-meadowintegration-parsefile",
+        "X": 300,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Parse TransitSystem",
+        "Ports": [
+          {
+            "Hash": "parse-TransitSystem-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "parse-TransitSystem-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "parse-TransitSystem-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "parse-TransitSystem-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "FilePath": "{LAB_SEED_PATH}/TransitSystem.json",
+          "Format": "json"
+        }
+      },
+      {
+        "Hash": "insert-TransitSystem",
+        "Type": "beacon-labwriter-bulkinsertviabeacon",
+        "X": 550,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Insert TransitSystem",
+        "Ports": [
+          {
+            "Hash": "insert-TransitSystem-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "insert-TransitSystem-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "insert-TransitSystem-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "insert-TransitSystem-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "BeaconURL": "{TARGET_BEACON_URL}",
+          "EntityName": "TransitSystem",
+          "Records": "{~D:Record.TaskOutput.parse-TransitSystem.Records~}"
+        }
+      },
+      {
+        "Hash": "parse-TransitRoute",
+        "Type": "beacon-meadowintegration-parsefile",
+        "X": 800,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Parse TransitRoute",
+        "Ports": [
+          {
+            "Hash": "parse-TransitRoute-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "parse-TransitRoute-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "parse-TransitRoute-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "parse-TransitRoute-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "FilePath": "{LAB_SEED_PATH}/TransitRoute.json",
+          "Format": "json"
+        }
+      },
+      {
+        "Hash": "insert-TransitRoute",
+        "Type": "beacon-labwriter-bulkinsertviabeacon",
+        "X": 1050,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Insert TransitRoute",
+        "Ports": [
+          {
+            "Hash": "insert-TransitRoute-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "insert-TransitRoute-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "insert-TransitRoute-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "insert-TransitRoute-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "BeaconURL": "{TARGET_BEACON_URL}",
+          "EntityName": "TransitRoute",
+          "Records": "{~D:Record.TaskOutput.parse-TransitRoute.Records~}"
+        }
+      },
+      {
+        "Hash": "end",
+        "Type": "end",
+        "X": 1300,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "End",
+        "Ports": [
+          {
+            "Hash": "end-in",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "In"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "error-handler",
+        "Type": "error-message",
+        "X": 700,
+        "Y": 450,
+        "Width": 220,
+        "Height": 80,
+        "Title": "Error Handler",
+        "Ports": [
+          {
+            "Hash": "error-handler-Execute",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Execute"
+          },
+          {
+            "Hash": "error-handler-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          }
+        ],
+        "Data": {
+          "Message": "Seed 'Transit Systems' encountered an error."
+        }
+      }
+    ],
+    "Connections": [
+      {
+        "SourceNodeHash": "start",
+        "SourcePortHash": "start-out",
+        "TargetNodeHash": "parse-TransitSystem",
+        "TargetPortHash": "parse-TransitSystem-Trigger"
+      },
+      {
+        "SourceNodeHash": "parse-TransitSystem",
+        "SourcePortHash": "parse-TransitSystem-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "parse-TransitSystem",
+        "SourcePortHash": "parse-TransitSystem-Complete",
+        "TargetNodeHash": "insert-TransitSystem",
+        "TargetPortHash": "insert-TransitSystem-Trigger"
+      },
+      {
+        "SourceNodeHash": "insert-TransitSystem",
+        "SourcePortHash": "insert-TransitSystem-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "insert-TransitSystem",
+        "SourcePortHash": "insert-TransitSystem-Complete",
+        "TargetNodeHash": "parse-TransitRoute",
+        "TargetPortHash": "parse-TransitRoute-Trigger"
+      },
+      {
+        "SourceNodeHash": "parse-TransitRoute",
+        "SourcePortHash": "parse-TransitRoute-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "parse-TransitRoute",
+        "SourcePortHash": "parse-TransitRoute-Complete",
+        "TargetNodeHash": "insert-TransitRoute",
+        "TargetPortHash": "insert-TransitRoute-Trigger"
+      },
+      {
+        "SourceNodeHash": "insert-TransitRoute",
+        "SourcePortHash": "insert-TransitRoute-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "insert-TransitRoute",
+        "SourcePortHash": "insert-TransitRoute-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      },
+      {
+        "SourceNodeHash": "error-handler",
+        "SourcePortHash": "error-handler-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      }
+    ]
+  },
+  "ViewState": {
+    "X": 0,
+    "Y": 0,
+    "Scale": 1
+  }
+}

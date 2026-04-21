@@ -1,0 +1,66 @@
+{
+  "Hash": "books",
+  "Name": "Books & Authors",
+  "Description": "Small literary catalog -- 8 authors and 12 books linked by IDAuthor.  Minimal two-entity fixture for learning multi-table ETL.",
+  "Entities": [
+    {
+      "Name": "Author",
+      "FileName": "Author.json",
+      "RowCount": 8,
+      "Schema": {
+        "Columns": [
+          {
+            "Name": "IDAuthor",
+            "Type": "AutoIdentity"
+          },
+          {
+            "Name": "FullName",
+            "Type": "String",
+            "Size": 128
+          },
+          {
+            "Name": "BirthYear",
+            "Type": "Integer"
+          },
+          {
+            "Name": "Nationality",
+            "Type": "String",
+            "Size": 64
+          }
+        ]
+      }
+    },
+    {
+      "Name": "Book",
+      "FileName": "Book.json",
+      "RowCount": 12,
+      "Schema": {
+        "Columns": [
+          {
+            "Name": "IDBook",
+            "Type": "AutoIdentity"
+          },
+          {
+            "Name": "IDAuthor",
+            "Type": "Integer"
+          },
+          {
+            "Name": "Title",
+            "Type": "String",
+            "Size": 256
+          },
+          {
+            "Name": "Year",
+            "Type": "Integer"
+          },
+          {
+            "Name": "Pages",
+            "Type": "Integer"
+          }
+        ]
+      }
+    }
+  ],
+  "OperationHash": "seed-books",
+  "Correlation": "IDAuthor"
+}

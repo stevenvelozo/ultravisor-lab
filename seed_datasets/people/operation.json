@@ -1,0 +1,198 @@
+{
+  "Hash": "seed-people",
+  "Name": "Seed People",
+  "Description": "Parses and inserts the People seed dataset via the lab's meadow-integration beacon.",
+  "Tags": [
+    "lab",
+    "seed"
+  ],
+  "Version": "1.0.0",
+  "Graph": {
+    "Nodes": [
+      {
+        "Hash": "start",
+        "Type": "start",
+        "X": 50,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "Start",
+        "Ports": [
+          {
+            "Hash": "start-out",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Out"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "parse-Person",
+        "Type": "beacon-meadowintegration-parsefile",
+        "X": 300,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Parse Person",
+        "Ports": [
+          {
+            "Hash": "parse-Person-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "parse-Person-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "parse-Person-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "parse-Person-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "FilePath": "{LAB_SEED_PATH}/Person.json",
+          "Format": "json"
+        }
+      },
+      {
+        "Hash": "insert-Person",
+        "Type": "beacon-labwriter-bulkinsertviabeacon",
+        "X": 550,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Insert Person",
+        "Ports": [
+          {
+            "Hash": "insert-Person-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "insert-Person-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "insert-Person-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "insert-Person-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "BeaconURL": "{TARGET_BEACON_URL}",
+          "EntityName": "Person",
+          "Records": "{~D:Record.TaskOutput.parse-Person.Records~}"
+        }
+      },
+      {
+        "Hash": "end",
+        "Type": "end",
+        "X": 800,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "End",
+        "Ports": [
+          {
+            "Hash": "end-in",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "In"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "error-handler",
+        "Type": "error-message",
+        "X": 700,
+        "Y": 450,
+        "Width": 220,
+        "Height": 80,
+        "Title": "Error Handler",
+        "Ports": [
+          {
+            "Hash": "error-handler-Execute",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Execute"
+          },
+          {
+            "Hash": "error-handler-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          }
+        ],
+        "Data": {
+          "Message": "Seed 'People' encountered an error."
+        }
+      }
+    ],
+    "Connections": [
+      {
+        "SourceNodeHash": "start",
+        "SourcePortHash": "start-out",
+        "TargetNodeHash": "parse-Person",
+        "TargetPortHash": "parse-Person-Trigger"
+      },
+      {
+        "SourceNodeHash": "parse-Person",
+        "SourcePortHash": "parse-Person-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "parse-Person",
+        "SourcePortHash": "parse-Person-Complete",
+        "TargetNodeHash": "insert-Person",
+        "TargetPortHash": "insert-Person-Trigger"
+      },
+      {
+        "SourceNodeHash": "insert-Person",
+        "SourcePortHash": "insert-Person-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "insert-Person",
+        "SourcePortHash": "insert-Person-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      },
+      {
+        "SourceNodeHash": "error-handler",
+        "SourcePortHash": "error-handler-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      }
+    ]
+  },
+  "ViewState": {
+    "X": 0,
+    "Y": 0,
+    "Scale": 1
+  }
+}

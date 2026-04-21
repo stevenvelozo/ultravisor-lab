@@ -1,0 +1,50 @@
+[
+  {
+    "IDAuthor": 1,
+    "FullName": "Ursula K. Le Guin",
+    "BirthYear": 1929,
+    "Nationality": "American"
+  },
+  {
+    "IDAuthor": 2,
+    "FullName": "Octavia Butler",
+    "BirthYear": 1947,
+    "Nationality": "American"
+  },
+  {
+    "IDAuthor": 3,
+    "FullName": "N. K. Jemisin",
+    "BirthYear": 1972,
+    "Nationality": "American"
+  },
+  {
+    "IDAuthor": 4,
+    "FullName": "Terry Pratchett",
+    "BirthYear": 1948,
+    "Nationality": "British"
+  },
+  {
+    "IDAuthor": 5,
+    "FullName": "Iain M. Banks",
+    "BirthYear": 1954,
+    "Nationality": "British"
+  },
+  {
+    "IDAuthor": 6,
+    "FullName": "Becky Chambers",
+    "BirthYear": 1985,
+    "Nationality": "American"
+  },
+  {
+    "IDAuthor": 7,
+    "FullName": "Ann Leckie",
+    "BirthYear": 1966,
+    "Nationality": "American"
+  },
+  {
+    "IDAuthor": 8,
+    "FullName": "Martha Wells",
+    "BirthYear": 1964,
+    "Nationality": "American"
+  }
+]

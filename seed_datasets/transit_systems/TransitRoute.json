@@ -1,0 +1,956 @@
+[
+  {
+    "IDTransitRoute": 1,
+    "IDTransitSystem": 1,
+    "RouteName": "NYC-01",
+    "RouteType": "LightRail",
+    "DailyRiders": 6496,
+    "LengthMiles": 9.8,
+    "StopsCount": 17
+  },
+  {
+    "IDTransitRoute": 2,
+    "IDTransitSystem": 1,
+    "RouteName": "NYC-02",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 11146,
+    "LengthMiles": 14.2,
+    "StopsCount": 15
+  },
+  {
+    "IDTransitRoute": 3,
+    "IDTransitSystem": 1,
+    "RouteName": "NYC-03",
+    "RouteType": "LightRail",
+    "DailyRiders": 9429,
+    "LengthMiles": 17.9,
+    "StopsCount": 21
+  },
+  {
+    "IDTransitRoute": 4,
+    "IDTransitSystem": 2,
+    "RouteName": "LA Metro-01",
+    "RouteType": "LightRail",
+    "DailyRiders": 8893,
+    "LengthMiles": 13.2,
+    "StopsCount": 11
+  },
+  {
+    "IDTransitRoute": 5,
+    "IDTransitSystem": 2,
+    "RouteName": "LA Metro-02",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 1812,
+    "LengthMiles": 19,
+    "StopsCount": 6
+  },
+  {
+    "IDTransitRoute": 6,
+    "IDTransitSystem": 2,
+    "RouteName": "LA Metro-03",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 7600,
+    "LengthMiles": 14,
+    "StopsCount": 25
+  },
+  {
+    "IDTransitRoute": 7,
+    "IDTransitSystem": 2,
+    "RouteName": "LA Metro-04",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 6546,
+    "LengthMiles": 8.8,
+    "StopsCount": 12
+  },
+  {
+    "IDTransitRoute": 8,
+    "IDTransitSystem": 2,
+    "RouteName": "LA Metro-05",
+    "RouteType": "Ferry",
+    "DailyRiders": 4613,
+    "LengthMiles": 16.5,
+    "StopsCount": 28
+  },
+  {
+    "IDTransitRoute": 9,
+    "IDTransitSystem": 3,
+    "RouteName": "CTA-01",
+    "RouteType": "LightRail",
+    "DailyRiders": 4724,
+    "LengthMiles": 5.4,
+    "StopsCount": 26
+  },
+  {
+    "IDTransitRoute": 10,
+    "IDTransitSystem": 3,
+    "RouteName": "CTA-02",
+    "RouteType": "Bus",
+    "DailyRiders": 11455,
+    "LengthMiles": 6.2,
+    "StopsCount": 16
+  },
+  {
+    "IDTransitRoute": 11,
+    "IDTransitSystem": 3,
+    "RouteName": "CTA-03",
+    "RouteType": "Commuter",
+    "DailyRiders": 1770,
+    "LengthMiles": 17.3,
+    "StopsCount": 27
+  },
+  {
+    "IDTransitRoute": 12,
+    "IDTransitSystem": 4,
+    "RouteName": "METRO-01",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 3355,
+    "LengthMiles": 16.4,
+    "StopsCount": 29
+  },
+  {
+    "IDTransitRoute": 13,
+    "IDTransitSystem": 4,
+    "RouteName": "METRO-02",
+    "RouteType": "Commuter",
+    "DailyRiders": 4618,
+    "LengthMiles": 8.7,
+    "StopsCount": 33
+  },
+  {
+    "IDTransitRoute": 14,
+    "IDTransitSystem": 4,
+    "RouteName": "METRO-03",
+    "RouteType": "LightRail",
+    "DailyRiders": 3252,
+    "LengthMiles": 5.3,
+    "StopsCount": 32
+  },
+  {
+    "IDTransitRoute": 15,
+    "IDTransitSystem": 4,
+    "RouteName": "METRO-04",
+    "RouteType": "LightRail",
+    "DailyRiders": 3683,
+    "LengthMiles": 12,
+    "StopsCount": 13
+  },
+  {
+    "IDTransitRoute": 16,
+    "IDTransitSystem": 4,
+    "RouteName": "METRO-05",
+    "RouteType": "Commuter",
+    "DailyRiders": 2909,
+    "LengthMiles": 5.1,
+    "StopsCount": 31
+  },
+  {
+    "IDTransitRoute": 17,
+    "IDTransitSystem": 5,
+    "RouteName": "Valley Metro-01",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 2352,
+    "LengthMiles": 8.7,
+    "StopsCount": 11
+  },
+  {
+    "IDTransitRoute": 18,
+    "IDTransitSystem": 5,
+    "RouteName": "Valley Metro-02",
+    "RouteType": "Ferry",
+    "DailyRiders": 12392,
+    "LengthMiles": 12.8,
+    "StopsCount": 7
+  },
+  {
+    "IDTransitRoute": 19,
+    "IDTransitSystem": 5,
+    "RouteName": "Valley Metro-03",
+    "RouteType": "LightRail",
+    "DailyRiders": 5692,
+    "LengthMiles": 7.4,
+    "StopsCount": 19
+  },
+  {
+    "IDTransitRoute": 20,
+    "IDTransitSystem": 5,
+    "RouteName": "Valley Metro-04",
+    "RouteType": "LightRail",
+    "DailyRiders": 9063,
+    "LengthMiles": 6.7,
+    "StopsCount": 12
+  },
+  {
+    "IDTransitRoute": 21,
+    "IDTransitSystem": 5,
+    "RouteName": "Valley Metro-05",
+    "RouteType": "Ferry",
+    "DailyRiders": 2684,
+    "LengthMiles": 12.1,
+    "StopsCount": 8
+  },
+  {
+    "IDTransitRoute": 22,
+    "IDTransitSystem": 6,
+    "RouteName": "SEPTA-01",
+    "RouteType": "Bus",
+    "DailyRiders": 10077,
+    "LengthMiles": 5.7,
+    "StopsCount": 23
+  },
+  {
+    "IDTransitRoute": 23,
+    "IDTransitSystem": 6,
+    "RouteName": "SEPTA-02",
+    "RouteType": "Commuter",
+    "DailyRiders": 12941,
+    "LengthMiles": 19.2,
+    "StopsCount": 9
+  },
+  {
+    "IDTransitRoute": 24,
+    "IDTransitSystem": 6,
+    "RouteName": "SEPTA-03",
+    "RouteType": "LightRail",
+    "DailyRiders": 4293,
+    "LengthMiles": 13.2,
+    "StopsCount": 12
+  },
+  {
+    "IDTransitRoute": 25,
+    "IDTransitSystem": 6,
+    "RouteName": "SEPTA-04",
+    "RouteType": "Ferry",
+    "DailyRiders": 6777,
+    "LengthMiles": 18.7,
+    "StopsCount": 30
+  },
+  {
+    "IDTransitRoute": 26,
+    "IDTransitSystem": 6,
+    "RouteName": "SEPTA-05",
+    "RouteType": "Commuter",
+    "DailyRiders": 3329,
+    "LengthMiles": 12.2,
+    "StopsCount": 21
+  },
+  {
+    "IDTransitRoute": 27,
+    "IDTransitSystem": 7,
+    "RouteName": "VIA-01",
+    "RouteType": "Bus",
+    "DailyRiders": 7209,
+    "LengthMiles": 9.3,
+    "StopsCount": 10
+  },
+  {
+    "IDTransitRoute": 28,
+    "IDTransitSystem": 7,
+    "RouteName": "VIA-02",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 7605,
+    "LengthMiles": 14.8,
+    "StopsCount": 18
+  },
+  {
+    "IDTransitRoute": 29,
+    "IDTransitSystem": 7,
+    "RouteName": "VIA-03",
+    "RouteType": "LightRail",
+    "DailyRiders": 2134,
+    "LengthMiles": 10.5,
+    "StopsCount": 9
+  },
+  {
+    "IDTransitRoute": 30,
+    "IDTransitSystem": 8,
+    "RouteName": "MTS-01",
+    "RouteType": "Bus",
+    "DailyRiders": 7003,
+    "LengthMiles": 16.6,
+    "StopsCount": 29
+  },
+  {
+    "IDTransitRoute": 31,
+    "IDTransitSystem": 8,
+    "RouteName": "MTS-02",
+    "RouteType": "Commuter",
+    "DailyRiders": 5576,
+    "LengthMiles": 15.1,
+    "StopsCount": 28
+  },
+  {
+    "IDTransitRoute": 32,
+    "IDTransitSystem": 8,
+    "RouteName": "MTS-03",
+    "RouteType": "LightRail",
+    "DailyRiders": 3128,
+    "LengthMiles": 13.4,
+    "StopsCount": 15
+  },
+  {
+    "IDTransitRoute": 33,
+    "IDTransitSystem": 8,
+    "RouteName": "MTS-04",
+    "RouteType": "LightRail",
+    "DailyRiders": 4429,
+    "LengthMiles": 14.6,
+    "StopsCount": 29
+  },
+  {
+    "IDTransitRoute": 34,
+    "IDTransitSystem": 8,
+    "RouteName": "MTS-05",
+    "RouteType": "Bus",
+    "DailyRiders": 5895,
+    "LengthMiles": 10.4,
+    "StopsCount": 27
+  },
+  {
+    "IDTransitRoute": 35,
+    "IDTransitSystem": 9,
+    "RouteName": "DART-01",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 10431,
+    "LengthMiles": 8.3,
+    "StopsCount": 23
+  },
+  {
+    "IDTransitRoute": 36,
+    "IDTransitSystem": 9,
+    "RouteName": "DART-02",
+    "RouteType": "LightRail",
+    "DailyRiders": 3066,
+    "LengthMiles": 9.3,
+    "StopsCount": 30
+  },
+  {
+    "IDTransitRoute": 37,
+    "IDTransitSystem": 9,
+    "RouteName": "DART-03",
+    "RouteType": "Bus",
+    "DailyRiders": 10845,
+    "LengthMiles": 7.5,
+    "StopsCount": 5
+  },
+  {
+    "IDTransitRoute": 38,
+    "IDTransitSystem": 9,
+    "RouteName": "DART-04",
+    "RouteType": "Ferry",
+    "DailyRiders": 12461,
+    "LengthMiles": 14.8,
+    "StopsCount": 32
+  },
+  {
+    "IDTransitRoute": 39,
+    "IDTransitSystem": 10,
+    "RouteName": "VTA-01",
+    "RouteType": "Ferry",
+    "DailyRiders": 12012,
+    "LengthMiles": 11.1,
+    "StopsCount": 18
+  },
+  {
+    "IDTransitRoute": 40,
+    "IDTransitSystem": 10,
+    "RouteName": "VTA-02",
+    "RouteType": "Commuter",
+    "DailyRiders": 1614,
+    "LengthMiles": 6.4,
+    "StopsCount": 7
+  },
+  {
+    "IDTransitRoute": 41,
+    "IDTransitSystem": 10,
+    "RouteName": "VTA-03",
+    "RouteType": "Commuter",
+    "DailyRiders": 5483,
+    "LengthMiles": 9.8,
+    "StopsCount": 17
+  },
+  {
+    "IDTransitRoute": 42,
+    "IDTransitSystem": 10,
+    "RouteName": "VTA-04",
+    "RouteType": "LightRail",
+    "DailyRiders": 8296,
+    "LengthMiles": 18.6,
+    "StopsCount": 24
+  },
+  {
+    "IDTransitRoute": 43,
+    "IDTransitSystem": 11,
+    "RouteName": "CapMetro-01",
+    "RouteType": "Bus",
+    "DailyRiders": 10793,
+    "LengthMiles": 6.2,
+    "StopsCount": 19
+  },
+  {
+    "IDTransitRoute": 44,
+    "IDTransitSystem": 11,
+    "RouteName": "CapMetro-02",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 6624,
+    "LengthMiles": 18,
+    "StopsCount": 26
+  },
+  {
+    "IDTransitRoute": 45,
+    "IDTransitSystem": 11,
+    "RouteName": "CapMetro-03",
+    "RouteType": "Ferry",
+    "DailyRiders": 8982,
+    "LengthMiles": 18.7,
+    "StopsCount": 22
+  },
+  {
+    "IDTransitRoute": 46,
+    "IDTransitSystem": 11,
+    "RouteName": "CapMetro-04",
+    "RouteType": "Commuter",
+    "DailyRiders": 10119,
+    "LengthMiles": 16.5,
+    "StopsCount": 15
+  },
+  {
+    "IDTransitRoute": 47,
+    "IDTransitSystem": 11,
+    "RouteName": "CapMetro-05",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 10439,
+    "LengthMiles": 13.7,
+    "StopsCount": 12
+  },
+  {
+    "IDTransitRoute": 48,
+    "IDTransitSystem": 12,
+    "RouteName": "JTA-01",
+    "RouteType": "Ferry",
+    "DailyRiders": 3220,
+    "LengthMiles": 11.4,
+    "StopsCount": 16
+  },
+  {
+    "IDTransitRoute": 49,
+    "IDTransitSystem": 12,
+    "RouteName": "JTA-02",
+    "RouteType": "LightRail",
+    "DailyRiders": 11400,
+    "LengthMiles": 19,
+    "StopsCount": 11
+  },
+  {
+    "IDTransitRoute": 50,
+    "IDTransitSystem": 12,
+    "RouteName": "JTA-03",
+    "RouteType": "Commuter",
+    "DailyRiders": 12133,
+    "LengthMiles": 17.5,
+    "StopsCount": 13
+  },
+  {
+    "IDTransitRoute": 51,
+    "IDTransitSystem": 13,
+    "RouteName": "Trinity Metro-01",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 9793,
+    "LengthMiles": 13.6,
+    "StopsCount": 15
+  },
+  {
+    "IDTransitRoute": 52,
+    "IDTransitSystem": 13,
+    "RouteName": "Trinity Metro-02",
+    "RouteType": "Commuter",
+    "DailyRiders": 5908,
+    "LengthMiles": 19.8,
+    "StopsCount": 15
+  },
+  {
+    "IDTransitRoute": 53,
+    "IDTransitSystem": 13,
+    "RouteName": "Trinity Metro-03",
+    "RouteType": "Commuter",
+    "DailyRiders": 10351,
+    "LengthMiles": 16,
+    "StopsCount": 24
+  },
+  {
+    "IDTransitRoute": 54,
+    "IDTransitSystem": 14,
+    "RouteName": "COTA-01",
+    "RouteType": "Bus",
+    "DailyRiders": 9168,
+    "LengthMiles": 14.4,
+    "StopsCount": 20
+  },
+  {
+    "IDTransitRoute": 55,
+    "IDTransitSystem": 14,
+    "RouteName": "COTA-02",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 1422,
+    "LengthMiles": 12.8,
+    "StopsCount": 10
+  },
+  {
+    "IDTransitRoute": 56,
+    "IDTransitSystem": 14,
+    "RouteName": "COTA-03",
+    "RouteType": "Ferry",
+    "DailyRiders": 7183,
+    "LengthMiles": 15.7,
+    "StopsCount": 6
+  },
+  {
+    "IDTransitRoute": 57,
+    "IDTransitSystem": 14,
+    "RouteName": "COTA-04",
+    "RouteType": "LightRail",
+    "DailyRiders": 10891,
+    "LengthMiles": 5.8,
+    "StopsCount": 31
+  },
+  {
+    "IDTransitRoute": 58,
+    "IDTransitSystem": 14,
+    "RouteName": "COTA-05",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 8531,
+    "LengthMiles": 5,
+    "StopsCount": 13
+  },
+  {
+    "IDTransitRoute": 59,
+    "IDTransitSystem": 15,
+    "RouteName": "IndyGo-01",
+    "RouteType": "Bus",
+    "DailyRiders": 1946,
+    "LengthMiles": 10.3,
+    "StopsCount": 8
+  },
+  {
+    "IDTransitRoute": 60,
+    "IDTransitSystem": 15,
+    "RouteName": "IndyGo-02",
+    "RouteType": "Ferry",
+    "DailyRiders": 12911,
+    "LengthMiles": 13.7,
+    "StopsCount": 14
+  },
+  {
+    "IDTransitRoute": 61,
+    "IDTransitSystem": 15,
+    "RouteName": "IndyGo-03",
+    "RouteType": "Ferry",
+    "DailyRiders": 11866,
+    "LengthMiles": 9.7,
+    "StopsCount": 21
+  },
+  {
+    "IDTransitRoute": 62,
+    "IDTransitSystem": 15,
+    "RouteName": "IndyGo-04",
+    "RouteType": "Ferry",
+    "DailyRiders": 6142,
+    "LengthMiles": 7.5,
+    "StopsCount": 10
+  },
+  {
+    "IDTransitRoute": 63,
+    "IDTransitSystem": 15,
+    "RouteName": "IndyGo-05",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 8542,
+    "LengthMiles": 14.6,
+    "StopsCount": 23
+  },
+  {
+    "IDTransitRoute": 64,
+    "IDTransitSystem": 16,
+    "RouteName": "CATS-01",
+    "RouteType": "Commuter",
+    "DailyRiders": 12492,
+    "LengthMiles": 18.4,
+    "StopsCount": 20
+  },
+  {
+    "IDTransitRoute": 65,
+    "IDTransitSystem": 16,
+    "RouteName": "CATS-02",
+    "RouteType": "LightRail",
+    "DailyRiders": 6961,
+    "LengthMiles": 15.6,
+    "StopsCount": 12
+  },
+  {
+    "IDTransitRoute": 66,
+    "IDTransitSystem": 16,
+    "RouteName": "CATS-03",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 8011,
+    "LengthMiles": 6.5,
+    "StopsCount": 15
+  },
+  {
+    "IDTransitRoute": 67,
+    "IDTransitSystem": 16,
+    "RouteName": "CATS-04",
+    "RouteType": "Ferry",
+    "DailyRiders": 6717,
+    "LengthMiles": 14.9,
+    "StopsCount": 16
+  },
+  {
+    "IDTransitRoute": 68,
+    "IDTransitSystem": 16,
+    "RouteName": "CATS-05",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 10968,
+    "LengthMiles": 10.9,
+    "StopsCount": 26
+  },
+  {
+    "IDTransitRoute": 69,
+    "IDTransitSystem": 17,
+    "RouteName": "Muni-01",
+    "RouteType": "LightRail",
+    "DailyRiders": 12317,
+    "LengthMiles": 18.9,
+    "StopsCount": 29
+  },
+  {
+    "IDTransitRoute": 70,
+    "IDTransitSystem": 17,
+    "RouteName": "Muni-02",
+    "RouteType": "Bus",
+    "DailyRiders": 5453,
+    "LengthMiles": 13,
+    "StopsCount": 12
+  },
+  {
+    "IDTransitRoute": 71,
+    "IDTransitSystem": 17,
+    "RouteName": "Muni-03",
+    "RouteType": "Bus",
+    "DailyRiders": 4210,
+    "LengthMiles": 13.4,
+    "StopsCount": 18
+  },
+  {
+    "IDTransitRoute": 72,
+    "IDTransitSystem": 17,
+    "RouteName": "Muni-04",
+    "RouteType": "Ferry",
+    "DailyRiders": 1526,
+    "LengthMiles": 4.2,
+    "StopsCount": 8
+  },
+  {
+    "IDTransitRoute": 73,
+    "IDTransitSystem": 18,
+    "RouteName": "Sound Transit-01",
+    "RouteType": "Ferry",
+    "DailyRiders": 11009,
+    "LengthMiles": 9.9,
+    "StopsCount": 10
+  },
+  {
+    "IDTransitRoute": 74,
+    "IDTransitSystem": 18,
+    "RouteName": "Sound Transit-02",
+    "RouteType": "Commuter",
+    "DailyRiders": 2172,
+    "LengthMiles": 13.2,
+    "StopsCount": 10
+  },
+  {
+    "IDTransitRoute": 75,
+    "IDTransitSystem": 18,
+    "RouteName": "Sound Transit-03",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 12854,
+    "LengthMiles": 17.2,
+    "StopsCount": 16
+  },
+  {
+    "IDTransitRoute": 76,
+    "IDTransitSystem": 18,
+    "RouteName": "Sound Transit-04",
+    "RouteType": "Ferry",
+    "DailyRiders": 9052,
+    "LengthMiles": 11,
+    "StopsCount": 10
+  },
+  {
+    "IDTransitRoute": 77,
+    "IDTransitSystem": 18,
+    "RouteName": "Sound Transit-05",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 6402,
+    "LengthMiles": 11.7,
+    "StopsCount": 34
+  },
+  {
+    "IDTransitRoute": 78,
+    "IDTransitSystem": 19,
+    "RouteName": "RTD-01",
+    "RouteType": "Bus",
+    "DailyRiders": 10401,
+    "LengthMiles": 11,
+    "StopsCount": 9
+  },
+  {
+    "IDTransitRoute": 79,
+    "IDTransitSystem": 19,
+    "RouteName": "RTD-02",
+    "RouteType": "Ferry",
+    "DailyRiders": 7948,
+    "LengthMiles": 13,
+    "StopsCount": 6
+  },
+  {
+    "IDTransitRoute": 80,
+    "IDTransitSystem": 19,
+    "RouteName": "RTD-03",
+    "RouteType": "Commuter",
+    "DailyRiders": 9375,
+    "LengthMiles": 5,
+    "StopsCount": 22
+  },
+  {
+    "IDTransitRoute": 81,
+    "IDTransitSystem": 19,
+    "RouteName": "RTD-04",
+    "RouteType": "Bus",
+    "DailyRiders": 8093,
+    "LengthMiles": 7.3,
+    "StopsCount": 26
+  },
+  {
+    "IDTransitRoute": 82,
+    "IDTransitSystem": 19,
+    "RouteName": "RTD-05",
+    "RouteType": "Commuter",
+    "DailyRiders": 11906,
+    "LengthMiles": 6.7,
+    "StopsCount": 7
+  },
+  {
+    "IDTransitRoute": 83,
+    "IDTransitSystem": 20,
+    "RouteName": "WMATA-01",
+    "RouteType": "Ferry",
+    "DailyRiders": 10434,
+    "LengthMiles": 18.7,
+    "StopsCount": 16
+  },
+  {
+    "IDTransitRoute": 84,
+    "IDTransitSystem": 20,
+    "RouteName": "WMATA-02",
+    "RouteType": "LightRail",
+    "DailyRiders": 11072,
+    "LengthMiles": 13,
+    "StopsCount": 32
+  },
+  {
+    "IDTransitRoute": 85,
+    "IDTransitSystem": 20,
+    "RouteName": "WMATA-03",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 5721,
+    "LengthMiles": 14.9,
+    "StopsCount": 29
+  },
+  {
+    "IDTransitRoute": 86,
+    "IDTransitSystem": 20,
+    "RouteName": "WMATA-04",
+    "RouteType": "Commuter",
+    "DailyRiders": 9096,
+    "LengthMiles": 16.7,
+    "StopsCount": 14
+  },
+  {
+    "IDTransitRoute": 87,
+    "IDTransitSystem": 20,
+    "RouteName": "WMATA-05",
+    "RouteType": "Bus",
+    "DailyRiders": 10370,
+    "LengthMiles": 14.1,
+    "StopsCount": 33
+  },
+  {
+    "IDTransitRoute": 88,
+    "IDTransitSystem": 21,
+    "RouteName": "MBTA-01",
+    "RouteType": "LightRail",
+    "DailyRiders": 9043,
+    "LengthMiles": 5.5,
+    "StopsCount": 16
+  },
+  {
+    "IDTransitRoute": 89,
+    "IDTransitSystem": 21,
+    "RouteName": "MBTA-02",
+    "RouteType": "Ferry",
+    "DailyRiders": 8331,
+    "LengthMiles": 9,
+    "StopsCount": 16
+  },
+  {
+    "IDTransitRoute": 90,
+    "IDTransitSystem": 21,
+    "RouteName": "MBTA-03",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 8839,
+    "LengthMiles": 15.9,
+    "StopsCount": 17
+  },
+  {
+    "IDTransitRoute": 91,
+    "IDTransitSystem": 21,
+    "RouteName": "MBTA-04",
+    "RouteType": "LightRail",
+    "DailyRiders": 6369,
+    "LengthMiles": 16.4,
+    "StopsCount": 7
+  },
+  {
+    "IDTransitRoute": 92,
+    "IDTransitSystem": 22,
+    "RouteName": "WeGo-01",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 3567,
+    "LengthMiles": 16.6,
+    "StopsCount": 32
+  },
+  {
+    "IDTransitRoute": 93,
+    "IDTransitSystem": 22,
+    "RouteName": "WeGo-02",
+    "RouteType": "Bus",
+    "DailyRiders": 1859,
+    "LengthMiles": 16.5,
+    "StopsCount": 32
+  },
+  {
+    "IDTransitRoute": 94,
+    "IDTransitSystem": 22,
+    "RouteName": "WeGo-03",
+    "RouteType": "Commuter",
+    "DailyRiders": 10562,
+    "LengthMiles": 15.1,
+    "StopsCount": 26
+  },
+  {
+    "IDTransitRoute": 95,
+    "IDTransitSystem": 22,
+    "RouteName": "WeGo-04",
+    "RouteType": "Ferry",
+    "DailyRiders": 9757,
+    "LengthMiles": 18.5,
+    "StopsCount": 19
+  },
+  {
+    "IDTransitRoute": 96,
+    "IDTransitSystem": 23,
+    "RouteName": "TriMet-01",
+    "RouteType": "Ferry",
+    "DailyRiders": 8718,
+    "LengthMiles": 12.1,
+    "StopsCount": 6
+  },
+  {
+    "IDTransitRoute": 97,
+    "IDTransitSystem": 23,
+    "RouteName": "TriMet-02",
+    "RouteType": "Commuter",
+    "DailyRiders": 2875,
+    "LengthMiles": 4.9,
+    "StopsCount": 30
+  },
+  {
+    "IDTransitRoute": 98,
+    "IDTransitSystem": 23,
+    "RouteName": "TriMet-03",
+    "RouteType": "HeavyRail",
+    "DailyRiders": 9018,
+    "LengthMiles": 11.7,
+    "StopsCount": 5
+  },
+  {
+    "IDTransitRoute": 99,
+    "IDTransitSystem": 24,
+    "RouteName": "RTC-01",
+    "RouteType": "Commuter",
+    "DailyRiders": 1182,
+    "LengthMiles": 15.1,
+    "StopsCount": 17
+  },
+  {
+    "IDTransitRoute": 100,
+    "IDTransitSystem": 24,
+    "RouteName": "RTC-02",
+    "RouteType": "Bus",
+    "DailyRiders": 1157,
+    "LengthMiles": 12,
+    "StopsCount": 30
+  },
+  {
+    "IDTransitRoute": 101,
+    "IDTransitSystem": 24,
+    "RouteName": "RTC-03",
+    "RouteType": "LightRail",
+    "DailyRiders": 8820,
+    "LengthMiles": 10,
+    "StopsCount": 16
+  },
+  {
+    "IDTransitRoute": 102,
+    "IDTransitSystem": 24,
+    "RouteName": "RTC-04",
+    "RouteType": "Bus",
+    "DailyRiders": 7661,
+    "LengthMiles": 16.2,
+    "StopsCount": 11
+  },
+  {
+    "IDTransitRoute": 103,
+    "IDTransitSystem": 25,
+    "RouteName": "DDOT-01",
+    "RouteType": "Commuter",
+    "DailyRiders": 6203,
+    "LengthMiles": 15.3,
+    "StopsCount": 21
+  },
+  {
+    "IDTransitRoute": 104,
+    "IDTransitSystem": 25,
+    "RouteName": "DDOT-02",
+    "RouteType": "Ferry",
+    "DailyRiders": 12580,
+    "LengthMiles": 19.4,
+    "StopsCount": 32
+  },
+  {
+    "IDTransitRoute": 105,
+    "IDTransitSystem": 25,
+    "RouteName": "DDOT-03",
+    "RouteType": "Ferry",
+    "DailyRiders": 6988,
+    "LengthMiles": 19.7,
+    "StopsCount": 18
+  },
+  {
+    "IDTransitRoute": 106,
+    "IDTransitSystem": 25,
+    "RouteName": "DDOT-04",
+    "RouteType": "Bus",
+    "DailyRiders": 9084,
+    "LengthMiles": 13,
+    "StopsCount": 26
+  }
+]

@@ -1,0 +1,198 @@
+{
+  "Hash": "seed-demographics",
+  "Name": "Seed City Demographics",
+  "Description": "Parses and inserts the City Demographics seed dataset via the lab's meadow-integration beacon.",
+  "Tags": [
+    "lab",
+    "seed"
+  ],
+  "Version": "1.0.0",
+  "Graph": {
+    "Nodes": [
+      {
+        "Hash": "start",
+        "Type": "start",
+        "X": 50,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "Start",
+        "Ports": [
+          {
+            "Hash": "start-out",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Out"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "parse-CityProfile",
+        "Type": "beacon-meadowintegration-parsefile",
+        "X": 300,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Parse CityProfile",
+        "Ports": [
+          {
+            "Hash": "parse-CityProfile-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "parse-CityProfile-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "parse-CityProfile-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "parse-CityProfile-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "FilePath": "{LAB_SEED_PATH}/CityProfile.json",
+          "Format": "json"
+        }
+      },
+      {
+        "Hash": "insert-CityProfile",
+        "Type": "beacon-labwriter-bulkinsertviabeacon",
+        "X": 550,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Insert CityProfile",
+        "Ports": [
+          {
+            "Hash": "insert-CityProfile-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "insert-CityProfile-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "insert-CityProfile-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "insert-CityProfile-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "BeaconURL": "{TARGET_BEACON_URL}",
+          "EntityName": "CityProfile",
+          "Records": "{~D:Record.TaskOutput.parse-CityProfile.Records~}"
+        }
+      },
+      {
+        "Hash": "end",
+        "Type": "end",
+        "X": 800,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "End",
+        "Ports": [
+          {
+            "Hash": "end-in",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "In"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "error-handler",
+        "Type": "error-message",
+        "X": 700,
+        "Y": 450,
+        "Width": 220,
+        "Height": 80,
+        "Title": "Error Handler",
+        "Ports": [
+          {
+            "Hash": "error-handler-Execute",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Execute"
+          },
+          {
+            "Hash": "error-handler-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          }
+        ],
+        "Data": {
+          "Message": "Seed 'City Demographics' encountered an error."
+        }
+      }
+    ],
+    "Connections": [
+      {
+        "SourceNodeHash": "start",
+        "SourcePortHash": "start-out",
+        "TargetNodeHash": "parse-CityProfile",
+        "TargetPortHash": "parse-CityProfile-Trigger"
+      },
+      {
+        "SourceNodeHash": "parse-CityProfile",
+        "SourcePortHash": "parse-CityProfile-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "parse-CityProfile",
+        "SourcePortHash": "parse-CityProfile-Complete",
+        "TargetNodeHash": "insert-CityProfile",
+        "TargetPortHash": "insert-CityProfile-Trigger"
+      },
+      {
+        "SourceNodeHash": "insert-CityProfile",
+        "SourcePortHash": "insert-CityProfile-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "insert-CityProfile",
+        "SourcePortHash": "insert-CityProfile-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      },
+      {
+        "SourceNodeHash": "error-handler",
+        "SourcePortHash": "error-handler-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      }
+    ]
+  },
+  "ViewState": {
+    "X": 0,
+    "Y": 0,
+    "Scale": 1
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "Hash": "weather-stations",
+  "Name": "Weather Stations",
+  "Description": "50 city weather stations + 12 monthly readings each (~600 readings).  Used by retold-data-mapper to exercise ETL against MySQL.",
+  "Entities": [
+    {
+      "Name": "WeatherStation",
+      "FileName": "WeatherStation.json",
+      "RowCount": 25,
+      "Schema": {
+        "Columns": [
+          {
+            "Name": "IDWeatherStation",
+            "Type": "AutoIdentity"
+          },
+          {
+            "Name": "StationCode",
+            "Type": "String",
+            "Size": 16
+          },
+          {
+            "Name": "CityName",
+            "Type": "String",
+            "Size": 128
+          },
+          {
+            "Name": "Latitude",
+            "Type": "Decimal",
+            "Precision": 10,
+            "Scale": 6
+          },
+          {
+            "Name": "Longitude",
+            "Type": "Decimal",
+            "Precision": 10,
+            "Scale": 6
+          },
+          {
+            "Name": "Timezone",
+            "Type": "String",
+            "Size": 64
+          },
+          {
+            "Name": "Active",
+            "Type": "Integer"
+          }
+        ]
+      }
+    },
+    {
+      "Name": "WeatherReading",
+      "FileName": "WeatherReading.json",
+      "RowCount": 300,
+      "Schema": {
+        "Columns": [
+          {
+            "Name": "IDWeatherReading",
+            "Type": "AutoIdentity"
+          },
+          {
+            "Name": "IDWeatherStation",
+            "Type": "Integer"
+          },
+          {
+            "Name": "ReadingDate",
+            "Type": "String",
+            "Size": 32
+          },
+          {
+            "Name": "AvgTemperatureF",
+            "Type": "Integer"
+          },
+          {
+            "Name": "HighTemperatureF",
+            "Type": "Integer"
+          },
+          {
+            "Name": "LowTemperatureF",
+            "Type": "Integer"
+          },
+          {
+            "Name": "PrecipitationInches",
+            "Type": "Decimal",
+            "Precision": 6,
+            "Scale": 2
+          },
+          {
+            "Name": "HumidityPercent",
+            "Type": "Integer"
+          },
+          {
+            "Name": "WindSpeedMPH",
+            "Type": "Integer"
+          }
+        ]
+      }
+    }
+  ],
+  "OperationHash": "seed-weather-stations",
+  "Correlation": "CityName (e.g. \"New York, NY\")"
+}

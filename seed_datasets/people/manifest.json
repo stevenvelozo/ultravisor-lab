@@ -1,0 +1,50 @@
+{
+  "Hash": "people",
+  "Name": "People",
+  "Description": "Flat 60-person directory.  Simplest possible fixture -- one entity, no foreign keys.  Good smoke-test target.",
+  "Entities": [
+    {
+      "Name": "Person",
+      "FileName": "Person.json",
+      "RowCount": 60,
+      "Schema": {
+        "Columns": [
+          {
+            "Name": "IDPerson",
+            "Type": "AutoIdentity"
+          },
+          {
+            "Name": "FirstName",
+            "Type": "String",
+            "Size": 64
+          },
+          {
+            "Name": "LastName",
+            "Type": "String",
+            "Size": 64
+          },
+          {
+            "Name": "Email",
+            "Type": "String",
+            "Size": 128
+          },
+          {
+            "Name": "Role",
+            "Type": "String",
+            "Size": 64
+          },
+          {
+            "Name": "HireYear",
+            "Type": "Integer"
+          },
+          {
+            "Name": "Active",
+            "Type": "Integer"
+          }
+        ]
+      }
+    }
+  ],
+  "OperationHash": "seed-people",
+  "Correlation": "n/a"
+}

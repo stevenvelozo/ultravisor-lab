@@ -1,0 +1,227 @@
+[
+  {
+    "IDWeatherStation": 1,
+    "StationCode": "WS001",
+    "CityName": "New York, NY",
+    "Latitude": 40.7128,
+    "Longitude": -74.006,
+    "Timezone": "America/New_York",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 2,
+    "StationCode": "WS002",
+    "CityName": "Los Angeles, CA",
+    "Latitude": 34.0522,
+    "Longitude": -118.2437,
+    "Timezone": "America/Los_Angeles",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 3,
+    "StationCode": "WS003",
+    "CityName": "Chicago, IL",
+    "Latitude": 41.8781,
+    "Longitude": -87.6298,
+    "Timezone": "America/Chicago",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 4,
+    "StationCode": "WS004",
+    "CityName": "Houston, TX",
+    "Latitude": 29.7604,
+    "Longitude": -95.3698,
+    "Timezone": "America/Chicago",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 5,
+    "StationCode": "WS005",
+    "CityName": "Phoenix, AZ",
+    "Latitude": 33.4484,
+    "Longitude": -112.074,
+    "Timezone": "America/Phoenix",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 6,
+    "StationCode": "WS006",
+    "CityName": "Philadelphia, PA",
+    "Latitude": 39.9526,
+    "Longitude": -75.1652,
+    "Timezone": "America/New_York",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 7,
+    "StationCode": "WS007",
+    "CityName": "San Antonio, TX",
+    "Latitude": 29.4241,
+    "Longitude": -98.4936,
+    "Timezone": "America/Chicago",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 8,
+    "StationCode": "WS008",
+    "CityName": "San Diego, CA",
+    "Latitude": 32.7157,
+    "Longitude": -117.1611,
+    "Timezone": "America/Los_Angeles",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 9,
+    "StationCode": "WS009",
+    "CityName": "Dallas, TX",
+    "Latitude": 32.7767,
+    "Longitude": -96.797,
+    "Timezone": "America/Chicago",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 10,
+    "StationCode": "WS010",
+    "CityName": "San Jose, CA",
+    "Latitude": 37.3382,
+    "Longitude": -121.8863,
+    "Timezone": "America/Los_Angeles",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 11,
+    "StationCode": "WS011",
+    "CityName": "Austin, TX",
+    "Latitude": 30.2672,
+    "Longitude": -97.7431,
+    "Timezone": "America/Chicago",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 12,
+    "StationCode": "WS012",
+    "CityName": "Jacksonville, FL",
+    "Latitude": 30.3322,
+    "Longitude": -81.6557,
+    "Timezone": "America/New_York",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 13,
+    "StationCode": "WS013",
+    "CityName": "Fort Worth, TX",
+    "Latitude": 32.7555,
+    "Longitude": -97.3308,
+    "Timezone": "America/Chicago",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 14,
+    "StationCode": "WS014",
+    "CityName": "Columbus, OH",
+    "Latitude": 39.9612,
+    "Longitude": -82.9988,
+    "Timezone": "America/New_York",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 15,
+    "StationCode": "WS015",
+    "CityName": "Indianapolis, IN",
+    "Latitude": 39.7684,
+    "Longitude": -86.1581,
+    "Timezone": "America/New_York",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 16,
+    "StationCode": "WS016",
+    "CityName": "Charlotte, NC",
+    "Latitude": 35.2271,
+    "Longitude": -80.8431,
+    "Timezone": "America/New_York",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 17,
+    "StationCode": "WS017",
+    "CityName": "San Francisco, CA",
+    "Latitude": 37.7749,
+    "Longitude": -122.4194,
+    "Timezone": "America/Los_Angeles",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 18,
+    "StationCode": "WS018",
+    "CityName": "Seattle, WA",
+    "Latitude": 47.6062,
+    "Longitude": -122.3321,
+    "Timezone": "America/Los_Angeles",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 19,
+    "StationCode": "WS019",
+    "CityName": "Denver, CO",
+    "Latitude": 39.7392,
+    "Longitude": -104.9903,
+    "Timezone": "America/Denver",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 20,
+    "StationCode": "WS020",
+    "CityName": "Washington, DC",
+    "Latitude": 38.9072,
+    "Longitude": -77.0369,
+    "Timezone": "America/New_York",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 21,
+    "StationCode": "WS021",
+    "CityName": "Boston, MA",
+    "Latitude": 42.3601,
+    "Longitude": -71.0589,
+    "Timezone": "America/New_York",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 22,
+    "StationCode": "WS022",
+    "CityName": "Nashville, TN",
+    "Latitude": 36.1627,
+    "Longitude": -86.7816,
+    "Timezone": "America/Chicago",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 23,
+    "StationCode": "WS023",
+    "CityName": "Portland, OR",
+    "Latitude": 45.5152,
+    "Longitude": -122.6784,
+    "Timezone": "America/Los_Angeles",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 24,
+    "StationCode": "WS024",
+    "CityName": "Las Vegas, NV",
+    "Latitude": 36.1699,
+    "Longitude": -115.1398,
+    "Timezone": "America/Los_Angeles",
+    "Active": 1
+  },
+  {
+    "IDWeatherStation": 25,
+    "StationCode": "WS025",
+    "CityName": "Detroit, MI",
+    "Latitude": 42.3314,
+    "Longitude": -83.0458,
+    "Timezone": "America/Detroit",
+    "Active": 1
+  }
+]

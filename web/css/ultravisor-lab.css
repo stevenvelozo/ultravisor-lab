@@ -1,0 +1,38 @@
+/* Ultravisor Lab -- base stylesheet (view-specific CSS lives in the views and
+ * gets injected into #PICT-CSS at runtime by the Pict CSS cascade). */
+
+html, body
+{
+	margin: 0;
+	padding: 0;
+	background: #f1f5f9;
+	color: #0f172a;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	font-size: 14px;
+	line-height: 1.5;
+	min-height: 100vh;
+}
+
+code
+{
+	font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+	background: #e2e8f0;
+	color: #0f172a;
+	padding: 1px 6px;
+	border-radius: 4px;
+	font-size: 12.5px;
+}
+
+.lab-boot-placeholder,
+.lab-boot-error
+{
+	padding: 40px 20px;
+	text-align: center;
+	color: #64748b;
+	font-size: 14px;
+}
+
+.lab-boot-error
+{
+	color: #b91c1c;
+}

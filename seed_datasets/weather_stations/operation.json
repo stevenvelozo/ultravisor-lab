@@ -1,0 +1,301 @@
+{
+  "Hash": "seed-weather-stations",
+  "Name": "Seed Weather Stations",
+  "Description": "Parses and inserts the Weather Stations seed dataset via the lab's meadow-integration beacon.",
+  "Tags": [
+    "lab",
+    "seed"
+  ],
+  "Version": "1.0.0",
+  "Graph": {
+    "Nodes": [
+      {
+        "Hash": "start",
+        "Type": "start",
+        "X": 50,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "Start",
+        "Ports": [
+          {
+            "Hash": "start-out",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Out"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "parse-WeatherStation",
+        "Type": "beacon-meadowintegration-parsefile",
+        "X": 300,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Parse WeatherStation",
+        "Ports": [
+          {
+            "Hash": "parse-WeatherStation-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "parse-WeatherStation-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "parse-WeatherStation-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "parse-WeatherStation-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "FilePath": "{LAB_SEED_PATH}/WeatherStation.json",
+          "Format": "json"
+        }
+      },
+      {
+        "Hash": "insert-WeatherStation",
+        "Type": "beacon-labwriter-bulkinsertviabeacon",
+        "X": 550,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Insert WeatherStation",
+        "Ports": [
+          {
+            "Hash": "insert-WeatherStation-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "insert-WeatherStation-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "insert-WeatherStation-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "insert-WeatherStation-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "BeaconURL": "{TARGET_BEACON_URL}",
+          "EntityName": "WeatherStation",
+          "Records": "{~D:Record.TaskOutput.parse-WeatherStation.Records~}"
+        }
+      },
+      {
+        "Hash": "parse-WeatherReading",
+        "Type": "beacon-meadowintegration-parsefile",
+        "X": 800,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Parse WeatherReading",
+        "Ports": [
+          {
+            "Hash": "parse-WeatherReading-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "parse-WeatherReading-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "parse-WeatherReading-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "parse-WeatherReading-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "FilePath": "{LAB_SEED_PATH}/WeatherReading.json",
+          "Format": "json"
+        }
+      },
+      {
+        "Hash": "insert-WeatherReading",
+        "Type": "beacon-labwriter-bulkinsertviabeacon",
+        "X": 1050,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Insert WeatherReading",
+        "Ports": [
+          {
+            "Hash": "insert-WeatherReading-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "insert-WeatherReading-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "insert-WeatherReading-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "insert-WeatherReading-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "BeaconURL": "{TARGET_BEACON_URL}",
+          "EntityName": "WeatherReading",
+          "Records": "{~D:Record.TaskOutput.parse-WeatherReading.Records~}"
+        }
+      },
+      {
+        "Hash": "end",
+        "Type": "end",
+        "X": 1300,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "End",
+        "Ports": [
+          {
+            "Hash": "end-in",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "In"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "error-handler",
+        "Type": "error-message",
+        "X": 700,
+        "Y": 450,
+        "Width": 220,
+        "Height": 80,
+        "Title": "Error Handler",
+        "Ports": [
+          {
+            "Hash": "error-handler-Execute",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Execute"
+          },
+          {
+            "Hash": "error-handler-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          }
+        ],
+        "Data": {
+          "Message": "Seed 'Weather Stations' encountered an error."
+        }
+      }
+    ],
+    "Connections": [
+      {
+        "SourceNodeHash": "start",
+        "SourcePortHash": "start-out",
+        "TargetNodeHash": "parse-WeatherStation",
+        "TargetPortHash": "parse-WeatherStation-Trigger"
+      },
+      {
+        "SourceNodeHash": "parse-WeatherStation",
+        "SourcePortHash": "parse-WeatherStation-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "parse-WeatherStation",
+        "SourcePortHash": "parse-WeatherStation-Complete",
+        "TargetNodeHash": "insert-WeatherStation",
+        "TargetPortHash": "insert-WeatherStation-Trigger"
+      },
+      {
+        "SourceNodeHash": "insert-WeatherStation",
+        "SourcePortHash": "insert-WeatherStation-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "insert-WeatherStation",
+        "SourcePortHash": "insert-WeatherStation-Complete",
+        "TargetNodeHash": "parse-WeatherReading",
+        "TargetPortHash": "parse-WeatherReading-Trigger"
+      },
+      {
+        "SourceNodeHash": "parse-WeatherReading",
+        "SourcePortHash": "parse-WeatherReading-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "parse-WeatherReading",
+        "SourcePortHash": "parse-WeatherReading-Complete",
+        "TargetNodeHash": "insert-WeatherReading",
+        "TargetPortHash": "insert-WeatherReading-Trigger"
+      },
+      {
+        "SourceNodeHash": "insert-WeatherReading",
+        "SourcePortHash": "insert-WeatherReading-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "insert-WeatherReading",
+        "SourcePortHash": "insert-WeatherReading-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      },
+      {
+        "SourceNodeHash": "error-handler",
+        "SourcePortHash": "error-handler-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      }
+    ]
+  },
+  "ViewState": {
+    "X": 0,
+    "Y": 0,
+    "Scale": 1
+  }
+}

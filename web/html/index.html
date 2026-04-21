@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Ultravisor Lab</title>
+	<link rel="stylesheet" href="css/ultravisor-lab.css">
+
+	<!-- Pict dynamic CSS container -- view CSS is injected here at runtime -->
+	<style id="PICT-CSS"></style>
+
+	<script src="js/pict.min.js"></script>
+</head>
+<body>
+	<div id="Lab-Navigation-Container"></div>
+	<div id="Lab-Content-Container">
+		<div class="lab-boot-placeholder">Loading Ultravisor Lab...</div>
+	</div>
+
+	<script src="js/ultravisor-lab.min.js"></script>
+	<script>
+	(function ()
+	{
+		'use strict';
+
+		function onReady(fCallback)
+		{
+			if (document.readyState !== 'loading') { fCallback(); return; }
+			document.addEventListener('DOMContentLoaded', fCallback);
+		}
+
+		onReady(function ()
+			{
+				if (typeof window.UltravisorLab !== 'function')
+				{
+					document.getElementById('Lab-Content-Container').innerHTML =
+						'<div class="lab-boot-error">Browser bundle failed to load. Run <code>npm run build-bundle</code> in the ultravisor-lab directory.</div>';
+					return;
+				}
+
+				var tmpPict = new Pict(window.UltravisorLab.pict_configuration);
+				window._Pict = tmpPict;
+				tmpPict.addApplication('UltravisorLab', window.UltravisorLab.default_configuration, window.UltravisorLab);
+				tmpPict.PictApplication.initializeAsync(function (pError)
+					{
+						if (pError)
+						{
+							console.error('Ultravisor-Lab failed to initialize:', pError);
+							document.getElementById('Lab-Content-Container').innerHTML =
+								'<div class="lab-boot-error">Failed to initialize: ' + (pError.message || pError) + '</div>';
+						}
+					});
+			});
+	})();
+	</script>
+</body>
+</html>

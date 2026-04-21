@@ -1,0 +1,198 @@
+{
+  "Hash": "seed-city-dashboard",
+  "Name": "Seed City Dashboard (target)",
+  "Description": "Parses and inserts the City Dashboard (target) seed dataset via the lab's meadow-integration beacon.",
+  "Tags": [
+    "lab",
+    "seed"
+  ],
+  "Version": "1.0.0",
+  "Graph": {
+    "Nodes": [
+      {
+        "Hash": "start",
+        "Type": "start",
+        "X": 50,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "Start",
+        "Ports": [
+          {
+            "Hash": "start-out",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Out"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "parse-CityRecord",
+        "Type": "beacon-meadowintegration-parsefile",
+        "X": 300,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Parse CityRecord",
+        "Ports": [
+          {
+            "Hash": "parse-CityRecord-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "parse-CityRecord-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "parse-CityRecord-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "parse-CityRecord-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "FilePath": "{LAB_SEED_PATH}/CityRecord.json",
+          "Format": "json"
+        }
+      },
+      {
+        "Hash": "insert-CityRecord",
+        "Type": "beacon-labwriter-bulkinsertviabeacon",
+        "X": 550,
+        "Y": 200,
+        "Width": 220,
+        "Height": 120,
+        "Title": "Insert CityRecord",
+        "Ports": [
+          {
+            "Hash": "insert-CityRecord-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "insert-CityRecord-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "insert-CityRecord-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          },
+          {
+            "Hash": "insert-CityRecord-Result",
+            "Direction": "output",
+            "Side": "right-top",
+            "Label": "Result"
+          }
+        ],
+        "Data": {
+          "BeaconURL": "{TARGET_BEACON_URL}",
+          "EntityName": "CityRecord",
+          "Records": "{~D:Record.TaskOutput.parse-CityRecord.Records~}"
+        }
+      },
+      {
+        "Hash": "end",
+        "Type": "end",
+        "X": 800,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "End",
+        "Ports": [
+          {
+            "Hash": "end-in",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "In"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "error-handler",
+        "Type": "error-message",
+        "X": 700,
+        "Y": 450,
+        "Width": 220,
+        "Height": 80,
+        "Title": "Error Handler",
+        "Ports": [
+          {
+            "Hash": "error-handler-Execute",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Execute"
+          },
+          {
+            "Hash": "error-handler-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          }
+        ],
+        "Data": {
+          "Message": "Seed 'City Dashboard (target)' encountered an error."
+        }
+      }
+    ],
+    "Connections": [
+      {
+        "SourceNodeHash": "start",
+        "SourcePortHash": "start-out",
+        "TargetNodeHash": "parse-CityRecord",
+        "TargetPortHash": "parse-CityRecord-Trigger"
+      },
+      {
+        "SourceNodeHash": "parse-CityRecord",
+        "SourcePortHash": "parse-CityRecord-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "parse-CityRecord",
+        "SourcePortHash": "parse-CityRecord-Complete",
+        "TargetNodeHash": "insert-CityRecord",
+        "TargetPortHash": "insert-CityRecord-Trigger"
+      },
+      {
+        "SourceNodeHash": "insert-CityRecord",
+        "SourcePortHash": "insert-CityRecord-Error",
+        "TargetNodeHash": "error-handler",
+        "TargetPortHash": "error-handler-Execute"
+      },
+      {
+        "SourceNodeHash": "insert-CityRecord",
+        "SourcePortHash": "insert-CityRecord-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      },
+      {
+        "SourceNodeHash": "error-handler",
+        "SourcePortHash": "error-handler-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      }
+    ]
+  },
+  "ViewState": {
+    "X": 0,
+    "Y": 0,
+    "Scale": 1
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "Hash": "demographics",
+  "Name": "City Demographics",
+  "Description": "50-city demographic profile: population, density, median age/income, region.  Correlates with weather_stations and transit_systems on CityName (mangled form).",
+  "Entities": [
+    {
+      "Name": "CityProfile",
+      "FileName": "CityProfile.json",
+      "RowCount": 25,
+      "Schema": {
+        "Columns": [
+          {
+            "Name": "IDCityProfile",
+            "Type": "AutoIdentity"
+          },
+          {
+            "Name": "CityName",
+            "Type": "String",
+            "Size": 128
+          },
+          {
+            "Name": "Population",
+            "Type": "Integer"
+          },
+          {
+            "Name": "AreaSqMiles",
+            "Type": "Decimal",
+            "Precision": 10,
+            "Scale": 2
+          },
+          {
+            "Name": "PopulationDensity",
+            "Type": "Integer"
+          },
+          {
+            "Name": "MedianAge",
+            "Type": "Decimal",
+            "Precision": 4,
+            "Scale": 1
+          },
+          {
+            "Name": "MedianIncome",
+            "Type": "Integer"
+          },
+          {
+            "Name": "FoundedYear",
+            "Type": "Integer"
+          },
+          {
+            "Name": "Region",
+            "Type": "String",
+            "Size": 32
+          }
+        ]
+      }
+    }
+  ],
+  "OperationHash": "seed-demographics",
+  "Correlation": "CityName (e.g. \"New York\")"
+}

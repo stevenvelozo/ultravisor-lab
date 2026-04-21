@@ -1,0 +1,20 @@
+{
+	"GulpfileConfiguration":
+	{
+		"EntrypointInputSourceFile": "{~Data:AppData.CWD~}/source/browser_bundle/Lab-Browser-Entry.js",
+		"LibraryObjectName": "UltravisorLab",
+		"LibraryOutputFolder": "{~Data:AppData.CWD~}/web/dist/js/",
+		"LibraryUniminifiedFileName": "ultravisor-lab.js",
+		"LibraryMinifiedFileName": "ultravisor-lab.min.js",
+		"BrowserifyIgnore": []
+	},
+	"GulpExecutions":
+	[
+		{
+			"Hash": "default",
+			"Name": "Default standard build.",
+			"BuildFileLabel": "",
+			"BrowsersListRC": "since 2022"
+		}
+	]
+}
