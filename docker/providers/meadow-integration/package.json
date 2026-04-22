@@ -1,0 +1,10 @@
+{
+	"name": "retold-lab-provider-meadow-integration",
+	"version": "0.0.1",
+	"private": true,
+	"description": "Lab-local ultravisor-beacon CapabilityProvider for meadow-integration.  Not published -- baked into the retold-beacon-host-meadow-integration container image at build time.  See docker/retold-beacon-host-meadow-integration.Dockerfile.",
+	"main": "Retold-Beacon-Provider-MeadowIntegration.js",
+	"dependencies": {
+		"meadow-integration": "^1.0.35"
+	}
+}
