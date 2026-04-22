@@ -1,19 +1,32 @@
 /**
  * Service-UltravisorManager
  *
- * Spawns and supervises `lab-ultravisor.js` child processes.  Each
- * UltravisorInstance row corresponds to one child process running an
- * Ultravisor API server on the row's port.  Beacons (including
- * meadow-integration) are their own entity (Beacon) managed by
- * Service-BeaconManager and created separately via the Beacons page.
+ * Supervises one container per UltravisorInstance row.  Each container runs
+ * the published `ultravisor` npm module's CLI (`ultravisor start -c
+ * /app/data/.ultravisor.json`) -- no lab-specific startup script is baked
+ * into the image.  The lab's responsibilities are:
  *
- * The per-instance data layout on disk:
+ *   1. Build the image on demand (`docker/ultravisor.Dockerfile`).
+ *   2. Render an `.ultravisor.json` config file into the instance's data
+ *      dir, using container-relative paths.
+ *   3. Provision seed operation JSONs into `operations/` (the Ultravisor's
+ *      UltravisorOperationLibraryPath).
+ *   4. `docker run` the container on the shared `ultravisor-lab` network
+ *      with the instance dir bind-mounted to /app/data.
+ *   5. Poll / for readiness and POST each operation file to /Operation so
+ *      the HypervisorState picks them up without a restart.
+ *
+ * Per-instance disk layout (unchanged on the host side):
  *   data/ultravisors/<id>/
- *     config.json                  -- spawn config (port, dirs)
- *     logs/ (via ProcessSupervisor)
- *     ultravisor_datastore/        -- Ultravisor's own state
- *     ultravisor_staging/
- *     operations/                  -- operation JSONs auto-loaded at boot
+ *     .ultravisor.json             -- rendered config (container paths)
+ *     operations/                  -- seed operation JSONs
+ *     ultravisor_datastore/        -- Ultravisor's file store
+ *     ultravisor_staging/          -- run artifacts
+ *
+ * Legacy host-process fallback is kept for rows with Runtime='process'
+ * in case someone runs this against a state store that hasn't been
+ * migrated yet; the boot migration in Lab-Server-Setup.js should flip
+ * every existing UV row to 'container' on first boot.
  */
 'use strict';
 
@@ -22,8 +35,11 @@ const libFs = require('fs');
 const libHttp = require('http');
 const libFableServiceProviderBase = require('fable-serviceproviderbase');
 
-const HEALTH_POLL_MAX_ATTEMPTS = 60;  // 60 * 1s = 60s budget
+const HEALTH_POLL_MAX_ATTEMPTS = 120;  // 120 * 1s = 2 min (container cold boot allows slack)
 const HEALTH_POLL_INTERVAL_MS  = 1000;
+
+const LAB_NETWORK_NAME = 'ultravisor-lab';
+const UV_INTERNAL_PORT = 54321;
 
 class ServiceUltravisorManager extends libFableServiceProviderBase
 {
@@ -54,6 +70,19 @@ class ServiceUltravisorManager extends libFableServiceProviderBase
 		return libPath.join(this._instanceDir(pID), 'operations');
 	}
 
+	containerName(pID)
+	{
+		return `lab-ultravisor-${pID}`;
+	}
+
+	imageTag()
+	{
+		let tmpVersion = this.fable.LabBeaconTypeRegistry
+			? this.fable.LabBeaconTypeRegistry.lookupPackageVersion('ultravisor')
+			: 'latest';
+		return `ultravisor-lab/ultravisor:${tmpVersion}`;
+	}
+
 	// ── Create ───────────────────────────────────────────────────────────────
 	/**
 	 * pRequest = { Name, Port }
@@ -75,8 +104,9 @@ class ServiceUltravisorManager extends libFableServiceProviderBase
 			{
 				Name:         tmpName,
 				Port:         tmpPort,
+				Runtime:      'container',
 				Status:       'provisioning',
-				StatusDetail: 'Preparing spawn...',
+				StatusDetail: 'Preparing image...',
 				ConfigPath:   ''
 			});
 
@@ -98,29 +128,26 @@ class ServiceUltravisorManager extends libFableServiceProviderBase
 			return fCallback(pErr);
 		}
 
-		let tmpConfig =
+		// Render the .ultravisor.json the published CLI expects.  All paths
+		// are the inside-container view (/app/data/...) because the lab
+		// bind-mounts the host instance dir to /app/data at docker run time.
+		let tmpConfigPath;
+		try { tmpConfigPath = this._renderConfig(tmpID, tmpPort); }
+		catch (pRenderErr)
 		{
-			Port:        tmpPort,
-			LibraryDir:  this.operationLibraryDir(tmpID),
-			DataDir:     this._instanceDir(tmpID)
-		};
-		let tmpConfigPath = libPath.join(this._instanceDir(tmpID), 'config.json');
-		try
-		{
-			libFs.writeFileSync(tmpConfigPath, JSON.stringify(tmpConfig, null, 2));
-		}
-		catch (pWriteErr)
-		{
-			this._markFailed(tmpID, tmpName, pWriteErr.message);
-			return fCallback(pWriteErr);
+			this._markFailed(tmpID, tmpName, pRenderErr.message);
+			return fCallback(pRenderErr);
 		}
 
 		tmpStore.update('UltravisorInstance', 'IDUltravisorInstance', tmpID,
 			{ ConfigPath: tmpConfigPath, StatusDetail: 'Installing seed dataset operations...' });
 
-		// Pre-populate the operation library with all seed datasets so the
-		// Ultravisor picks them up on its startup scan.  This also leaves the
-		// operation JSONs visible on disk for users who want to inspect them.
+		// Pre-populate the operation library with all seed datasets.  The
+		// published CLI doesn't auto-load these on startup (it exposes a
+		// library-browse endpoint instead), so after the container is
+		// healthy we also POST each operation to /Operation below.  Keeping
+		// the files on disk means the library endpoint + `docker cp`-style
+		// inspection still work.
 		if (this.fable.LabSeedDatasetManager && typeof this.fable.LabSeedDatasetManager.provisionOperationsForUltravisor === 'function')
 		{
 			try { this.fable.LabSeedDatasetManager.provisionOperationsForUltravisor(tmpID); }
@@ -128,53 +155,172 @@ class ServiceUltravisorManager extends libFableServiceProviderBase
 		}
 
 		tmpStore.update('UltravisorInstance', 'IDUltravisorInstance', tmpID,
-			{ StatusDetail: 'Spawning Ultravisor...' });
+			{ StatusDetail: 'Building image...' });
 
-		let tmpBinPath = libPath.resolve(__dirname, '..', '..', 'bin', 'lab-ultravisor.js');
-		let tmpPid;
-		try
-		{
-			tmpPid = this.fable.LabProcessSupervisor.spawn('UltravisorInstance', tmpID,
-				{
-					Command: process.execPath,
-					Args:
-					[
-						tmpBinPath,
-						'--port',         String(tmpPort),
-						'--library-dir',  this.operationLibraryDir(tmpID),
-						'--data-dir',     this._instanceDir(tmpID)
-					],
-					Cwd: this._instanceDir(tmpID),
-					Env: Object.assign({}, process.env)
-				});
-		}
-		catch (pSpawnErr)
-		{
-			this._markFailed(tmpID, tmpName, pSpawnErr.message);
-			return fCallback(pSpawnErr);
-		}
-
-		tmpStore.update('UltravisorInstance', 'IDUltravisorInstance', tmpID,
-			{ PID: tmpPid, StatusDetail: 'Waiting for Ultravisor API...' });
-
-		this._waitForHttp(tmpPort, 0, (pReady) =>
+		this._ensureContainer(tmpID, tmpName, tmpPort,
+			(pRunErr, pResult) =>
 			{
-				if (!pReady)
-				{
-					this._markFailed(tmpID, tmpName, 'Ultravisor API did not come up');
-					return;
-				}
+				if (pRunErr) { this._markFailed(tmpID, tmpName, pRunErr.message); return fCallback(pRunErr); }
+
 				tmpStore.update('UltravisorInstance', 'IDUltravisorInstance', tmpID,
-					{ Status: 'running', StatusDetail: '' });
-				tmpStore.recordEvent(
 					{
-						EntityType: 'UltravisorInstance', EntityID: tmpID, EntityName: tmpName,
-						EventType: 'ultravisor-ready', Severity: 'info',
-						Message: `Ultravisor '${tmpName}' ready on port ${tmpPort}`
+						ContainerID:   pResult.ContainerID,
+						ContainerName: pResult.ContainerName,
+						ImageTag:      pResult.ImageTag,
+						ImageVersion:  pResult.ImageVersion,
+						StatusDetail:  'Waiting for Ultravisor API...'
+					});
+
+				this._waitForHttp(tmpPort, 0, (pReady) =>
+					{
+						if (!pReady)
+						{
+							this._markFailed(tmpID, tmpName, 'Ultravisor API did not come up');
+							return;
+						}
+						this._loadOperationsFromLibrary(tmpID, () =>
+							{
+								tmpStore.update('UltravisorInstance', 'IDUltravisorInstance', tmpID,
+									{ Status: 'running', StatusDetail: '' });
+								tmpStore.recordEvent(
+									{
+										EntityType: 'UltravisorInstance', EntityID: tmpID, EntityName: tmpName,
+										EventType: 'ultravisor-ready', Severity: 'info',
+										Message: `Ultravisor '${tmpName}' ready on port ${tmpPort} (container ${pResult.ContainerName})`
+									});
+							});
+					});
+
+				return fCallback(null, { IDUltravisorInstance: tmpID, Runtime: 'container', Status: 'provisioning' });
+			});
+	}
+
+	// ── Render .ultravisor.json with container-relative paths ───────────────
+
+	/**
+	 * Write `.ultravisor.json` into the instance's data dir.  The file is
+	 * rewritten on every create + every start so stanza changes flow into
+	 * existing instances without a recreate cycle.
+	 */
+	_renderConfig(pID, pPort)
+	{
+		let tmpConfig =
+		{
+			UltravisorAPIServerPort:            UV_INTERNAL_PORT,
+			UltravisorFileStorePath:            '/app/data/ultravisor_datastore',
+			UltravisorStagingRoot:              '/app/data/ultravisor_staging',
+			UltravisorTickIntervalMilliseconds: 60000,
+			UltravisorCommandTimeoutMilliseconds: 300000,
+			UltravisorCommandMaxBufferBytes:    10485760,
+			UltravisorWebInterfacePath:         '/app/node_modules/ultravisor/webinterface/dist',
+			UltravisorOperationLibraryPath:     '/app/data/operations',
+			UltravisorBeaconHeartbeatTimeoutMs: 60000,
+			UltravisorBeaconWorkItemTimeoutMs:  300000,
+			UltravisorBeaconAffinityTTLMs:      3600000,
+			UltravisorBeaconPollIntervalMs:     5000,
+			UltravisorBeaconJournalCompactThreshold: 500
+		};
+		let tmpConfigPath = libPath.join(this._instanceDir(pID), '.ultravisor.json');
+		libFs.writeFileSync(tmpConfigPath, JSON.stringify(tmpConfig, null, 2));
+		return tmpConfigPath;
+	}
+
+	// ── Container management ────────────────────────────────────────────────
+
+	/**
+	 * Build the image (if absent), ensure the network, and `docker run` the
+	 * container.  Called by both createInstance and startInstance (the
+	 * latter when no ContainerID is on the row, e.g. after the user
+	 * manually `docker rm`'d it).
+	 */
+	_ensureContainer(pID, pName, pPort, fCallback)
+	{
+		let tmpDocker = this.fable.LabDockerManager;
+		let tmpImageTag = this.imageTag();
+		let tmpVersion = tmpImageTag.split(':').pop();
+		let tmpDockerfilePath = libPath.resolve(__dirname, '..', '..', 'docker', 'ultravisor.Dockerfile');
+		let tmpContextDir = libPath.dirname(tmpDockerfilePath);
+
+		tmpDocker.ensureNetwork(LAB_NETWORK_NAME,
+			(pNetErr) =>
+			{
+				if (pNetErr) { return fCallback(pNetErr); }
+
+				tmpDocker.ensureImage(
+					{
+						ImageTag:       tmpImageTag,
+						DockerfilePath: tmpDockerfilePath,
+						ContextDir:     tmpContextDir,
+						BuildArgs:      { VERSION: tmpVersion }
+					},
+					(pImgErr, pImgResult) =>
+					{
+						if (pImgErr) { return fCallback(pImgErr); }
+
+						let tmpContainerName = this.containerName(pID);
+						tmpDocker.run(
+							{
+								Name:      tmpContainerName,
+								Hostname:  tmpContainerName,
+								Network:   LAB_NETWORK_NAME,
+								Image:     tmpImageTag,
+								Ports:     [{ Host: pPort, Container: UV_INTERNAL_PORT }],
+								Volumes:
+								[
+									{ Source: this._instanceDir(pID), Target: '/app/data' }
+								]
+							},
+							(pRunErr, pRunResult) =>
+							{
+								if (pRunErr) { return fCallback(pRunErr); }
+								return fCallback(null,
+									{
+										ContainerID:   pRunResult.ContainerID,
+										ContainerName: tmpContainerName,
+										ImageTag:      tmpImageTag,
+										ImageVersion:  tmpVersion,
+										ImageBuilt:    pImgResult.Built === true
+									});
+							});
 					});
 			});
+	}
 
-		return fCallback(null, { IDUltravisorInstance: tmpID, PID: tmpPid, Status: 'provisioning' });
+	/**
+	 * Walk the provisioned operation library dir and POST each file to the
+	 * Ultravisor's /Operation endpoint.  Published `ultravisor start`
+	 * doesn't auto-load the library at boot, so this is how seed operations
+	 * become available for triggering.  Idempotent: /Operation upserts.
+	 */
+	_loadOperationsFromLibrary(pID, fCallback)
+	{
+		let tmpDir = this.operationLibraryDir(pID);
+		let tmpFiles = [];
+		try { tmpFiles = libFs.readdirSync(tmpDir).filter((pF) => pF.endsWith('.json')); }
+		catch (pErr) { return fCallback(); }
+		if (tmpFiles.length === 0) { return fCallback(); }
+
+		let tmpIdx = 0;
+		let tmpNext = () =>
+		{
+			if (tmpIdx >= tmpFiles.length) { return fCallback(); }
+			let tmpFile = tmpFiles[tmpIdx++];
+			let tmpPath = libPath.join(tmpDir, tmpFile);
+			let tmpOperation;
+			try { tmpOperation = JSON.parse(libFs.readFileSync(tmpPath, 'utf8')); }
+			catch (pParseErr)
+			{
+				this.fable.log.warn(`UltravisorManager: invalid JSON in ${tmpFile}: ${pParseErr.message}`);
+				return setImmediate(tmpNext);
+			}
+			this.registerOperation(pID, tmpOperation,
+				(pErr) =>
+				{
+					if (pErr) { this.fable.log.warn(`UltravisorManager: register ${tmpFile} failed: ${pErr.message}`); }
+					setImmediate(tmpNext);
+				});
+		};
+		tmpNext();
 	}
 
 	_waitForHttp(pPort, pAttempt, fCallback)
@@ -214,48 +360,60 @@ class ServiceUltravisorManager extends libFableServiceProviderBase
 		let tmpInstance = this.getInstance(pID);
 		if (!tmpInstance) { return fCallback(new Error('Ultravisor not found.')); }
 
-		let tmpBinPath = libPath.resolve(__dirname, '..', '..', 'bin', 'lab-ultravisor.js');
-		let tmpConfigPath = tmpInstance.ConfigPath;
-		let tmpConfig = {};
-		try { tmpConfig = JSON.parse(libFs.readFileSync(tmpConfigPath, 'utf8')); }
-		catch (pErr) { return fCallback(new Error(`Could not read ultravisor config: ${pErr.message}`)); }
-
-		let tmpPid;
-		try
+		if (tmpInstance.Runtime === 'container')
 		{
-			tmpPid = this.fable.LabProcessSupervisor.spawn('UltravisorInstance', pID,
+			// Re-render the config in case stanza settings changed.  Cheap;
+			// idempotent; keeps the on-disk file fresh for inspection too.
+			try { this._renderConfig(pID, tmpInstance.Port); }
+			catch (pRenderErr) { return fCallback(pRenderErr); }
+
+			this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
+				{ Status: 'starting', StatusDetail: 'Starting container...' });
+
+			let fReady = () =>
+			{
+				this._waitForHttp(tmpInstance.Port, 0, (pR) =>
+					{
+						if (!pR) { this._markFailed(pID, tmpInstance.Name, 'Ultravisor API did not come up'); return; }
+						this._loadOperationsFromLibrary(pID, () =>
+							{
+								this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
+									{ Status: 'running', StatusDetail: '' });
+							});
+					});
+			};
+
+			if (tmpInstance.ContainerID)
+			{
+				return this.fable.LabDockerManager.start(tmpInstance.ContainerID,
+					(pErr) =>
+					{
+						if (pErr) { this._markFailed(pID, tmpInstance.Name, pErr.message); return fCallback(pErr); }
+						fReady();
+						return fCallback(null, { Status: 'starting' });
+					});
+			}
+
+			return this._ensureContainer(pID, tmpInstance.Name, tmpInstance.Port,
+				(pErr, pResult) =>
 				{
-					Command: process.execPath,
-					Args:
-					[
-						tmpBinPath,
-						'--port',         String(tmpConfig.Port || tmpInstance.Port),
-						'--library-dir',  tmpConfig.LibraryDir || this.operationLibraryDir(pID),
-						'--data-dir',     tmpConfig.DataDir    || this._instanceDir(pID)
-					],
-					Cwd: this._instanceDir(pID),
-					Env: Object.assign({}, process.env)
+					if (pErr) { this._markFailed(pID, tmpInstance.Name, pErr.message); return fCallback(pErr); }
+					this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
+						{
+							ContainerID:   pResult.ContainerID,
+							ContainerName: pResult.ContainerName,
+							ImageTag:      pResult.ImageTag,
+							ImageVersion:  pResult.ImageVersion,
+							StatusDetail:  'Waiting for Ultravisor API...'
+						});
+					fReady();
+					return fCallback(null, { Status: 'starting' });
 				});
 		}
-		catch (pSpawnErr) { return fCallback(pSpawnErr); }
 
-		this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
-			{ PID: tmpPid, Status: 'starting', StatusDetail: 'Waiting for Ultravisor API...' });
-
-		this._waitForHttp(tmpInstance.Port, 0, (pReady) =>
-			{
-				if (pReady)
-				{
-					this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
-						{ Status: 'running', StatusDetail: '' });
-				}
-				else
-				{
-					this._markFailed(pID, tmpInstance.Name, 'Ultravisor API did not come up');
-				}
-			});
-
-		return fCallback(null, { PID: tmpPid, Status: 'starting' });
+		// Host-process fallback kept for pre-migration rows.  Should never
+		// fire after the boot migration in Lab-Server-Setup flips them all.
+		return fCallback(new Error('Host-process Ultravisor instances are no longer supported; remove and recreate.'));
 	}
 
 	stopInstance(pID, fCallback)
@@ -266,6 +424,27 @@ class ServiceUltravisorManager extends libFableServiceProviderBase
 		this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
 			{ Status: 'stopping', StatusDetail: '' });
 
+		if (tmpInstance.Runtime === 'container' && tmpInstance.ContainerID)
+		{
+			return this.fable.LabDockerManager.stop(tmpInstance.ContainerID,
+				(pErr) =>
+				{
+					if (pErr)
+					{
+						this.fable.LabStateStore.recordEvent(
+							{
+								EntityType: 'UltravisorInstance', EntityID: pID, EntityName: tmpInstance.Name,
+								EventType: 'stop-failed', Severity: 'warning', Message: pErr.message
+							});
+						return fCallback(pErr);
+					}
+					this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
+						{ Status: 'stopped', StatusDetail: '' });
+					return fCallback(null, { Stopped: true });
+				});
+		}
+
+		// Host-process cleanup kept for parity with migration.
 		this.fable.LabProcessSupervisor.stop('UltravisorInstance', pID,
 			(pErr) =>
 			{
@@ -299,20 +478,26 @@ class ServiceUltravisorManager extends libFableServiceProviderBase
 				tmpBeaconMgr.removeBeaconsForUltravisor(pID, () => fDone());
 			};
 
+		let fFinalize = () =>
+		{
+			this.fable.LabStateStore.remove('UltravisorInstance', 'IDUltravisorInstance', pID);
+			try { this._rimraf(this._instanceDir(pID)); } catch (pErr) { /* ignore */ }
+			this.fable.LabStateStore.recordEvent(
+				{
+					EntityType: 'UltravisorInstance', EntityID: pID, EntityName: tmpInstance.Name,
+					EventType: 'ultravisor-removed', Severity: 'info',
+					Message: `Ultravisor '${tmpInstance.Name}' removed`
+				});
+			return fCallback(null, { Removed: true });
+		};
+
 		tmpCascade(() =>
 			{
-				this.fable.LabProcessSupervisor.stop('UltravisorInstance', pID, () =>
-					{
-						this.fable.LabStateStore.remove('UltravisorInstance', 'IDUltravisorInstance', pID);
-						try { this._rimraf(this._instanceDir(pID)); } catch (pErr) { /* ignore */ }
-						this.fable.LabStateStore.recordEvent(
-							{
-								EntityType: 'UltravisorInstance', EntityID: pID, EntityName: tmpInstance.Name,
-								EventType: 'ultravisor-removed', Severity: 'info',
-								Message: `Ultravisor '${tmpInstance.Name}' removed`
-							});
-						return fCallback(null, { Removed: true });
-					});
+				if (tmpInstance.Runtime === 'container' && tmpInstance.ContainerID)
+				{
+					return this.fable.LabDockerManager.rm(tmpInstance.ContainerID, true, () => fFinalize());
+				}
+				this.fable.LabProcessSupervisor.stop('UltravisorInstance', pID, () => fFinalize());
 			});
 	}
 

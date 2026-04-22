@@ -152,21 +152,21 @@ const _ViewConfiguration =
 		<summary title="Menu">☰</summary>
 		<nav class="lab-nav-dropdown">
 			<a class="{~D:AppData.Lab.Computed.Navigation.OverviewClass~}"     href="#/view/overview">Overview</a>
-			<a class="{~D:AppData.Lab.Computed.Navigation.DBEnginesClass~}"    href="#/view/dbengines">DB Engines</a>
+			<a class="{~D:AppData.Lab.Computed.Navigation.EventsClass~}"       href="#/view/events">Events</a>
 			<a class="{~D:AppData.Lab.Computed.Navigation.UltravisorClass~}"   href="#/view/ultravisor">Ultravisor</a>
 			<a class="{~D:AppData.Lab.Computed.Navigation.BeaconsClass~}"      href="#/view/beacons">Ultravisor Beacons</a>
+			<a class="{~D:AppData.Lab.Computed.Navigation.DBEnginesClass~}"    href="#/view/dbengines">DB Engines</a>
 			<a class="{~D:AppData.Lab.Computed.Navigation.SeedDatasetsClass~}" href="#/view/seeddatasets">Seed Data</a>
-			<a class="{~D:AppData.Lab.Computed.Navigation.EventsClass~}"       href="#/view/events">Events</a>
 		</nav>
 	</details>
 
 	<nav class="lab-nav-inline">
 		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.OverviewClass~}"     href="#/view/overview">Overview</a>
-		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.DBEnginesClass~}"    href="#/view/dbengines">DB Engines</a>
+		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.EventsClass~}"       href="#/view/events">Events</a>
 		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.UltravisorClass~}"   href="#/view/ultravisor">Ultravisor</a>
 		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.BeaconsClass~}"      href="#/view/beacons">Ultravisor Beacons</a>
+		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.DBEnginesClass~}"    href="#/view/dbengines">DB Engines</a>
 		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.SeedDatasetsClass~}" href="#/view/seeddatasets">Seed Data</a>
-		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.EventsClass~}"       href="#/view/events">Events</a>
 	</nav>
 
 	<span class="lab-header-spacer"></span>

@@ -16,6 +16,7 @@ const libFableServiceProviderBase = require('fable-serviceproviderbase');
 
 const DEFAULT_TIMEOUT_MS  = 10000;
 const PULL_TIMEOUT_MS     = 600000;  // 10 min -- first-time image pulls are slow
+const BUILD_TIMEOUT_MS    = 900000;  // 15 min -- fresh `npm install` + base layer pull combined
 const EXEC_TIMEOUT_MS     = 30000;
 
 class ServiceDockerManager extends libFableServiceProviderBase
@@ -79,6 +80,168 @@ class ServiceDockerManager extends libFableServiceProviderBase
 		return 'stopped';
 	}
 
+	// ── Images ───────────────────────────────────────────────────────────────
+
+	/**
+	 * Check whether a local image tag exists in the docker daemon.
+	 * Returns the image id string if present, '' if not.  Does not talk to
+	 * any registry -- `docker images -q` is a purely local lookup.
+	 */
+	imageExists(pImageTag, fCallback)
+	{
+		libChildProcess.execFile('docker', ['images', '-q', pImageTag], { timeout: DEFAULT_TIMEOUT_MS },
+			(pError, pStdout) =>
+			{
+				if (pError) { return fCallback(null, ''); }
+				return fCallback(null, (pStdout || '').trim());
+			});
+	}
+
+	/**
+	 * Build an image from a Dockerfile if it isn't already present locally.
+	 *
+	 * pBuild =
+	 * {
+	 *   ImageTag:       string   -- e.g. 'ultravisor-lab/retold-databeacon:0.0.8'
+	 *   DockerfilePath: string   -- absolute path to the .Dockerfile
+	 *   ContextDir:     string   -- absolute path used as the docker build context
+	 *                                (any directory -- our Dockerfiles don't COPY
+	 *                                anything from the context, so an empty dir is
+	 *                                safest and avoids sending irrelevant files)
+	 *   BuildArgs:      { KEY: VALUE, ... }   -- passed as --build-arg flags
+	 * }
+	 *
+	 * Callback gets { ImageTag, Built: true|false } so callers can log
+	 * the first-build cost when it happens.
+	 */
+	ensureImage(pBuild, fCallback, fProgress)
+	{
+		if (!pBuild || !pBuild.ImageTag || !pBuild.DockerfilePath || !pBuild.ContextDir)
+		{
+			return fCallback(new Error('ensureImage requires ImageTag, DockerfilePath, and ContextDir.'));
+		}
+
+		// fProgress is an optional (pPhase, pData) callback the caller uses
+		// to surface build lifecycle to the UI.  Phases:
+		//   'build-started'   { ImageTag }
+		//   'build-progress'  { ImageTag, ElapsedMs }   -- ticks every HEARTBEAT_MS
+		//   'build-completed' { ImageTag, ElapsedMs }
+		//   'build-failed'    { ImageTag, ElapsedMs, Error }
+		let fEmit = (typeof fProgress === 'function') ? fProgress : () => {};
+
+		this.imageExists(pBuild.ImageTag,
+			(pExistsErr, pImageID) =>
+			{
+				if (pImageID)
+				{
+					return fCallback(null, { ImageTag: pBuild.ImageTag, Built: false, ImageID: pImageID });
+				}
+
+				let tmpArgs = ['build', '-t', pBuild.ImageTag, '-f', pBuild.DockerfilePath];
+
+				if (pBuild.BuildArgs && typeof pBuild.BuildArgs === 'object')
+				{
+					for (let tmpKey of Object.keys(pBuild.BuildArgs))
+					{
+						tmpArgs.push('--build-arg', `${tmpKey}=${pBuild.BuildArgs[tmpKey]}`);
+					}
+				}
+
+				tmpArgs.push(pBuild.ContextDir);
+
+				this.fable.log.info(`[DockerManager] Building image ${pBuild.ImageTag}... (first build may take several minutes)`);
+
+				let tmpStartedAt = Date.now();
+				fEmit('build-started', { ImageTag: pBuild.ImageTag });
+
+				// Periodic heartbeat so the UI's Events timeline shows the
+				// build is still making progress.  Ticks every 10 seconds
+				// until the execFile callback cancels it.
+				const HEARTBEAT_MS = 10000;
+				let tmpHeartbeat = setInterval(
+					() => fEmit('build-progress', { ImageTag: pBuild.ImageTag, ElapsedMs: Date.now() - tmpStartedAt }),
+					HEARTBEAT_MS);
+
+				libChildProcess.execFile('docker', tmpArgs,
+					{ timeout: BUILD_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 },
+					(pError, pStdout, pStderr) =>
+					{
+						clearInterval(tmpHeartbeat);
+						let tmpElapsedMs = Date.now() - tmpStartedAt;
+
+						if (pError)
+						{
+							let tmpMsg = (pStderr || pError.message).trim().slice(0, 500);
+							fEmit('build-failed', { ImageTag: pBuild.ImageTag, ElapsedMs: tmpElapsedMs, Error: tmpMsg });
+							return fCallback(new Error(`docker build ${pBuild.ImageTag} failed: ${tmpMsg}`));
+						}
+
+						this.fable.log.info(`[DockerManager] Built image ${pBuild.ImageTag} in ${Math.round(tmpElapsedMs / 1000)}s.`);
+						fEmit('build-completed', { ImageTag: pBuild.ImageTag, ElapsedMs: tmpElapsedMs });
+						return fCallback(null, { ImageTag: pBuild.ImageTag, Built: true, ElapsedMs: tmpElapsedMs });
+					});
+			});
+	}
+
+	// ── Networks ─────────────────────────────────────────────────────────────
+
+	/**
+	 * Ensure a user-defined bridge network exists.  Idempotent; repeated
+	 * calls are no-ops after the first one.  Beacons, DB engines, and
+	 * (eventually) Ultravisors all attach to the same network so they
+	 * resolve each other by container name via docker's embedded DNS.
+	 */
+	ensureNetwork(pNetworkName, fCallback)
+	{
+		if (!pNetworkName) { return fCallback(new Error('ensureNetwork requires a network name.')); }
+
+		libChildProcess.execFile('docker', ['network', 'inspect', pNetworkName],
+			{ timeout: DEFAULT_TIMEOUT_MS },
+			(pError) =>
+			{
+				if (!pError)
+				{
+					return fCallback(null, { NetworkName: pNetworkName, Created: false });
+				}
+
+				libChildProcess.execFile('docker', ['network', 'create', pNetworkName],
+					{ timeout: DEFAULT_TIMEOUT_MS },
+					(pCreateError, pStdout, pStderr) =>
+					{
+						if (pCreateError)
+						{
+							return fCallback(new Error(`docker network create ${pNetworkName} failed: ${(pStderr || pCreateError.message).trim()}`));
+						}
+						this.fable.log.info(`[DockerManager] Created docker network '${pNetworkName}'.`);
+						return fCallback(null, { NetworkName: pNetworkName, Created: true });
+					});
+			});
+	}
+
+	/**
+	 * Attach an existing container to a docker network.  Idempotent: the
+	 * docker CLI errors with `endpoint ... already exists` when the
+	 * container is already a member, and we swallow that specific error.
+	 */
+	connectToNetwork(pNetworkName, pContainerID, fCallback)
+	{
+		libChildProcess.execFile('docker', ['network', 'connect', pNetworkName, pContainerID],
+			{ timeout: DEFAULT_TIMEOUT_MS },
+			(pError, pStdout, pStderr) =>
+			{
+				if (!pError)
+				{
+					return fCallback(null, { Attached: true });
+				}
+				let tmpMsg = (pStderr || pError.message || '').trim();
+				if (/already exists/i.test(tmpMsg) || /is already attached/i.test(tmpMsg))
+				{
+					return fCallback(null, { Attached: false, AlreadyAttached: true });
+				}
+				return fCallback(new Error(tmpMsg));
+			});
+	}
+
 	// ── Pull ─────────────────────────────────────────────────────────────────
 
 	pull(pImage, fCallback)
@@ -113,12 +276,34 @@ class ServiceDockerManager extends libFableServiceProviderBase
 	{
 		let tmpArgs = ['run', '-d', '--name', pRun.Name];
 
+		if (pRun.Network)
+		{
+			tmpArgs.push('--network', pRun.Network);
+		}
+
+		if (pRun.Hostname)
+		{
+			tmpArgs.push('--hostname', pRun.Hostname);
+		}
+
 		if (Array.isArray(pRun.Ports))
 		{
 			for (let i = 0; i < pRun.Ports.length; i++)
 			{
 				let tmpPort = pRun.Ports[i];
 				tmpArgs.push('-p', `${tmpPort.Host}:${tmpPort.Container}`);
+			}
+		}
+
+		if (Array.isArray(pRun.Volumes))
+		{
+			for (let i = 0; i < pRun.Volumes.length; i++)
+			{
+				let tmpVol = pRun.Volumes[i];
+				// { Source, Target, ReadOnly? } -- Source may be a named volume or host path
+				let tmpSpec = `${tmpVol.Source}:${tmpVol.Target}`;
+				if (tmpVol.ReadOnly) { tmpSpec += ':ro'; }
+				tmpArgs.push('-v', tmpSpec);
 			}
 		}
 

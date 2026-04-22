@@ -23,6 +23,7 @@ module.exports = function registerDBEngineRoutes(pCore)
 {
 	let tmpOrator    = pCore.Orator;
 	let tmpEngineMgr = pCore.EngineManager;
+	let tmpDocker    = pCore.DockerManager;
 
 	// Engine registry (for the "Add Engine" form)
 	tmpOrator.serviceServer.doGet('/api/lab/db-engine-types',
@@ -66,6 +67,45 @@ module.exports = function registerDBEngineRoutes(pCore)
 					ConnectionInfo:   tmpEngineMgr.connectionInfo(tmpID)
 				});
 			return pNext();
+		});
+
+	// Docker logs for an engine container.  DB engines are always container-
+	// backed so there's no process-mode fallback.  Returns the same shape as
+	// the beacon logs endpoint so the frontend can share a single modal.
+	tmpOrator.serviceServer.doGet('/api/lab/db-engines/:id/logs',
+		(pReq, pRes, pNext) =>
+		{
+			let tmpID = parseInt(pReq.params.id, 10);
+			let tmpEngine = tmpEngineMgr.getEngine(tmpID);
+			if (!tmpEngine) { pRes.send(404, { Error: 'Engine not found.' }); return pNext(); }
+			if (!tmpEngine.ContainerID)
+			{
+				pRes.send({ Runtime: 'container', Lines: [], Source: 'no-container-yet' });
+				return pNext();
+			}
+
+			let tmpLines = 500;
+			if (pReq.query && pReq.query.lines)
+			{
+				let tmpParsed = parseInt(pReq.query.lines, 10);
+				if (Number.isFinite(tmpParsed) && tmpParsed > 0) { tmpLines = Math.min(tmpParsed, 5000); }
+			}
+
+			tmpDocker.logs(tmpEngine.ContainerID, tmpLines,
+				(pLogErr, pLogResult) =>
+				{
+					if (pLogErr)
+					{
+						pRes.send(400, { Error: pLogErr.message, Runtime: 'container', Lines: [], Source: 'docker' });
+						return pNext();
+					}
+					let tmpLinesOut = [];
+					if (pLogResult.Stdout) { tmpLinesOut = tmpLinesOut.concat(pLogResult.Stdout.split('\n')); }
+					if (pLogResult.Stderr) { tmpLinesOut = tmpLinesOut.concat(pLogResult.Stderr.split('\n')); }
+					while (tmpLinesOut.length > 0 && tmpLinesOut[tmpLinesOut.length - 1] === '') { tmpLinesOut.pop(); }
+					pRes.send({ Runtime: 'container', Lines: tmpLinesOut, Source: 'docker', ContainerID: tmpEngine.ContainerID, ContainerName: tmpEngine.ContainerName });
+					return pNext();
+				});
 		});
 
 	tmpOrator.serviceServer.doGet('/api/lab/db-engines/:id/connection-info',

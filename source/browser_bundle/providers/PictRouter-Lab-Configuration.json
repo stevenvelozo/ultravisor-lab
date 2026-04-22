@@ -23,6 +23,9 @@
 		{ "path": "/dbengines/:id/stop",    "template": "{~LV:Pict.PictApplication.stopEngine(Record.data.id)~}" },
 		{ "path": "/dbengines/:id/remove",  "template": "{~LV:Pict.PictApplication.removeEngine(Record.data.id)~}" },
 		{ "path": "/dbengines/:id/reveal",  "template": "{~LV:Pict.PictApplication.toggleCredentialReveal(Record.data.id)~}" },
+		{ "path": "/dbengines/:id/copy-password", "template": "{~LV:Pict.PictApplication.copyEnginePassword(Record.data.id)~}" },
+		{ "path": "/dbengines/:id/logs",    "template": "{~LV:Pict.PictApplication.openEngineLogs(Record.data.id)~}" },
+		{ "path": "/dbengines/:id/logs/refresh","template": "{~LV:Pict.PictApplication.refreshEngineLogs(Record.data.id)~}" },
 		{ "path": "/dbengines/:id/databases/create",       "template": "{~LV:Pict.PictApplication.createDatabase(Record.data.id)~}" },
 		{ "path": "/dbengines/:id/databases/:dbid/drop",   "template": "{~LV:Pict.PictApplication.dropDatabase(Record.data.id, Record.data.dbid)~}" },
 
@@ -39,6 +42,8 @@
 		{ "path": "/beacons/:id/start",       "template": "{~LV:Pict.PictApplication.startBeacon(Record.data.id)~}" },
 		{ "path": "/beacons/:id/stop",        "template": "{~LV:Pict.PictApplication.stopBeacon(Record.data.id)~}" },
 		{ "path": "/beacons/:id/remove",      "template": "{~LV:Pict.PictApplication.removeBeacon(Record.data.id)~}" },
+		{ "path": "/beacons/:id/logs",        "template": "{~LV:Pict.PictApplication.openBeaconLogs(Record.data.id)~}" },
+		{ "path": "/beacons/:id/logs/refresh","template": "{~LV:Pict.PictApplication.refreshBeaconLogs(Record.data.id)~}" },
 
 		{ "path": "/seeds/:hash/run",           "template": "{~LV:Pict.PictApplication.runSeedDataset(Record.data.hash)~}" },
 		{ "path": "/seeds/:hash/seed-to-engine","template": "{~LV:Pict.PictApplication.seedDatasetToEngine(Record.data.hash)~}" }

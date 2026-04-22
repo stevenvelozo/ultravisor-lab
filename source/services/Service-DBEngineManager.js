@@ -98,6 +98,7 @@ class ServiceDBEngineManager extends libFableServiceProviderBase
 				Name:           tmpName,
 				EngineType:     tmpAdapter.EngineType,
 				Port:           tmpPort,
+				InternalPort:   tmpAdapter.DefaultPort,
 				ContainerName:  tmpContainerName,
 				ImageTag:       tmpImage,
 				RootUsername:   tmpAdapter.DefaultUsername,
@@ -113,56 +114,71 @@ class ServiceDBEngineManager extends libFableServiceProviderBase
 				Message: `Creating ${tmpAdapter.DisplayName} engine '${tmpName}' on port ${tmpPort}`
 			});
 
-		// Step 1: pull image (may be a no-op if already present).
-		tmpDocker.pull(tmpImage,
-			(pPullErr) =>
+		// Step 1: pull image (may be a no-op if already present) and ensure
+		// the shared lab docker network exists so beacons running on it can
+		// reach this engine by container DNS.
+		tmpDocker.ensureNetwork('ultravisor-lab',
+			(pNetErr) =>
 			{
-				if (pPullErr)
+				if (pNetErr)
 				{
-					this._markEngineFailed(tmpEngineID, tmpName, 'pull-failed', pPullErr.message);
-					return fCallback(pPullErr);
+					this._markEngineFailed(tmpEngineID, tmpName, 'network-failed', pNetErr.message);
+					return fCallback(pNetErr);
 				}
 
-				tmpStore.update('DBEngine', 'IDDBEngine', tmpEngineID, { StatusDetail: 'Starting container...' });
-
-				// Step 2: run container.
-				let tmpEnv = tmpAdapter.buildEnv({ RootPassword: tmpRootPassword });
-				let tmpExtra = tmpAdapter.buildExtraRunArgs({ RootPassword: tmpRootPassword });
-
-				tmpDocker.run(
+				tmpDocker.pull(tmpImage,
+					(pPullErr) =>
 					{
-						Name:       tmpContainerName,
-						Image:      tmpImage,
-						Ports:      [{ Host: tmpPort, Container: tmpAdapter.DefaultPort }],
-						Env:        tmpEnv,
-						ExtraArgs:  tmpExtra
-					},
-					(pRunErr, pRunResult) =>
-					{
-						if (pRunErr)
+						if (pPullErr)
 						{
-							this._markEngineFailed(tmpEngineID, tmpName, 'run-failed', pRunErr.message);
-							return fCallback(pRunErr);
+							this._markEngineFailed(tmpEngineID, tmpName, 'pull-failed', pPullErr.message);
+							return fCallback(pPullErr);
 						}
 
-						tmpStore.update('DBEngine', 'IDDBEngine', tmpEngineID,
-							{
-								ContainerID:  pRunResult.ContainerID,
-								StatusDetail: 'Waiting for engine to accept connections...'
-							});
+						tmpStore.update('DBEngine', 'IDDBEngine', tmpEngineID, { StatusDetail: 'Starting container...' });
 
-						// Step 3: poll for health in the background.  The API
-						// response is sent right away so the UI can render the
-						// new engine card in `provisioning` state.
-						this._pollHealthy(tmpEngineID, tmpName, tmpAdapter,
-							{ ContainerID: pRunResult.ContainerID, RootPassword: tmpRootPassword },
-							() => {});
+						// Step 2: run container on the shared network with
+						// the stable hostname other containers resolve against.
+						let tmpEnv = tmpAdapter.buildEnv({ RootPassword: tmpRootPassword });
+						let tmpExtra = tmpAdapter.buildExtraRunArgs({ RootPassword: tmpRootPassword });
 
-						return fCallback(null,
+						tmpDocker.run(
 							{
-								IDDBEngine:   tmpEngineID,
-								ContainerID:  pRunResult.ContainerID,
-								Status:       'provisioning'
+								Name:      tmpContainerName,
+								Hostname:  tmpContainerName,
+								Network:   'ultravisor-lab',
+								Image:     tmpImage,
+								Ports:     [{ Host: tmpPort, Container: tmpAdapter.DefaultPort }],
+								Env:       tmpEnv,
+								ExtraArgs: tmpExtra
+							},
+							(pRunErr, pRunResult) =>
+							{
+								if (pRunErr)
+								{
+									this._markEngineFailed(tmpEngineID, tmpName, 'run-failed', pRunErr.message);
+									return fCallback(pRunErr);
+								}
+
+								tmpStore.update('DBEngine', 'IDDBEngine', tmpEngineID,
+									{
+										ContainerID:  pRunResult.ContainerID,
+										StatusDetail: 'Waiting for engine to accept connections...'
+									});
+
+								// Step 3: poll for health in the background.  The API
+								// response is sent right away so the UI can render the
+								// new engine card in `provisioning` state.
+								this._pollHealthy(tmpEngineID, tmpName, tmpAdapter,
+									{ ContainerID: pRunResult.ContainerID, RootPassword: tmpRootPassword },
+									() => {});
+
+								return fCallback(null,
+									{
+										IDDBEngine:   tmpEngineID,
+										ContainerID:  pRunResult.ContainerID,
+										Status:       'provisioning'
+									});
 							});
 					});
 			});

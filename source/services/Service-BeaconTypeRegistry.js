@@ -50,32 +50,58 @@ const libFableServiceProviderBase = require('fable-serviceproviderbase');
 const SCANNED_MODULES =
 [
 	'retold-databeacon',
-	'meadow-integration',
 	'orator-conversion',
 	'retold-facto',
 	'retold-content-system',
 	'retold-remote'
 ];
 
-// Lab-local registry entries.  Used for beacon types the lab defines
-// itself because the underlying npm module doesn't yet ship a
-// retoldBeacon stanza + CapabilityProvider class.  Each entry carries the
-// same shape as the package-level stanza (see _loadFromPackage below).
-// Paths are resolved against the lab module root in _normalizeLocal.
+// Lab-local registry entries for capability-provider beacons that ship
+// inside the lab rather than as their own published npm package.  The
+// provider source lives under `docker/providers/<name>/` as its own
+// tiny build context; the lab's docker Dockerfile COPIES it into the
+// container image at build time and retold-beacon-host loads it via
+// `--provider /app/provider` at container-run time.  These entries carry
+// all the stanza fields a published package would, plus:
+//
+//   LocalProviderDir: path (relative to lab root) to the docker build
+//                     context directory.  Becomes the ContextDir passed
+//                     to LabDockerManager.ensureImage.
 const LOCAL_REGISTRY_ENTRIES =
 [
 	{
 		BeaconType:  'meadow-integration',
-		DisplayName: 'Meadow-Integration',
+		DisplayName: 'Meadow Integration',
 		Description: 'Parse / transform / LabWriter capabilities that seed operations dispatch to via the Ultravisor.',
 		Category:    'integration',
 		Mode:        'capability-provider',
-		ProviderPath:'source/beacon_providers/Lab-MeadowIntegration-BeaconProvider.js',
 		Capability:  'MeadowIntegration',
 		DefaultPort: 54400,
 		RequiresUltravisor: true,
 		HealthCheck: { Path: '/' },
-		ConfigForm:  { Fields: [] }
+		ConfigForm:  { Fields: [] },
+		LocalProviderDir: 'docker/providers/meadow-integration',
+		Docker:
+		{
+			Image:           'retold-beacon-host-meadow-integration',
+			Version:         '0.0.1',  // bump when the provider source changes shape
+			Dockerfile:      'retold-beacon-host-meadow-integration.Dockerfile',
+			DataMountPath:   '/app/data',
+			ConfigMountPath: '/app/data/config.json',
+			ExposedPort:     54400,
+			HostPackage:     'retold-beacon-host',
+			HostVersion:     '',   // resolved dynamically by lookupPackageVersion
+			// Data dirs the lab bind-mounts read-only into the container so
+			// capability actions (e.g. MeadowIntegration.ParseFile) can read
+			// them.  `Source` is relative to the lab root; the container
+			// manager resolves it.  These are shared across all beacons of
+			// this type -- each beacon gets the same mount at the same
+			// container path.
+			ExtraMounts:
+			[
+				{ Source: 'seed_datasets', Target: '/app/seed_datasets', ReadOnly: true }
+			]
+		}
 	}
 ];
 
@@ -146,9 +172,18 @@ class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 		{
 			tmpResolved.ProviderPath = libPath.resolve(tmpLabRoot, pEntry.ProviderPath);
 		}
+		// Lab-local capability-provider entries carry a build-context path
+		// the Dockerfile COPYs into /app/provider/.  Resolve it to absolute
+		// so the container manager can hand it straight to docker build.
+		if (pEntry.LocalProviderDir)
+		{
+			tmpResolved.LocalProviderDir = libPath.resolve(tmpLabRoot, pEntry.LocalProviderDir);
+		}
 		tmpResolved.PackageRoot = tmpLabRoot;
 		tmpResolved.Source = 'lab-local';
 		tmpResolved.ConfigForm = this._resolveConfigForm(tmpLabRoot, pEntry.ConfigForm);
+		// Preserve Docker block verbatim (it's already an object in the
+		// literal; Object.assign above did the shallow copy).
 		return tmpResolved;
 	}
 
@@ -211,8 +246,90 @@ class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 		{
 			tmpDescriptor.Capability = tmpStanza.capability;
 		}
+		// For capability-provider packages whose class is loaded inside the
+		// beacon-host container, we don't need ProviderPath on the host.
+		// `providerPackage` in the stanza carries the npm name for the
+		// Dockerfile's `npm install` step; default to the package's own
+		// name so providers don't have to restate themselves.
+		//
+		// If `providerPath` is present in the stanza, the class lives at a
+		// submodule path of the package -- we compose the in-container
+		// require spec as `<package>/<providerPath>` (leading `./` stripped)
+		// so node's require() resolves to the right file inside
+		// /app/node_modules/<package>/...  This lets published modules whose
+		// `main` is something else (e.g. orator-conversion's
+		// Orator-File-Translation) still surface the provider class to
+		// retold-beacon-host.
+		if (tmpStanza.mode === 'capability-provider')
+		{
+			let tmpBase = tmpStanza.providerPackage || pModuleName;
+			if (tmpStanza.providerPath)
+			{
+				let tmpSub = tmpStanza.providerPath.replace(/^\.\//, '');
+				tmpDescriptor.ProviderPackage = `${tmpBase}/${tmpSub}`;
+			}
+			else
+			{
+				tmpDescriptor.ProviderPackage = tmpBase;
+			}
+		}
+
+		// docker block is optional -- types without one run via the host-process
+		// path.  When present, BeaconManager routes through LabBeaconContainerManager
+		// and the module's published version is baked into the locally-built image.
+		if (tmpStanza.docker && typeof tmpStanza.docker === 'object')
+		{
+			tmpDescriptor.Docker =
+				{
+					Image:            tmpStanza.docker.image || pModuleName,
+					Version:          tmpStanza.docker.version || tmpPackageJson.version || 'latest',
+					Dockerfile:       tmpStanza.docker.dockerfile || '',
+					DataMountPath:    tmpStanza.docker.dataMountPath || '/app/data',
+					ConfigMountPath:  tmpStanza.docker.configMountPath || '/app/data/config.json',
+					ContentMountPath: tmpStanza.docker.contentMountPath || '/app/content',
+					ExposedPort:      tmpStanza.docker.exposedPort || tmpStanza.defaultPort || 0,
+					// Capability-provider mode has a two-package image: the
+					// generic beacon-host + the concrete provider.  HostPackage
+					// defaults to 'retold-beacon-host'; HostVersion is free for
+					// per-type override but usually the caller lets it default.
+					HostPackage:      tmpStanza.docker.hostPackage || 'retold-beacon-host',
+					HostVersion:      tmpStanza.docker.hostVersion || '',
+					// Optional arrays consumed by the container manager:
+					//   ExtraMounts   -- type-level mounts relative to lab root
+					//                    (e.g. seed_datasets/ for MI beacons)
+					//   ConfigMounts  -- per-beacon mounts whose Source is read
+					//                    from the beacon's ConfigJSON at run time
+					//                    (e.g. HostContentPath for retold-remote)
+					ExtraMounts:      Array.isArray(tmpStanza.docker.extraMounts) ? tmpStanza.docker.extraMounts : [],
+					ConfigMounts:     Array.isArray(tmpStanza.docker.configMounts) ? tmpStanza.docker.configMounts : []
+				};
+		}
 
 		return tmpDescriptor;
+	}
+
+	/**
+	 * Resolve the version of a dependency package the lab references but
+	 * doesn't import -- notably `retold-beacon-host`, which is only baked
+	 * into container images.  Tries sibling checkout first, then the lab's
+	 * node_modules, then `latest` as a last resort.  Containers built with
+	 * `latest` will re-pull on every lab version bump, which is fine since
+	 * ensureImage skips the build when the tagged image already exists.
+	 */
+	lookupPackageVersion(pPackageName)
+	{
+		let tmpPath = this._resolveSiblingPackageJson(pPackageName);
+		if (!tmpPath)
+		{
+			try { tmpPath = require.resolve(`${pPackageName}/package.json`); }
+			catch (pErr) { return 'latest'; }
+		}
+		try
+		{
+			let tmpPkg = JSON.parse(libFs.readFileSync(tmpPath, 'utf8'));
+			return tmpPkg.version || 'latest';
+		}
+		catch (pErr) { return 'latest'; }
 	}
 
 	/**

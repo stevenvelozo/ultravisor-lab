@@ -312,6 +312,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<div class="lab-engine-actions">
 			<a class="lab-btn secondary small {~D:Record.StartDisabled~}" href="#/dbengines/{~D:Record.IDDBEngine~}/start">Start</a>
 			<a class="lab-btn secondary small {~D:Record.StopDisabled~}"  href="#/dbengines/{~D:Record.IDDBEngine~}/stop">Stop</a>
+			<a class="lab-btn secondary small" href="#/dbengines/{~D:Record.IDDBEngine~}/logs">Logs</a>
 			<a class="lab-btn danger small" href="#/dbengines/{~D:Record.IDDBEngine~}/remove">Remove</a>
 		</div>
 	</div>
@@ -330,6 +331,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 			<div class="secret">
 				<code>{~D:Record.PasswordDisplay~}</code>
 				<a class="lab-btn secondary small" href="#/dbengines/{~D:Record.IDDBEngine~}/reveal">{~D:Record.RevealLabel~}</a>
+				<a class="lab-btn secondary small" href="#/dbengines/{~D:Record.IDDBEngine~}/copy-password" title="Copy password to clipboard">Copy</a>
 			</div>
 		</div>
 		<div style="grid-column: 1 / -1;">

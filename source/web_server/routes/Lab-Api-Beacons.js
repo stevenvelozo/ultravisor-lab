@@ -30,6 +30,7 @@ module.exports = function registerBeaconRoutes(pCore)
 	let tmpUvMgr       = pCore.UltravisorManager;
 	let tmpAllocator   = pCore.PortAllocator;
 	let tmpSupervisor  = pCore.Supervisor;
+	let tmpContainer   = pCore.BeaconContainerManager;
 
 	tmpOrator.serviceServer.doGet('/api/lab/beacon-types',
 		(pReq, pRes, pNext) =>
@@ -122,13 +123,48 @@ module.exports = function registerBeaconRoutes(pCore)
 		(pReq, pRes, pNext) =>
 		{
 			let tmpID = parseInt(pReq.params.id, 10);
-			let tmpLines = 200;
+			let tmpBeacon = tmpMgr.getBeacon(tmpID);
+			if (!tmpBeacon) { pRes.send(404, { Error: 'Beacon not found.' }); return pNext(); }
+
+			let tmpLines = 500;
 			if (pReq.query && pReq.query.lines)
 			{
 				let tmpParsed = parseInt(pReq.query.lines, 10);
-				if (Number.isFinite(tmpParsed) && tmpParsed > 0) { tmpLines = Math.min(tmpParsed, 2000); }
+				if (Number.isFinite(tmpParsed) && tmpParsed > 0) { tmpLines = Math.min(tmpParsed, 5000); }
 			}
-			pRes.send({ Lines: tmpSupervisor.tailLog('Beacon', tmpID, tmpLines) });
+
+			// Container-backed beacons surface logs via `docker logs`.
+			// Process-backed beacons surface via the supervisor's file tail.
+			// Either way we return the same { Runtime, Lines, Source } shape
+			// so the UI doesn't care which path served it.
+			if (tmpBeacon.Runtime === 'container' && tmpBeacon.ContainerID)
+			{
+				return tmpContainer.logs(tmpBeacon.ContainerID, tmpLines,
+					(pLogErr, pLogResult) =>
+					{
+						if (pLogErr)
+						{
+							pRes.send(400, { Error: pLogErr.message, Runtime: 'container', Lines: [], Source: 'docker' });
+							return pNext();
+						}
+						// docker returns separate stdout / stderr streams; most
+						// image entrypoints go to stdout, error traces to stderr.
+						// Interleave them in a single flat list the UI can render.
+						let tmpLinesOut = [];
+						if (pLogResult.Stdout) { tmpLinesOut = tmpLinesOut.concat(pLogResult.Stdout.split('\n')); }
+						if (pLogResult.Stderr) { tmpLinesOut = tmpLinesOut.concat(pLogResult.Stderr.split('\n')); }
+						// Trim trailing blank line introduced by split().
+						while (tmpLinesOut.length > 0 && tmpLinesOut[tmpLinesOut.length - 1] === '')
+						{
+							tmpLinesOut.pop();
+						}
+						pRes.send({ Runtime: 'container', Lines: tmpLinesOut, Source: 'docker', ContainerID: tmpBeacon.ContainerID, ContainerName: tmpBeacon.ContainerName });
+						return pNext();
+					});
+			}
+
+			let tmpPath = tmpSupervisor.logFilePath('Beacon', tmpID);
+			pRes.send({ Runtime: 'process', Lines: tmpSupervisor.tailLog('Beacon', tmpID, tmpLines), Source: tmpPath });
 			return pNext();
 		});
 };

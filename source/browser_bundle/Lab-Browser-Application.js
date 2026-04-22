@@ -637,6 +637,61 @@ class LabBrowserApplication extends libPictApplication
 		tmpState.RevealedCredentials[pID] = !tmpState.RevealedCredentials[pID];
 		this.pict.views['Lab-DBEngines'].render('Lab-DBEngines-List');
 	}
+
+	/**
+	 * Copy the root password for an engine to the system clipboard.  Uses
+	 * navigator.clipboard.writeText when available; falls back to a textarea
+	 * select/execCommand('copy') on older browsers that block async clipboard
+	 * without a secure context.
+	 */
+	copyEnginePassword(pID)
+	{
+		let tmpEngine = ((this.pict.AppData.Lab.DBEngines && this.pict.AppData.Lab.DBEngines.Engines) || [])
+			.find((pR) => String(pR.IDDBEngine) === String(pID));
+		if (!tmpEngine) { this._toastError('Engine not found.'); return; }
+
+		let tmpPassword = tmpEngine.RootPassword || '';
+		if (!tmpPassword) { this._toastWarning('No password on this engine.'); return; }
+
+		let fDone = (pOk, pErr) =>
+		{
+			if (pOk) { this._toastSuccess(`Password for '${tmpEngine.Name}' copied to clipboard.`); return; }
+			this._toastError('Copy failed' + (pErr ? (': ' + pErr) : '.') + ' Reveal + select manually.');
+		};
+
+		if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function')
+		{
+			navigator.clipboard.writeText(tmpPassword)
+				.then(() => fDone(true))
+				.catch((pEx) => this._copyFallback(tmpPassword, fDone, pEx));
+			return;
+		}
+
+		this._copyFallback(tmpPassword, fDone);
+	}
+
+	_copyFallback(pText, fDone, pOriginalError)
+	{
+		try
+		{
+			let tmpTA = document.createElement('textarea');
+			tmpTA.value = pText;
+			tmpTA.setAttribute('readonly', '');
+			// Keep it off-screen; the select/copy still works.
+			tmpTA.style.position = 'fixed';
+			tmpTA.style.top = '-9999px';
+			document.body.appendChild(tmpTA);
+			tmpTA.select();
+			let tmpOk = document.execCommand && document.execCommand('copy');
+			document.body.removeChild(tmpTA);
+			if (tmpOk) { fDone(true); return; }
+			fDone(false, pOriginalError ? pOriginalError.message : 'execCommand returned false');
+		}
+		catch (pEx)
+		{
+			fDone(false, pEx.message);
+		}
+	}
 	createDatabase(pEngineID)
 	{
 		let tmpSelector = `#Lab-Engine-${pEngineID}-NewDB`;
@@ -865,6 +920,111 @@ class LabBrowserApplication extends libPictApplication
 							this.refreshAll(() => {});
 						});
 				});
+	}
+
+	// ── Log viewer (shared across Beacon + DBEngine) ────────────────────────
+
+	openBeaconLogs(pID)  { return this._openLogs('Beacon',   pID); }
+	openEngineLogs(pID)  { return this._openLogs('DBEngine', pID); }
+
+	// Route aliases -- re-open with fresh content.
+	refreshBeaconLogs(pID) { return this._openLogs('Beacon',   pID); }
+	refreshEngineLogs(pID) { return this._openLogs('DBEngine', pID); }
+
+	/**
+	 * Generic log-modal entry point.  Looks up the entity's display name
+	 * from AppData, calls the right API endpoint based on EntityType, and
+	 * renders the result in a dark <pre> modal with Refresh / Close buttons.
+	 * The Refresh button dismisses + re-opens so the modal never has to
+	 * mutate its own DOM -- keeps the pict-section-modal contract clean.
+	 */
+	_openLogs(pEntityType, pID)
+	{
+		let tmpApi = this.pict.providers.LabApi;
+		let tmpLookupName, tmpFetcher;
+
+		if (pEntityType === 'Beacon')
+		{
+			let tmpBeacon = ((this.pict.AppData.Lab.Beacons && this.pict.AppData.Lab.Beacons.Beacons) || [])
+				.find((pR) => String(pR.IDBeacon) === String(pID));
+			tmpLookupName = tmpBeacon ? tmpBeacon.Name : `beacon #${pID}`;
+			tmpFetcher = (fCb) => tmpApi.getBeaconLogs(pID, 500, fCb);
+		}
+		else if (pEntityType === 'DBEngine')
+		{
+			let tmpEngine = ((this.pict.AppData.Lab.DBEngines && this.pict.AppData.Lab.DBEngines.Engines) || [])
+				.find((pR) => String(pR.IDDBEngine) === String(pID));
+			tmpLookupName = tmpEngine ? tmpEngine.Name : `engine #${pID}`;
+			tmpFetcher = (fCb) => tmpApi.getEngineLogs(pID, 500, fCb);
+		}
+		else
+		{
+			this._toastError(`No log viewer for entity type '${pEntityType}'.`);
+			return;
+		}
+
+		let tmpTitle = `Logs — ${tmpLookupName}`;
+
+		tmpFetcher((pErr, pPayload) =>
+			{
+				if (pErr)
+				{
+					this._toastError('Could not load logs: ' + pErr.message);
+					return;
+				}
+
+				let tmpLines   = (pPayload && pPayload.Lines) || [];
+				let tmpSource  = (pPayload && pPayload.Source) || '';
+				let tmpRuntime = (pPayload && pPayload.Runtime) || '';
+
+				let tmpToolbar = `<div class="lab-log-toolbar">`
+					+ `<span class="lab-log-badge">${this._escapeHTML(tmpRuntime || 'process')}</span>`
+					+ `<span class="lab-log-source" title="${this._escapeHTML(tmpSource)}">${this._escapeHTML(tmpSource) || '(no source)'}</span>`
+					+ `<span class="lab-log-count">${tmpLines.length} lines</span>`
+					+ `</div>`;
+
+				let tmpBody = tmpLines.length === 0
+					? `<div class="lab-log-empty">No log output yet.</div>`
+					: `<pre class="lab-log-content">${tmpLines.map((pL) => this._escapeHTML(pL)).join('\n')}</pre>`;
+
+				this._modal().show(
+					{
+						title:     tmpTitle,
+						content:   tmpToolbar + tmpBody,
+						width:     'min(1100px, 92vw)',
+						closeable: true,
+						buttons:
+						[
+							{ Hash: 'refresh', Label: 'Refresh', Style: 'secondary' },
+							{ Hash: 'close',   Label: 'Close',   Style: 'primary'   }
+						],
+						// Jump the <pre> to the tail on open so the newest
+						// lines are visible first -- setting scrollTop to
+						// scrollHeight lands at the bottom of the pane.
+						onOpen: (pDialog) =>
+							{
+								let tmpPre = pDialog && pDialog.querySelector ? pDialog.querySelector('.lab-log-content') : null;
+								if (tmpPre) { tmpPre.scrollTop = tmpPre.scrollHeight; }
+							}
+					})
+					.then((pHash) =>
+						{
+							if (pHash === 'refresh')
+							{
+								// Small defer so the modal finishes its dismiss animation
+								// before we open the replacement; avoids an odd double-stack
+								// while the overlay is fading out.
+								setTimeout(() => this._openLogs(pEntityType, pID), 80);
+							}
+						});
+			});
+	}
+
+	_escapeHTML(pStr)
+	{
+		return String(pStr == null ? '' : pStr)
+			.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 	}
 
 	// ── Ultravisor form ─────────────────────────────────────────────────────

@@ -122,17 +122,29 @@ class ServiceSeedDatasetManager extends libFableServiceProviderBase
 		for (let i = 0; i < this.catalog.length; i++)
 		{
 			let tmpEntry = this.catalog[i];
-			let tmpOp = this._substitutePaths(tmpEntry.OperationJSON, tmpEntry.DatasetDir);
+			let tmpOp = this._substitutePaths(tmpEntry.OperationJSON, tmpEntry.FolderName);
 			tmpUvMgr.writeOperationFile(pInstanceID, tmpOp.Hash, tmpOp);
 			tmpLoaded++;
 		}
 		return { Loaded: tmpLoaded };
 	}
 
-	_substitutePaths(pOperation, pDatasetDir)
+	/**
+	 * Replace `{LAB_SEED_PATH}` in the operation JSON with the container-
+	 * relative path the MI beacon sees (via the ExtraMounts bind-mount the
+	 * container manager sets up).  Phase 1b made MI beacons always-container
+	 * so there's no host-process fallback; the operation file on disk only
+	 * needs the container-relative form.
+	 *
+	 * pFolderName is the seed_datasets subdir name (e.g. `people`) -- the
+	 * host's `seed_datasets/` is mounted at `/app/seed_datasets/` in the
+	 * container, so the substitution target is `/app/seed_datasets/<folder>`.
+	 */
+	_substitutePaths(pOperation, pFolderName)
 	{
+		let tmpContainerPath = `/app/seed_datasets/${pFolderName}`;
 		let tmpText = JSON.stringify(pOperation);
-		tmpText = tmpText.split('{LAB_SEED_PATH}').join(pDatasetDir);
+		tmpText = tmpText.split('{LAB_SEED_PATH}').join(tmpContainerPath);
 		return JSON.parse(tmpText);
 	}
 
@@ -376,8 +388,27 @@ class ServiceSeedDatasetManager extends libFableServiceProviderBase
 		// (notably underscores) replaced by hyphens.
 		let tmpRawName = `lab-${tmpEngine.EngineType}-${tmpDatabase.Name}`;
 		let tmpRouteHash = tmpRawName.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
-		let tmpBeaconURL = `http://127.0.0.1:${tmpBeacon.Port}/1.0/${tmpRouteHash}`;
-		let tmpOperation = this._substitutePaths(tmpEntry.OperationJSON, tmpEntry.DatasetDir);
+
+		// BeaconURL target for LabWriter.BulkInsertViaBeacon.  Resolved to
+		// docker-DNS + internal port when the databeacon is a container --
+		// the MI beacon making the POST is assumed to also be in a container
+		// on the shared ultravisor-lab network in phase-1b+.  Earlier phases
+		// (MI beacon on host) still work because host-mode MI beacons reach
+		// the databeacon via host.docker.internal... but phase-1b makes MI
+		// always-container, so the simple rule here is "if databeacon is a
+		// container, use its container DNS".
+		let tmpBeaconURL;
+		if (tmpBeacon.Runtime === 'container' && tmpBeacon.ContainerName)
+		{
+			let tmpInternalPort = (this.fable.LabBeaconTypeRegistry.get(tmpBeacon.BeaconType) || {});
+			let tmpExposed = (tmpInternalPort.Docker && tmpInternalPort.Docker.ExposedPort) || tmpInternalPort.DefaultPort || 8500;
+			tmpBeaconURL = `http://${tmpBeacon.ContainerName}:${tmpExposed}/1.0/${tmpRouteHash}`;
+		}
+		else
+		{
+			tmpBeaconURL = `http://127.0.0.1:${tmpBeacon.Port}/1.0/${tmpRouteHash}`;
+		}
+		let tmpOperation = this._substitutePaths(tmpEntry.OperationJSON, tmpEntry.FolderName);
 		tmpOperation = JSON.parse(JSON.stringify(tmpOperation).split('{TARGET_BEACON_URL}').join(tmpBeaconURL));
 
 		let tmpJobID = tmpStore.insert('IngestionJob',
@@ -572,14 +603,23 @@ class ServiceSeedDatasetManager extends libFableServiceProviderBase
 					return fCallback(new Error(`Engine type '${pEngine.EngineType}' is not supported by retold-databeacon's connection bridge.`));
 				}
 
+				// If the beacon is itself a container on the ultravisor-lab
+				// docker network, point it at the engine's container hostname
+				// + internal port (the one MySQL actually listens on inside
+				// the container).  From-host beacons still use the lab's
+				// host-mapped port because 127.0.0.1 is the lab's loopback.
+				let tmpEndpoint = this.fable.LabBeaconContainerManager.resolveEngineEndpoint(
+					pEngine,
+					{ FromContainer: pBeacon.Runtime === 'container' });
+
 				let tmpBody = JSON.stringify(
 					{
 						Name:   tmpName,
 						Type:   tmpBeaconType,
 						Config:
 						{
-							Server:   '127.0.0.1',
-							Port:     pEngine.Port,
+							Server:   tmpEndpoint.Host,
+							Port:     tmpEndpoint.Port,
 							User:     pEngine.RootUsername,
 							Password: pEngine.RootPassword,
 							Database: pDatabase.Name

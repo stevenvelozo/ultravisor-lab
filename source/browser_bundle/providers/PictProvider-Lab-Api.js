@@ -148,6 +148,24 @@ class LabApiProvider extends libFableServiceProviderBase
 	startBeacon(pID, fCallback) { return _request('POST', '/api/lab/beacons/' + pID + '/start', {}, fCallback); }
 	stopBeacon(pID, fCallback)  { return _request('POST', '/api/lab/beacons/' + pID + '/stop',  {}, fCallback); }
 	removeBeacon(pID, fCallback) { return _request('DELETE', '/api/lab/beacons/' + pID, null, fCallback); }
+	getBeaconLogs(pID, pLines, fCallback)
+	{
+		let tmpCallback = fCallback;
+		let tmpLines = pLines;
+		if (typeof pLines === 'function') { tmpCallback = pLines; tmpLines = null; }
+		let tmpPath = '/api/lab/beacons/' + pID + '/logs';
+		if (tmpLines) { tmpPath += '?lines=' + encodeURIComponent(tmpLines); }
+		return _request('GET', tmpPath, null, tmpCallback);
+	}
+	getEngineLogs(pID, pLines, fCallback)
+	{
+		let tmpCallback = fCallback;
+		let tmpLines = pLines;
+		if (typeof pLines === 'function') { tmpCallback = pLines; tmpLines = null; }
+		let tmpPath = '/api/lab/db-engines/' + pID + '/logs';
+		if (tmpLines) { tmpPath += '?lines=' + encodeURIComponent(tmpLines); }
+		return _request('GET', tmpPath, null, tmpCallback);
+	}
 	getNextBeaconPort(pStart, fCallback)
 	{
 		// Two call shapes for convenience: `getNextBeaconPort(cb)` or

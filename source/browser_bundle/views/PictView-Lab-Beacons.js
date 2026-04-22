@@ -223,6 +223,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<div class="lab-beacon-actions">
 			<a class="lab-btn secondary small {~D:Record.StartDisabled~}" href="#/beacons/{~D:Record.IDBeacon~}/start">Start</a>
 			<a class="lab-btn secondary small {~D:Record.StopDisabled~}"  href="#/beacons/{~D:Record.IDBeacon~}/stop">Stop</a>
+			<a class="lab-btn secondary small" href="#/beacons/{~D:Record.IDBeacon~}/logs">Logs</a>
 			<a class="lab-btn danger small" href="#/beacons/{~D:Record.IDBeacon~}/remove">Remove</a>
 		</div>
 	</div>
@@ -241,8 +242,8 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 			<div class="lab-beacon-detail-value">{~D:Record.UltravisorLabel~}</div>
 		</div>
 		<div>
-			<div class="label">PID</div>
-			<div class="lab-beacon-detail-value">{~D:Record.PID~}</div>
+			<div class="label">{~D:Record.RuntimeLabel~}</div>
+			<div class="lab-beacon-detail-value">{~D:Record.RuntimeValue~}</div>
 		</div>
 	</div>
 </div>`
@@ -342,6 +343,16 @@ class LabBeaconsView extends libPictView
 			let tmpUv = tmpBeacon.IDUltravisorInstance ? tmpInstances.find((pU) => pU.IDUltravisorInstance === tmpBeacon.IDUltravisorInstance) : null;
 			let tmpUvLabel = tmpUv ? `${this._escape(tmpUv.Name)} (port ${tmpUv.Port})` : (tmpBeacon.IDUltravisorInstance ? '(missing)' : 'n/a');
 
+			// Container-mode beacons don't have a PID; the meaningful ident is
+			// their container + image.  Process-mode beacons stay with PID.
+			let tmpRuntimeLabel = 'PID';
+			let tmpRuntimeValue = tmpBeacon.PID ? String(tmpBeacon.PID) : '--';
+			if (tmpBeacon.Runtime === 'container')
+			{
+				tmpRuntimeLabel = 'Image';
+				tmpRuntimeValue = tmpBeacon.ImageTag ? this._escape(tmpBeacon.ImageTag) : '--';
+			}
+
 			tmpHtml += this.pict.parseTemplateByHash('Lab-Beacons-Card-Template',
 				{
 					IDBeacon:        tmpBeacon.IDBeacon,
@@ -351,7 +362,8 @@ class LabBeaconsView extends libPictView
 					StatusDetail:    this._escape(tmpBeacon.StatusDetail || ''),
 					DetailDisplay:   tmpBeacon.StatusDetail ? 'block' : 'none',
 					Port:            tmpBeacon.Port,
-					PID:             tmpBeacon.PID || '--',
+					RuntimeLabel:    tmpRuntimeLabel,
+					RuntimeValue:    tmpRuntimeValue,
 					UltravisorLabel: tmpUvLabel,
 					StartDisabled:   (tmpBeacon.Status === 'running' || tmpBeacon.Status === 'starting' || tmpBeacon.Status === 'provisioning') ? 'disabled' : '',
 					StopDisabled:    (tmpBeacon.Status !== 'running') ? 'disabled' : ''

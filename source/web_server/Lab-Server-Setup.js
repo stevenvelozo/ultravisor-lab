@@ -31,6 +31,7 @@ const libServiceDBEngineManager    = require('../services/Service-DBEngineManage
 const libServiceUltravisorManager  = require('../services/Service-UltravisorManager.js');
 const libServiceBeaconTypeRegistry = require('../services/Service-BeaconTypeRegistry.js');
 const libServiceBeaconManager      = require('../services/Service-BeaconManager.js');
+const libServiceBeaconContainerManager = require('../services/Service-BeaconContainerManager.js');
 const libServiceSeedDatasetManager = require('../services/Service-SeedDatasetManager.js');
 const libServiceLabLifecycle       = require('../services/Service-LabLifecycle.js');
 
@@ -90,6 +91,7 @@ function setupLabServer(pOptions, fCallback)
 	tmpFable.addAndInstantiateServiceType('LabDBEngineManager',    libServiceDBEngineManager);
 	tmpFable.addAndInstantiateServiceType('LabUltravisorManager',  libServiceUltravisorManager);
 	tmpFable.addAndInstantiateServiceType('LabBeaconTypeRegistry', libServiceBeaconTypeRegistry);
+	tmpFable.addAndInstantiateServiceType('LabBeaconContainerManager', libServiceBeaconContainerManager);
 	tmpFable.addAndInstantiateServiceType('LabBeaconManager',      libServiceBeaconManager);
 	tmpFable.addAndInstantiateServiceType('LabSeedDatasetManager', libServiceSeedDatasetManager);
 	tmpFable.addAndInstantiateServiceType('LabLifecycle',          libServiceLabLifecycle);
@@ -130,6 +132,7 @@ function setupLabServer(pOptions, fCallback)
 						UltravisorManager:  tmpFable.LabUltravisorManager,
 						BeaconTypeRegistry: tmpFable.LabBeaconTypeRegistry,
 						BeaconManager:      tmpFable.LabBeaconManager,
+						BeaconContainerManager: tmpFable.LabBeaconContainerManager,
 						SeedDatasetManager: tmpFable.LabSeedDatasetManager,
 						Lifecycle:          tmpFable.LabLifecycle,
 						Package:            tmpPackage
@@ -194,6 +197,12 @@ function setupLabServer(pOptions, fCallback)
 									tmpOrator.serviceServer.Active = true;
 									tmpOrator.serviceServer.Port = tmpPort;
 
+									// Bump Runtime on any Beacon / Ultravisor rows still
+									// running under the older host-process path.  Idempotent
+									// on subsequent boots.
+									_migrateBeaconRuntimes(tmpFable);
+									_migrateUltravisorRuntimes(tmpFable);
+
 									// Snapshot rows that claimed Status==='running' before the
 									// lab shut down.  The reconcile pass is about to stomp
 									// their status back to 'stopped' (dead PIDs, missing
@@ -202,28 +211,50 @@ function setupLabServer(pOptions, fCallback)
 									// state survives a lab restart.
 									let tmpWasRunning = _snapshotWasRunning(tmpFable.LabStateStore);
 
-									// Prime the reconcile loop with a boot-time pass so the UI has fresh state on first render.
-									tmpFable.LabReconcileLoop.runOnce(
-										() =>
+									// Ensure the shared docker network exists before
+									// reconcile / auto-restart runs, so container-backed
+									// beacons + DB engines have a place to land.  No-op
+									// when docker is unavailable; the fCallback branches
+									// there so the lab still boots without docker.
+									tmpFable.LabDockerManager.probe(
+										(pProbeErr, pProbe) =>
 										{
-											tmpFable.LabReconcileLoop.start();
+											let fAfterNet = () =>
+											{
+												// Prime the reconcile loop with a boot-time pass so the UI has fresh state on first render.
+												tmpFable.LabReconcileLoop.runOnce(
+													() =>
+													{
+														tmpFable.LabReconcileLoop.start();
 
-											// Auto-restart everything that was running before
-											// the last shutdown.  DB engines first (beacons
-											// depend on them), then Ultravisors, then beacons.
-											_autoStartWasRunning(tmpFable, tmpWasRunning,
-												() =>
-												{
-													return fCallback(null,
-														{
-															Fable:    tmpFable,
-															Orator:   tmpOrator,
-															Core:     tmpCore,
-															Port:     tmpPort,
-															Host:     tmpHost,
-															DistPath: tmpDistRoot
-														});
-												});
+														// Auto-restart everything that was running before
+														// the last shutdown.  DB engines first (beacons
+														// depend on them), then Ultravisors, then beacons.
+														_autoStartWasRunning(tmpFable, tmpWasRunning,
+															() =>
+															{
+																return fCallback(null,
+																	{
+																		Fable:    tmpFable,
+																		Orator:   tmpOrator,
+																		Core:     tmpCore,
+																		Port:     tmpPort,
+																		Host:     tmpHost,
+																		DistPath: tmpDistRoot
+																	});
+															});
+													});
+											};
+
+											if (pProbe && pProbe.Available)
+											{
+												tmpFable.LabDockerManager.ensureNetwork('ultravisor-lab',
+													() => _attachExistingContainers(tmpFable, () => fAfterNet()));
+											}
+											else
+											{
+												fAfterNet();
+											}
 										});
 								});
 						});
@@ -301,6 +332,117 @@ function _autoStartWasRunning(pFable, pWasRunning, fCallback)
 						() => fCallback());
 				});
 		});
+}
+
+/**
+ * Attach any pre-existing DBEngine + container-mode Beacon containers to
+ * the shared `ultravisor-lab` network.  Covers the upgrade path where
+ * containers were created before the lab started joining them to the
+ * shared network; `docker network connect` is idempotent via the
+ * AlreadyAttached short-circuit in LabDockerManager.connectToNetwork.
+ */
+function _attachExistingContainers(pFable, fCallback)
+{
+	let tmpStore = pFable.LabStateStore;
+	let tmpDocker = pFable.LabDockerManager;
+
+	let tmpTargets = [];
+	let tmpEngineRows = tmpStore.list('DBEngine');
+	for (let i = 0; i < tmpEngineRows.length; i++)
+	{
+		if (tmpEngineRows[i].ContainerID) { tmpTargets.push({ Kind: 'DBEngine', ID: tmpEngineRows[i].ContainerID, Name: tmpEngineRows[i].Name }); }
+	}
+	let tmpBeaconRows = tmpStore.list('Beacon');
+	for (let j = 0; j < tmpBeaconRows.length; j++)
+	{
+		if (tmpBeaconRows[j].Runtime === 'container' && tmpBeaconRows[j].ContainerID)
+		{
+			tmpTargets.push({ Kind: 'Beacon', ID: tmpBeaconRows[j].ContainerID, Name: tmpBeaconRows[j].Name });
+		}
+	}
+	let tmpUVRows = tmpStore.list('UltravisorInstance');
+	for (let k = 0; k < tmpUVRows.length; k++)
+	{
+		if (tmpUVRows[k].Runtime === 'container' && tmpUVRows[k].ContainerID)
+		{
+			tmpTargets.push({ Kind: 'UltravisorInstance', ID: tmpUVRows[k].ContainerID, Name: tmpUVRows[k].Name });
+		}
+	}
+
+	if (tmpTargets.length === 0) { return fCallback(); }
+
+	let tmpIdx = 0;
+	let tmpNext = () =>
+	{
+		if (tmpIdx >= tmpTargets.length) { return fCallback(); }
+		let tmpT = tmpTargets[tmpIdx++];
+		tmpDocker.connectToNetwork('ultravisor-lab', tmpT.ID,
+			(pErr, pResult) =>
+			{
+				if (pErr)
+				{
+					// Container might not exist anymore; reconcile will
+					// catch that on its own pass.  Log and move on.
+					pFable.log.warn(`[AutoAttach] ${tmpT.Kind} "${tmpT.Name}" could not attach to ultravisor-lab network: ${pErr.message}`);
+				}
+				else if (pResult && pResult.Attached)
+				{
+					pFable.log.info(`[AutoAttach] ${tmpT.Kind} "${tmpT.Name}" attached to ultravisor-lab network.`);
+				}
+				return tmpNext();
+			});
+	};
+	tmpNext();
+}
+
+/**
+ * One-shot migration for Beacon rows whose type descriptor has a `docker`
+ * block but whose row still says Runtime='process' (i.e. rows created
+ * under the pre-container code path).  Flips Runtime to 'container' and
+ * clears the stale PID so the next start routes through the container
+ * manager instead of the host-process path.
+ *
+ * Idempotent -- rows already at Runtime='container' are skipped.  Rows
+ * whose type still has no docker block are left alone.
+ */
+function _migrateBeaconRuntimes(pFable)
+{
+	let tmpStore = pFable.LabStateStore;
+	let tmpRegistry = pFable.LabBeaconTypeRegistry;
+
+	let tmpRows = tmpStore.list('Beacon');
+	for (let i = 0; i < tmpRows.length; i++)
+	{
+		let tmpRow = tmpRows[i];
+		if (tmpRow.Runtime === 'container') { continue; }
+		let tmpType = tmpRegistry.get(tmpRow.BeaconType);
+		if (!tmpType || !tmpType.Docker) { continue; }
+
+		tmpStore.update('Beacon', 'IDBeacon', tmpRow.IDBeacon,
+			{ Runtime: 'container', PID: 0, ContainerID: '' });
+		pFable.log.info(`[Migration] Beacon '${tmpRow.Name}' (#${tmpRow.IDBeacon}) flipped to container runtime.`);
+	}
+}
+
+/**
+ * Flip any Ultravisor rows still at Runtime='process' to 'container'.
+ * Phase 1b-2 made Ultravisors always-container -- the host-process path
+ * is dead code.  The row's PID + ContainerID both get cleared so the
+ * next start goes through the container manager and rebuilds the image
+ * if necessary.
+ */
+function _migrateUltravisorRuntimes(pFable)
+{
+	let tmpStore = pFable.LabStateStore;
+	let tmpRows = tmpStore.list('UltravisorInstance');
+	for (let i = 0; i < tmpRows.length; i++)
+	{
+		let tmpRow = tmpRows[i];
+		if (tmpRow.Runtime === 'container') { continue; }
+		tmpStore.update('UltravisorInstance', 'IDUltravisorInstance', tmpRow.IDUltravisorInstance,
+			{ Runtime: 'container', PID: 0, ContainerID: '' });
+		pFable.log.info(`[Migration] Ultravisor '${tmpRow.Name}' (#${tmpRow.IDUltravisorInstance}) flipped to container runtime.`);
+	}
 }
 
 function _startSerially(pRows, pIDColumn, fPerRow, fDone)

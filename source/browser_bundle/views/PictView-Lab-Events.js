@@ -41,6 +41,13 @@ const _ViewConfiguration =
 .lab-events .sev-info    { color: #1e40af; }
 .lab-events .sev-warning { color: #b45309; }
 .lab-events .sev-error   { color: #b91c1c; }
+.lab-events-log-link
+{
+	color: #1d4ed8;
+	text-decoration: none;
+	border-bottom: 1px dashed #93c5fd;
+}
+.lab-events-log-link:hover { color: #1e40af; border-bottom-color: #1e40af; }
 .lab-events .lab-events-empty
 {
 	padding: 40px;
@@ -129,11 +136,28 @@ class LabEventsView extends libPictView
 			for (let i = 0; i < tmpEvents.length; i++)
 			{
 				let tmpEvt = tmpEvents[i];
+
+				// Make the entity label a clickable log-viewer link when
+				// we know how to resolve it.  Beacon + DBEngine both have
+				// log routes; other entity types (System, etc.) render flat.
+				let tmpText = tmpEvt.EntityName ? `${tmpEvt.EntityType}/${tmpEvt.EntityName}` : tmpEvt.EntityType;
+				let tmpEntityLabel = this._escape(tmpText);
+				let tmpLogHref = '';
+				if (tmpEvt.EntityID)
+				{
+					if (tmpEvt.EntityType === 'Beacon')   { tmpLogHref = `#/beacons/${tmpEvt.EntityID}/logs`; }
+					else if (tmpEvt.EntityType === 'DBEngine') { tmpLogHref = `#/dbengines/${tmpEvt.EntityID}/logs`; }
+				}
+				if (tmpLogHref)
+				{
+					tmpEntityLabel = `<a class="lab-events-log-link" href="${tmpLogHref}" title="Open logs">${this._escape(tmpText)}</a>`;
+				}
+
 				let tmpRecord =
 				{
 					TimeLabel:   this._formatTime(tmpEvt.Timestamp),
 					Severity:    tmpEvt.Severity || 'info',
-					EntityLabel: tmpEvt.EntityName ? `${tmpEvt.EntityType}/${tmpEvt.EntityName}` : tmpEvt.EntityType,
+					EntityLabel: tmpEntityLabel,
 					EventType:   tmpEvt.EventType,
 					Message:     this._escape(tmpEvt.Message || '')
 				};

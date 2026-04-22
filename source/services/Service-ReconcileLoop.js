@@ -109,17 +109,42 @@ class ServiceReconcileLoop extends libFableServiceProviderBase
 
 	_reconcileContainers(pStore, pDocker, pCounters, pDockerAvailable, fCallback)
 	{
-		let tmpRows = pStore.list('DBEngine');
-		if (tmpRows.length === 0 || !pDockerAvailable)
+		if (!pDockerAvailable) { return fCallback(); }
+
+		// Container-backed rows live in DBEngine (always) + Beacon rows with
+		// Runtime='container' + UltravisorInstance rows with Runtime='container'.
+		// All three walk the same inspect path so they share drift detection.
+		let tmpTargets = [];
+		let tmpEngineRows = pStore.list('DBEngine');
+		for (let i = 0; i < tmpEngineRows.length; i++)
 		{
-			return fCallback();
+			tmpTargets.push({ Table: 'DBEngine', IDColumn: 'IDDBEngine', EntityType: 'DBEngine', Row: tmpEngineRows[i] });
 		}
+		let tmpBeaconRows = pStore.list('Beacon');
+		for (let j = 0; j < tmpBeaconRows.length; j++)
+		{
+			if (tmpBeaconRows[j].Runtime === 'container')
+			{
+				tmpTargets.push({ Table: 'Beacon', IDColumn: 'IDBeacon', EntityType: 'Beacon', Row: tmpBeaconRows[j] });
+			}
+		}
+		let tmpUVRows = pStore.list('UltravisorInstance');
+		for (let k = 0; k < tmpUVRows.length; k++)
+		{
+			if (tmpUVRows[k].Runtime === 'container')
+			{
+				tmpTargets.push({ Table: 'UltravisorInstance', IDColumn: 'IDUltravisorInstance', EntityType: 'UltravisorInstance', Row: tmpUVRows[k] });
+			}
+		}
+
+		if (tmpTargets.length === 0) { return fCallback(); }
 
 		let tmpIdx = 0;
 		let tmpNext = () =>
 		{
-			if (tmpIdx >= tmpRows.length) { return fCallback(); }
-			let tmpRow = tmpRows[tmpIdx++];
+			if (tmpIdx >= tmpTargets.length) { return fCallback(); }
+			let tmpTarget = tmpTargets[tmpIdx++];
+			let tmpRow = tmpTarget.Row;
 			pCounters.Checked++;
 
 			if (!tmpRow.ContainerID)
@@ -138,14 +163,14 @@ class ServiceReconcileLoop extends libFableServiceProviderBase
 
 					if (tmpRow.Status !== tmpObserved)
 					{
-						pStore.update('DBEngine', 'IDDBEngine', tmpRow.IDDBEngine, { Status: tmpObserved });
+						pStore.update(tmpTarget.Table, tmpTarget.IDColumn, tmpRow[tmpTarget.IDColumn], { Status: tmpObserved });
 						if (tmpRow.Status === 'running' && tmpObserved !== 'running')
 						{
 							pCounters.Drift++;
 							pStore.recordEvent(
 								{
-									EntityType:  'DBEngine',
-									EntityID:    tmpRow.IDDBEngine,
+									EntityType:  tmpTarget.EntityType,
+									EntityID:    tmpRow[tmpTarget.IDColumn],
 									EntityName:  tmpRow.Name,
 									EventType:   'drift-detected',
 									Severity:    'warning',
@@ -171,6 +196,11 @@ class ServiceReconcileLoop extends libFableServiceProviderBase
 			for (let j = 0; j < tmpRows.length; j++)
 			{
 				let tmpRow = tmpRows[j];
+
+				// Container-mode beacons/UVs are reconciled by _reconcileContainers
+				// via docker inspect; PID checks don't apply to them.
+				if ((tmpEntity.Table === 'Beacon' || tmpEntity.Table === 'UltravisorInstance') && tmpRow.Runtime === 'container') { continue; }
+
 				pCounters.Checked++;
 
 				let tmpPidFromFile = pSupervisor.readPidFile(tmpEntity.EntityType, tmpRow[tmpEntity.IDColumn]);

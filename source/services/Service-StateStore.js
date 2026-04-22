@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS DBEngine
 	Name             TEXT    NOT NULL,
 	EngineType       TEXT    NOT NULL,
 	Port             INTEGER NOT NULL,
+	InternalPort     INTEGER DEFAULT 0,
 	ContainerID      TEXT    DEFAULT '',
 	ContainerName    TEXT    DEFAULT '',
 	ImageTag         TEXT    DEFAULT '',
@@ -51,6 +52,11 @@ CREATE TABLE IF NOT EXISTS UltravisorInstance
 	Name                 TEXT    NOT NULL,
 	Port                 INTEGER NOT NULL,
 	PID                  INTEGER DEFAULT 0,
+	ContainerID          TEXT    DEFAULT '',
+	ContainerName        TEXT    DEFAULT '',
+	ImageTag             TEXT    DEFAULT '',
+	ImageVersion         TEXT    DEFAULT '',
+	Runtime              TEXT    DEFAULT 'process',
 	ConfigPath           TEXT    DEFAULT '',
 	Status               TEXT    DEFAULT 'pending',
 	StatusDetail         TEXT    DEFAULT '',
@@ -69,6 +75,11 @@ CREATE TABLE IF NOT EXISTS Beacon
 	BeaconType           TEXT    NOT NULL,
 	Port                 INTEGER NOT NULL,
 	PID                  INTEGER DEFAULT 0,
+	ContainerID          TEXT    DEFAULT '',
+	ContainerName        TEXT    DEFAULT '',
+	ImageTag             TEXT    DEFAULT '',
+	ImageVersion         TEXT    DEFAULT '',
+	Runtime              TEXT    DEFAULT 'process',  -- 'process' | 'container'
 	IDUltravisorInstance INTEGER DEFAULT 0,
 	ConfigPath           TEXT    DEFAULT '',
 	ConfigJSON           TEXT    DEFAULT '{}',
@@ -189,6 +200,7 @@ class ServiceStateStore extends libFableServiceProviderBase
 				{
 					this.fable.MeadowSQLiteProvider.db.exec(LAB_SCHEMA_SQL);
 					this.db = this.fable.MeadowSQLiteProvider.db;
+					this._applyColumnMigrations();
 					this.fable.log.info(`LabStateStore: ready at [${this.dbPath}]`);
 					return fCallback(null);
 				}
@@ -198,6 +210,46 @@ class ServiceStateStore extends libFableServiceProviderBase
 					return fCallback(pSchemaError);
 				}
 			});
+	}
+
+	/**
+	 * SQLite doesn't support `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, so
+	 * for each newly-added column we probe `PRAGMA table_info(<table>)` and
+	 * issue an `ALTER TABLE ADD COLUMN` only when the column is missing.
+	 * This keeps existing dev databases alive without a wipe-and-recreate.
+	 *
+	 * Columns added in each schema iteration:
+	 *   - 2026-04 Beacon    -- ContainerID, ContainerName, ImageTag, ImageVersion, Runtime
+	 *   - 2026-04 DBEngine  -- InternalPort
+	 */
+	_applyColumnMigrations()
+	{
+		let tmpMigrations =
+		[
+			{ Table: 'Beacon',             Column: 'ContainerID',   Def: `TEXT DEFAULT ''` },
+			{ Table: 'Beacon',             Column: 'ContainerName', Def: `TEXT DEFAULT ''` },
+			{ Table: 'Beacon',             Column: 'ImageTag',      Def: `TEXT DEFAULT ''` },
+			{ Table: 'Beacon',             Column: 'ImageVersion',  Def: `TEXT DEFAULT ''` },
+			{ Table: 'Beacon',             Column: 'Runtime',       Def: `TEXT DEFAULT 'process'` },
+			{ Table: 'DBEngine',           Column: 'InternalPort',  Def: `INTEGER DEFAULT 0` },
+			{ Table: 'UltravisorInstance', Column: 'ContainerID',   Def: `TEXT DEFAULT ''` },
+			{ Table: 'UltravisorInstance', Column: 'ContainerName', Def: `TEXT DEFAULT ''` },
+			{ Table: 'UltravisorInstance', Column: 'ImageTag',      Def: `TEXT DEFAULT ''` },
+			{ Table: 'UltravisorInstance', Column: 'ImageVersion',  Def: `TEXT DEFAULT ''` },
+			{ Table: 'UltravisorInstance', Column: 'Runtime',       Def: `TEXT DEFAULT 'process'` }
+		];
+
+		for (let i = 0; i < tmpMigrations.length; i++)
+		{
+			let tmpM = tmpMigrations[i];
+			let tmpInfo = this.db.prepare(`PRAGMA table_info(${tmpM.Table})`).all();
+			let tmpHas = tmpInfo.some((pR) => pR.name === tmpM.Column);
+			if (!tmpHas)
+			{
+				this.db.exec(`ALTER TABLE ${tmpM.Table} ADD COLUMN ${tmpM.Column} ${tmpM.Def}`);
+				this.fable.log.info(`LabStateStore: migrated ${tmpM.Table}.${tmpM.Column}`);
+			}
+		}
 	}
 
 	// ── Generic helpers ──────────────────────────────────────────────────────

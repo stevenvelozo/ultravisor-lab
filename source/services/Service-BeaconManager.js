@@ -1,22 +1,22 @@
 /**
  * Service-BeaconManager
  *
- * Generic lifecycle manager for every row in the Beacon table.  Dispatches
- * to one of two spawn strategies based on the type descriptor from
- * Service-BeaconTypeRegistry:
+ * Generic lifecycle manager for every row in the Beacon table.  Forks
+ * on the row's Runtime column:
  *
- *   standalone-service   -- run the module's own bin, pointed at the
- *                           user's saved ConfigJSON (written to disk so
- *                           the module can consume it in its native form).
- *   capability-provider  -- run the lab's lab-beacon-host.js, which loads
- *                           the module's CapabilityProvider class and
- *                           registers it with the target Ultravisor.
+ *   container  -- LabBeaconContainerManager builds the beacon image
+ *                 (standalone-service or capability-provider flavor)
+ *                 and runs it on the shared `ultravisor-lab` network.
+ *   process    -- legacy host-process path for standalone-service
+ *                 beacons whose npm package doesn't ship a docker block.
+ *                 Capability-provider beacons are container-only.
  *
- * Data layout:
+ * Per-beacon data layout (host side):
  *   data/beacons/<id>/
- *     config.json                 -- ConfigJSON persisted to disk (fed to
- *                                    the module via argTemplate)
- *     logs/ (via ProcessSupervisor)
+ *     config.json                 -- rendered from the type's ConfigTemplate
+ *                                    (bind-mounted to /app/data in container
+ *                                    mode)
+ *     logs/ (via ProcessSupervisor) -- process mode only
  */
 'use strict';
 
@@ -92,6 +92,13 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 
 		let tmpConfig = pRequest.Config && typeof pRequest.Config === 'object' ? pRequest.Config : {};
 
+		// Runtime is driven by the type descriptor: if it carries a docker
+		// block we route through the container manager, else fall back to
+		// the existing host-process path.  The choice is frozen on the
+		// Beacon row so start/stop/remove always route consistently even
+		// if the stanza is later edited.
+		let tmpRuntime = tmpType.Docker ? 'container' : 'process';
+
 		let tmpID = tmpStore.insert('Beacon',
 			{
 				Name:                 tmpName,
@@ -99,6 +106,7 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 				Port:                 tmpPort,
 				IDUltravisorInstance: tmpUvID,
 				ConfigJSON:           JSON.stringify(tmpConfig),
+				Runtime:              tmpRuntime,
 				Status:               'provisioning',
 				StatusDetail:         'Preparing spawn...'
 			});
@@ -131,8 +139,67 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 			return fCallback(pErr);
 		}
 		tmpStore.update('Beacon', 'IDBeacon', tmpID,
-			{ ConfigPath: tmpConfigPath, StatusDetail: 'Spawning beacon...' });
+			{ ConfigPath: tmpConfigPath, StatusDetail: (tmpRuntime === 'container' ? 'Building container...' : 'Spawning beacon...') });
 
+		if (tmpRuntime === 'container')
+		{
+			// Include ConfigJSON so the container manager's _resolveConfigMounts
+			// can read per-beacon bind sources (e.g. HostContentPath) from the
+			// saved config.  Otherwise the stub row is missing the field and
+			// config-driven mounts silently fall back to anonymous volumes.
+			let tmpBeaconRow =
+				{
+					IDBeacon:             tmpID,
+					Name:                 tmpName,
+					Port:                 tmpPort,
+					IDUltravisorInstance: tmpUvID,
+					ConfigJSON:           JSON.stringify(tmpConfig)
+				};
+
+			let fProgress = this._buildContainerProgressEmitter(
+				{ IDBeacon: tmpID, Name: tmpName, TypeDisplayName: tmpType.DisplayName });
+
+			this.fable.LabBeaconContainerManager.create(tmpType, tmpBeaconRow,
+				(pContainerErr, pContainerResult) =>
+				{
+					if (pContainerErr)
+					{
+						this._markFailed(tmpID, tmpName, pContainerErr.message);
+						return;
+					}
+					tmpStore.update('Beacon', 'IDBeacon', tmpID,
+						{
+							ContainerID:   pContainerResult.ContainerID,
+							ContainerName: pContainerResult.ContainerName,
+							ImageTag:      pContainerResult.ImageTag,
+							ImageVersion:  pContainerResult.ImageVersion,
+							StatusDetail:  'Waiting for HTTP readiness...'
+						});
+
+					this._waitForHttp(tmpPort, tmpType.HealthCheck && tmpType.HealthCheck.Path, 0,
+						(pReady) =>
+						{
+							if (!pReady)
+							{
+								this._markFailed(tmpID, tmpName, 'beacon container did not come up');
+								return;
+							}
+							tmpStore.update('Beacon', 'IDBeacon', tmpID,
+								{ Status: 'running', StatusDetail: '' });
+							tmpStore.recordEvent(
+								{
+									EntityType: 'Beacon', EntityID: tmpID, EntityName: tmpName,
+									EventType: 'beacon-ready', Severity: 'info',
+									Message: `${tmpType.DisplayName} beacon '${tmpName}' ready on port ${tmpPort} (container ${pContainerResult.ContainerName})`
+								});
+						});
+				},
+				fProgress);
+
+			return fCallback(null, { IDBeacon: tmpID, Runtime: 'container', Status: 'provisioning' });
+		}
+
+		// Host-process path ( existing behavior; unchanged ).
 		let tmpSpawn;
 		try
 		{
@@ -182,7 +249,7 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 					});
 			});
 
-		return fCallback(null, { IDBeacon: tmpID, PID: tmpPid, Status: 'provisioning' });
+		return fCallback(null, { IDBeacon: tmpID, PID: tmpPid, Runtime: 'process', Status: 'provisioning' });
 	}
 
 	// ── Config rendering ────────────────────────────────────────────────────
@@ -194,12 +261,57 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 	 */
 	_renderConfig(pType, pUserConfig, pID, pName, pPort, pInstance)
 	{
+		// For container-mode beacons the process inside the container sees
+		// two lab-written paths differently than host-mode beacons:
+		//   - Port: the internal port it listens on (stanza's ExposedPort).
+		//           The host→container port mapping is separate.
+		//   - BeaconDir: the container-visible path of its data dir (the
+		//           DataMountPath in the stanza, where the lab bind-mounts
+		//           data/beacons/<id>/).  Writing the host path here means
+		//           the container writes to an unmounted path and loses
+		//           state on restart.
+		//   - UltravisorURL: the container reaches the host-process
+		//           Ultravisor via host.docker.internal instead of 127.0.0.1.
+		let tmpIsContainer = !!(pType.Docker);
+
+		let tmpInternalPort = pPort;
+		if (tmpIsContainer && pType.Docker.ExposedPort)
+		{
+			tmpInternalPort = pType.Docker.ExposedPort;
+		}
+
+		let tmpBeaconDir = tmpIsContainer
+			? (pType.Docker.DataMountPath || '/app/data')
+			: this._beaconDir(pID);
+
+		let tmpUltravisorURL = '';
+		if (pInstance)
+		{
+			if (tmpIsContainer)
+			{
+				// Container-to-UV: docker DNS on shared network when the UV
+				// is also a container; host.docker.internal otherwise.
+				if (pInstance.Runtime === 'container' && pInstance.ContainerName)
+				{
+					tmpUltravisorURL = `http://${pInstance.ContainerName}:54321`;
+				}
+				else
+				{
+					tmpUltravisorURL = `http://host.docker.internal:${pInstance.Port}`;
+				}
+			}
+			else
+			{
+				tmpUltravisorURL = `http://127.0.0.1:${pInstance.Port}`;
+			}
+		}
+
 		let tmpTokens =
 		{
-			Port:          pPort,
+			Port:          tmpInternalPort,
 			BeaconName:    pName,
-			BeaconDir:     this._beaconDir(pID),
-			UltravisorURL: pInstance ? `http://127.0.0.1:${pInstance.Port}` : '',
+			BeaconDir:     tmpBeaconDir,
+			UltravisorURL: tmpUltravisorURL,
 			IDBeacon:      pID
 		};
 		let tmpTemplate = pType.ConfigTemplate ? this._substituteTokens(pType.ConfigTemplate, tmpTokens) : {};
@@ -263,20 +375,12 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 
 		if (pType.Mode === 'capability-provider')
 		{
-			if (!pType.ProviderPath) { throw new Error(`Type '${pType.BeaconType}' has no provider path.`); }
-			if (!pInstance) { throw new Error(`capability-provider mode requires a target Ultravisor.`); }
-
-			let tmpHost = libPath.resolve(__dirname, '..', '..', 'bin', 'lab-beacon-host.js');
-			let tmpArgs =
-			[
-				tmpHost,
-				'--port',            String(pPort),
-				'--beacon-name',     pName,
-				'--ultravisor-url',  `http://127.0.0.1:${pInstance.Port}`,
-				'--provider',        `${pType.BeaconType}:${pType.ProviderPath}`,
-				'--config',          pConfigPath
-			];
-			return { Command: process.execPath, Args: tmpArgs };
+			// Host-process capability-provider beacons are no longer
+			// supported -- they live exclusively as containers via
+			// LabBeaconContainerManager.  Boot migration flips legacy rows
+			// to Runtime='container' before anything tries this path, so
+			// reaching here means something slipped the migration.
+			throw new Error(`Capability-provider type '${pType.BeaconType}' must run as a container; no host-process fallback.`);
 		}
 
 		throw new Error(`Unknown beacon mode: ${pType.Mode}`);
@@ -326,6 +430,81 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 			});
 	}
 
+	/**
+	 * Build a progress callback the container manager uses to surface
+	 * image-build + container-start phases into the Beacon row's
+	 * StatusDetail and the Events timeline.  Keeps the user informed
+	 * during long docker builds (the first image build of a given
+	 * version can take multiple minutes).
+	 */
+	_buildContainerProgressEmitter(pCtx)
+	{
+		let tmpStore = this.fable.LabStateStore;
+
+		return (pPhase, pData) =>
+		{
+			let tmpStatusDetail = '';
+			let tmpEventType    = '';
+			let tmpSeverity     = 'info';
+			let tmpMessage      = '';
+			let tmpData         = pData || {};
+			let tmpElapsedS     = tmpData.ElapsedMs ? Math.round(tmpData.ElapsedMs / 1000) : 0;
+
+			switch (pPhase)
+			{
+				case 'build-started':
+					tmpStatusDetail = `Building image ${tmpData.ImageTag} (first build may take a few minutes)...`;
+					tmpEventType    = 'beacon-image-build-started';
+					tmpMessage      = `Building container image ${tmpData.ImageTag} for '${pCtx.Name}'...`;
+					break;
+				case 'build-progress':
+					tmpStatusDetail = `Building image... ${tmpElapsedS}s elapsed`;
+					tmpEventType    = 'beacon-image-build-progress';
+					tmpMessage      = `Still building ${tmpData.ImageTag} for '${pCtx.Name}'... ${tmpElapsedS}s elapsed`;
+					break;
+				case 'build-completed':
+					tmpStatusDetail = `Image ready (${tmpElapsedS}s)`;
+					tmpEventType    = 'beacon-image-built';
+					tmpMessage      = `Built container image ${tmpData.ImageTag} for '${pCtx.Name}' in ${tmpElapsedS}s`;
+					break;
+				case 'build-failed':
+					tmpSeverity     = 'error';
+					tmpEventType    = 'beacon-image-build-failed';
+					tmpMessage      = `Image build failed for '${pCtx.Name}' after ${tmpElapsedS}s: ${tmpData.Error || 'unknown error'}`;
+					break;
+				case 'container-creating':
+					tmpStatusDetail = 'Starting container...';
+					tmpEventType    = 'beacon-container-creating';
+					tmpMessage      = `Starting container ${tmpData.ContainerName} for '${pCtx.Name}'...`;
+					break;
+				case 'container-started':
+					tmpStatusDetail = 'Container running; waiting for HTTP readiness...';
+					tmpEventType    = 'beacon-container-started';
+					tmpMessage      = `Container ${tmpData.ContainerName} running for '${pCtx.Name}'.`;
+					break;
+				default:
+					return;
+			}
+
+			if (tmpStatusDetail)
+			{
+				tmpStore.update('Beacon', 'IDBeacon', pCtx.IDBeacon, { StatusDetail: tmpStatusDetail });
+			}
+			if (tmpEventType)
+			{
+				tmpStore.recordEvent(
+					{
+						EntityType: 'Beacon',
+						EntityID:   pCtx.IDBeacon,
+						EntityName: pCtx.Name,
+						EventType:  tmpEventType,
+						Severity:   tmpSeverity,
+						Message:    tmpMessage
+					});
+			}
+		};
+	}
+
 	_markFailed(pID, pName, pMessage)
 	{
 		this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID,
@@ -353,6 +532,91 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 			return fCallback(new Error('Paired Ultravisor no longer exists.'));
 		}
 
+		if (tmpBeacon.Runtime === 'container')
+		{
+			// If we already have a container id, just `docker start` it.
+			// Otherwise (e.g. first boot after a container was removed out
+			// from under us) re-create the container from the type descriptor.
+			let fReady = () =>
+			{
+				this._waitForHttp(tmpBeacon.Port, tmpType.HealthCheck && tmpType.HealthCheck.Path, 0,
+					(pR) =>
+					{
+						if (pR)
+						{
+							this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID,
+								{ Status: 'running', StatusDetail: '' });
+						}
+						else
+						{
+							this._markFailed(pID, tmpBeacon.Name, 'beacon container did not come up');
+						}
+					});
+			};
+
+			this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID,
+				{ Status: 'starting', StatusDetail: 'Starting container...' });
+
+			if (tmpBeacon.ContainerID)
+			{
+				return this.fable.LabBeaconContainerManager.start(tmpBeacon.ContainerID,
+					(pErr) =>
+					{
+						if (pErr)
+						{
+							this._markFailed(pID, tmpBeacon.Name, pErr.message);
+							return fCallback(pErr);
+						}
+						fReady();
+						return fCallback(null, { Status: 'starting' });
+					});
+			}
+
+			// Re-render config.json before (re-)creating the container.
+			// Stanza tweaks (port mappings, mount paths, etc.) only reach
+			// the running process through the rendered file, so any config
+			// older than the current type descriptor gets refreshed here.
+			try
+			{
+				let tmpConfig = {};
+				try { tmpConfig = JSON.parse(tmpBeacon.ConfigJSON || '{}'); } catch (pCEx) { /* ignore */ }
+				let tmpRendered = this._renderConfig(tmpType, tmpConfig, pID, tmpBeacon.Name, tmpBeacon.Port, tmpInstance);
+				let tmpCfgPath = tmpBeacon.ConfigPath || libPath.join(this._beaconDir(pID), 'config.json');
+				libFs.mkdirSync(this._beaconDir(pID), { recursive: true });
+				libFs.writeFileSync(tmpCfgPath, JSON.stringify(tmpRendered, null, 2));
+				if (tmpBeacon.ConfigPath !== tmpCfgPath)
+				{
+					this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID, { ConfigPath: tmpCfgPath });
+				}
+			}
+			catch (pRenderErr)
+			{
+				this._markFailed(pID, tmpBeacon.Name, `config render failed: ${pRenderErr.message}`);
+				return fCallback(pRenderErr);
+			}
+
+			let fProgress = this._buildContainerProgressEmitter(
+				{ IDBeacon: pID, Name: tmpBeacon.Name, TypeDisplayName: tmpType.DisplayName });
+
+			return this.fable.LabBeaconContainerManager.create(tmpType, tmpBeacon,
+				(pErr, pResult) =>
+				{
+					if (pErr) { this._markFailed(pID, tmpBeacon.Name, pErr.message); return fCallback(pErr); }
+					this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID,
+						{
+							ContainerID:   pResult.ContainerID,
+							ContainerName: pResult.ContainerName,
+							ImageTag:      pResult.ImageTag,
+							ImageVersion:  pResult.ImageVersion,
+							StatusDetail:  'Waiting for HTTP readiness...'
+						});
+					fReady();
+					return fCallback(null, { Status: 'starting' });
+				},
+				fProgress);
+		}
+
+		// Host-process path ( existing behavior; unchanged ).
 		let tmpSpawn;
 		try
 		{
@@ -401,6 +665,26 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 		this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID,
 			{ Status: 'stopping', StatusDetail: '' });
 
+		if (tmpBeacon.Runtime === 'container' && tmpBeacon.ContainerID)
+		{
+			return this.fable.LabBeaconContainerManager.stop(tmpBeacon.ContainerID,
+				(pErr) =>
+				{
+					if (pErr)
+					{
+						this.fable.LabStateStore.recordEvent(
+							{
+								EntityType: 'Beacon', EntityID: pID, EntityName: tmpBeacon.Name,
+								EventType: 'stop-failed', Severity: 'warning', Message: pErr.message
+							});
+						return fCallback(pErr);
+					}
+					this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID,
+						{ Status: 'stopped', StatusDetail: '' });
+					return fCallback(null, { Stopped: true });
+				});
+		}
+
 		this.fable.LabProcessSupervisor.stop('Beacon', pID,
 			(pErr) =>
 			{
@@ -424,18 +708,25 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 		let tmpBeacon = this.getBeacon(pID);
 		if (!tmpBeacon) { return fCallback(new Error('Beacon not found.')); }
 
-		this.fable.LabProcessSupervisor.stop('Beacon', pID, () =>
-			{
-				this.fable.LabStateStore.remove('Beacon', 'IDBeacon', pID);
-				try { this._rimraf(this._beaconDir(pID)); } catch (pErr) { /* ignore */ }
-				this.fable.LabStateStore.recordEvent(
-					{
-						EntityType: 'Beacon', EntityID: pID, EntityName: tmpBeacon.Name,
-						EventType: 'beacon-removed', Severity: 'info',
-						Message: `Beacon '${tmpBeacon.Name}' removed`
-					});
-				return fCallback(null, { Removed: true });
-			});
+		let fFinalize = () =>
+		{
+			this.fable.LabStateStore.remove('Beacon', 'IDBeacon', pID);
+			try { this._rimraf(this._beaconDir(pID)); } catch (pErr) { /* ignore */ }
+			this.fable.LabStateStore.recordEvent(
+				{
+					EntityType: 'Beacon', EntityID: pID, EntityName: tmpBeacon.Name,
+					EventType: 'beacon-removed', Severity: 'info',
+					Message: `Beacon '${tmpBeacon.Name}' removed`
+				});
+			return fCallback(null, { Removed: true });
+		};
+
+		if (tmpBeacon.Runtime === 'container' && tmpBeacon.ContainerID)
+		{
+			return this.fable.LabBeaconContainerManager.remove(tmpBeacon.ContainerID, () => fFinalize());
+		}
+
+		this.fable.LabProcessSupervisor.stop('Beacon', pID, () => fFinalize());
 	}
 
 	// Cascade hook called when an Ultravisor is removed.  Beacons registered
