@@ -42,6 +42,8 @@
 		{ "path": "/beacons/:id/start",       "template": "{~LV:Pict.PictApplication.startBeacon(Record.data.id)~}" },
 		{ "path": "/beacons/:id/stop",        "template": "{~LV:Pict.PictApplication.stopBeacon(Record.data.id)~}" },
 		{ "path": "/beacons/:id/remove",      "template": "{~LV:Pict.PictApplication.removeBeacon(Record.data.id)~}" },
+		{ "path": "/beacons/:id/rebuild",     "template": "{~LV:Pict.PictApplication.rebuildBeaconImage(Record.data.id)~}" },
+		{ "path": "/beacons/:id/build-source/:src", "template": "{~LV:Pict.PictApplication.switchBeaconBuildSource(Record.data.id, Record.data.src)~}" },
 		{ "path": "/beacons/:id/logs",        "template": "{~LV:Pict.PictApplication.openBeaconLogs(Record.data.id)~}" },
 		{ "path": "/beacons/:id/logs/refresh","template": "{~LV:Pict.PictApplication.refreshBeaconLogs(Record.data.id)~}" },
 

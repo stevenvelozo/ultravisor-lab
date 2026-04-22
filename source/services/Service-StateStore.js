@@ -231,6 +231,11 @@ class ServiceStateStore extends libFableServiceProviderBase
 			{ Table: 'Beacon',             Column: 'ImageTag',      Def: `TEXT DEFAULT ''` },
 			{ Table: 'Beacon',             Column: 'ImageVersion',  Def: `TEXT DEFAULT ''` },
 			{ Table: 'Beacon',             Column: 'Runtime',       Def: `TEXT DEFAULT 'process'` },
+			// BuildSource: 'npm' (default -- pull from registry at image build
+			// time) or 'source' (pack the sibling monorepo checkout into a
+			// tarball and install from that).  Source mode lets developers
+			// debug the image-resident code against an unpublished version.
+			{ Table: 'Beacon',             Column: 'BuildSource',   Def: `TEXT DEFAULT 'npm'` },
 			{ Table: 'DBEngine',           Column: 'InternalPort',  Def: `INTEGER DEFAULT 0` },
 			{ Table: 'UltravisorInstance', Column: 'ContainerID',   Def: `TEXT DEFAULT ''` },
 			{ Table: 'UltravisorInstance', Column: 'ContainerName', Def: `TEXT DEFAULT ''` },

@@ -139,6 +139,33 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 .lab-btn.small { padding: 4px 10px; font-size: 12px; }
 .lab-btn:disabled,
 .lab-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+/* Build-source chip cluster.  Visible on container-mode beacon cards when
+   the beacon type has a sibling monorepo checkout.  The active chip is
+   darkened; the inactive one is a light link the user clicks to switch. */
+.lab-beacon-build-source
+{
+	display: inline-flex; align-items: center; gap: 4px;
+	padding: 0 6px; border-left: 1px solid #e2e8f0; margin-left: 4px;
+}
+.lab-beacon-build-source .label
+{
+	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
+	color: #64748b; font-weight: 600;
+}
+.lab-chip
+{
+	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
+	padding: 2px 8px; border-radius: 10px; text-decoration: none;
+	background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+	cursor: pointer; line-height: 1.4;
+}
+.lab-chip:hover { background: #e2e8f0; color: #0f172a; }
+.lab-chip.active
+{
+	background: #1d4ed8; color: #fff; border-color: #1d4ed8;
+	cursor: default; pointer-events: none;
+}
 `,
 
 	Templates:
@@ -224,6 +251,12 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 			<a class="lab-btn secondary small {~D:Record.StartDisabled~}" href="#/beacons/{~D:Record.IDBeacon~}/start">Start</a>
 			<a class="lab-btn secondary small {~D:Record.StopDisabled~}"  href="#/beacons/{~D:Record.IDBeacon~}/stop">Stop</a>
 			<a class="lab-btn secondary small" href="#/beacons/{~D:Record.IDBeacon~}/logs">Logs</a>
+			<a class="lab-btn secondary small" href="#/beacons/{~D:Record.IDBeacon~}/rebuild" style="display: {~D:Record.RebuildDisplay~};" title="Stop + remove container, drop cached image, rebuild from current stanza version">Rebuild</a>
+			<span class="lab-beacon-build-source" style="display: {~D:Record.BuildSourceDisplay~};" title="Image source for this beacon. Source mode packs your local monorepo checkout instead of the npm registry.">
+				<span class="label">Image:</span>
+				<a class="lab-chip {~D:Record.IsNpmClass~}" href="#/beacons/{~D:Record.IDBeacon~}/build-source/npm" title="Published npm tarball">npm</a>
+				<a class="lab-chip {~D:Record.IsSourceClass~}" href="#/beacons/{~D:Record.IDBeacon~}/build-source/source" title="Local monorepo checkout (npm pack of the sibling repo)">source</a>
+			</span>
 			<a class="lab-btn danger small" href="#/beacons/{~D:Record.IDBeacon~}/remove">Remove</a>
 		</div>
 	</div>
@@ -353,6 +386,14 @@ class LabBeaconsView extends libPictView
 				tmpRuntimeValue = tmpBeacon.ImageTag ? this._escape(tmpBeacon.ImageTag) : '--';
 			}
 
+			// Build-source chip state: visible only for container-mode beacons
+			// whose type supports source builds (capability-provider + missing
+			// sibling checkout both disqualify).  The active chip gets the
+			// `active` class so CSS can highlight it; the other is a link.
+			let tmpSupportsSource = !!(tmpType && tmpType.SupportsSourceBuild);
+			let tmpBuildSource = tmpBeacon.BuildSource || 'npm';
+			let tmpShowBuildSource = (tmpBeacon.Runtime === 'container' && tmpSupportsSource);
+
 			tmpHtml += this.pict.parseTemplateByHash('Lab-Beacons-Card-Template',
 				{
 					IDBeacon:        tmpBeacon.IDBeacon,
@@ -366,7 +407,12 @@ class LabBeaconsView extends libPictView
 					RuntimeValue:    tmpRuntimeValue,
 					UltravisorLabel: tmpUvLabel,
 					StartDisabled:   (tmpBeacon.Status === 'running' || tmpBeacon.Status === 'starting' || tmpBeacon.Status === 'provisioning') ? 'disabled' : '',
-					StopDisabled:    (tmpBeacon.Status !== 'running') ? 'disabled' : ''
+					StopDisabled:    (tmpBeacon.Status !== 'running') ? 'disabled' : '',
+					// Rebuild only makes sense for container-mode beacons.
+					RebuildDisplay:  (tmpBeacon.Runtime === 'container') ? 'inline-flex' : 'none',
+					BuildSourceDisplay: tmpShowBuildSource ? 'inline-flex' : 'none',
+					IsNpmClass:        (tmpBuildSource === 'npm')    ? 'active' : '',
+					IsSourceClass:     (tmpBuildSource === 'source') ? 'active' : ''
 				});
 		}
 		return tmpHtml;

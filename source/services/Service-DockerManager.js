@@ -402,6 +402,26 @@ class ServiceDockerManager extends libFableServiceProviderBase
 			});
 	}
 
+	/**
+	 * Remove an image by tag.  Best-effort: if other containers still
+	 * reference the tag, docker returns an error and we surface it via
+	 * fCallback -- callers typically treat that as "cached image stays,
+	 * proceed without a fresh build" rather than a hard failure.
+	 */
+	rmi(pImageTag, fCallback)
+	{
+		libChildProcess.execFile('docker', ['rmi', pImageTag], { timeout: DEFAULT_TIMEOUT_MS },
+			(pError, pStdout, pStderr) =>
+			{
+				if (pError)
+				{
+					let tmpMsg = (pStderr || pError.message || '').trim();
+					return fCallback(new Error(tmpMsg));
+				}
+				return fCallback(null, { Removed: true, Output: (pStdout || '').trim() });
+			});
+	}
+
 	rm(pContainerID, pForce, fCallback)
 	{
 		let tmpArgs = ['rm'];

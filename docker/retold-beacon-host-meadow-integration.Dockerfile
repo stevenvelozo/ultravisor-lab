@@ -1,30 +1,30 @@
 # retold-beacon-host-meadow-integration container image.
 #
 # Built on demand by the lab when a capability-provider beacon of type
-# `meadow-integration` is created.  Pulls the published `retold-beacon-host`
-# from npm and COPYs the lab-local provider source in from the build
-# context (`docker/providers/meadow-integration/`).
+# `meadow-integration` is created.  Installs the generic retold-beacon-host
+# plus the meadow-integration module (which now ships its own
+# CapabilityProvider class alongside the rest of its code) from npm.
+#
+# Parallel shape to retold-beacon-host-orator-conversion.Dockerfile -- the
+# lab passes the same build args for every published capability-provider:
 #
 # Build args:
-#   HOST_VERSION  -- retold-beacon-host npm version to install.  Resolved
-#                    by the lab from the lab's own package.json / sibling
-#                    checkout; defaults to 'latest' when neither is known.
-#
-# Context dir:
-#   docker/providers/meadow-integration/
-#   (contains package.json + Retold-Beacon-Provider-MeadowIntegration.js;
-#    `npm install` inside the image resolves its meadow-integration dep
-#    from the npm registry.)
+#   HOST_VERSION      -- retold-beacon-host npm version to install
+#   PROVIDER_PACKAGE  -- 'meadow-integration' (supplied by the lab from
+#                        the module's retoldBeacon stanza)
+#   PROVIDER_VERSION  -- meadow-integration npm version
 #
 # Runtime:
 #   Entrypoint is retold-beacon-host's bin.  CMD is supplied by the lab's
 #   `docker run` at start time (--port / --beacon-name / --ultravisor-url
-#   / --provider /app/provider / --config /app/data/config.json).
+#   / --provider <package>/<providerPath> / --config /app/data/config.json).
 
 ARG NODE_VERSION=22
 FROM node:${NODE_VERSION}-bookworm-slim
 
 ARG HOST_VERSION=latest
+ARG PROVIDER_PACKAGE
+ARG PROVIDER_VERSION=latest
 
 ENV NODE_ENV=production
 WORKDIR /app
@@ -33,15 +33,9 @@ RUN apt-get update \
 	&& apt-get install -y --no-install-recommends ca-certificates \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& npm init -y >/dev/null \
-	&& npm install --omit=dev "retold-beacon-host@${HOST_VERSION}" \
-	&& npm cache clean --force
-
-# Lab-local provider package.  `COPY .` pulls this directory's contents
-# (package.json + the provider JS) into /app/provider/.  The subsequent
-# `npm install` inside resolves `meadow-integration` from npm.
-COPY . /app/provider/
-RUN cd /app/provider \
-	&& npm install --omit=dev \
+	&& npm install --omit=dev --ignore-scripts \
+		"retold-beacon-host@${HOST_VERSION}" \
+		"${PROVIDER_PACKAGE}@${PROVIDER_VERSION}" \
 	&& npm cache clean --force
 
 # Runtime state volume -- the lab bind-mounts data/beacons/<id>/ here so

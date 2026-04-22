@@ -148,6 +148,8 @@ class LabApiProvider extends libFableServiceProviderBase
 	startBeacon(pID, fCallback) { return _request('POST', '/api/lab/beacons/' + pID + '/start', {}, fCallback); }
 	stopBeacon(pID, fCallback)  { return _request('POST', '/api/lab/beacons/' + pID + '/stop',  {}, fCallback); }
 	removeBeacon(pID, fCallback) { return _request('DELETE', '/api/lab/beacons/' + pID, null, fCallback); }
+	rebuildBeaconImage(pID, fCallback) { return _request('POST', '/api/lab/beacons/' + pID + '/rebuild', {}, fCallback); }
+	switchBeaconBuildSource(pID, pBuildSource, fCallback) { return _request('POST', '/api/lab/beacons/' + pID + '/build-source', { BuildSource: pBuildSource }, fCallback); }
 	getBeaconLogs(pID, pLines, fCallback)
 	{
 		let tmpCallback = fCallback;

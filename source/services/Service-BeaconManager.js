@@ -99,6 +99,12 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 		// if the stanza is later edited.
 		let tmpRuntime = tmpType.Docker ? 'container' : 'process';
 
+		// New beacons default to npm-build source; users opt into source
+		// mode per-beacon via POST /api/lab/beacons/:id/build-source.  The
+		// request body may set it up-front when a pre-cached source image is
+		// already sitting in docker (rare; tested via curl more than UI).
+		let tmpBuildSource = (pRequest.BuildSource === 'source') ? 'source' : 'npm';
+
 		let tmpID = tmpStore.insert('Beacon',
 			{
 				Name:                 tmpName,
@@ -107,6 +113,7 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 				IDUltravisorInstance: tmpUvID,
 				ConfigJSON:           JSON.stringify(tmpConfig),
 				Runtime:              tmpRuntime,
+				BuildSource:          tmpBuildSource,
 				Status:               'provisioning',
 				StatusDetail:         'Preparing spawn...'
 			});
@@ -153,7 +160,8 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 					Name:                 tmpName,
 					Port:                 tmpPort,
 					IDUltravisorInstance: tmpUvID,
-					ConfigJSON:           JSON.stringify(tmpConfig)
+					ConfigJSON:           JSON.stringify(tmpConfig),
+					BuildSource:          tmpBuildSource
 				};
 
 			let fProgress = this._buildContainerProgressEmitter(
@@ -173,6 +181,7 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 							ContainerName: pContainerResult.ContainerName,
 							ImageTag:      pContainerResult.ImageTag,
 							ImageVersion:  pContainerResult.ImageVersion,
+							BuildSource:   pContainerResult.BuildSource || tmpBuildSource,
 							StatusDetail:  'Waiting for HTTP readiness...'
 						});
 
@@ -608,6 +617,7 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 							ContainerName: pResult.ContainerName,
 							ImageTag:      pResult.ImageTag,
 							ImageVersion:  pResult.ImageVersion,
+							BuildSource:   pResult.BuildSource || tmpBeacon.BuildSource || 'npm',
 							StatusDetail:  'Waiting for HTTP readiness...'
 						});
 					fReady();
@@ -727,6 +737,206 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 		}
 
 		this.fable.LabProcessSupervisor.stop('Beacon', pID, () => fFinalize());
+	}
+
+	// ── Rebuild image (container-mode beacons only) ─────────────────────────
+	/**
+	 * "Rebuild image" flow: force a full rebuild from the current stanza.
+	 *   1. Stop + remove the container.
+	 *   2. Best-effort `docker rmi` the cached image tag.  If another beacon
+	 *      still references it, docker refuses and we proceed with the
+	 *      cached image -- the newly-created container will run on the
+	 *      existing image (same-tag case).  For the common "stanza version
+	 *      bumped" case, the tag will be different and a fresh build runs
+	 *      unconditionally since the new tag has no cached image.
+	 *   3. Clear ContainerID on the row so startBeacon re-enters the
+	 *      create path (builds + runs fresh).
+	 *   4. Re-invoke startBeacon to do the work.
+	 *
+	 * Records a `beacon-rebuild-started` InfrastructureEvent so the Events
+	 * timeline shows the intent; the create path already emits its own
+	 * image-build + container-started events on top of that.
+	 */
+	rebuildBeaconImage(pID, fCallback)
+	{
+		let tmpBeacon = this.getBeacon(pID);
+		if (!tmpBeacon) { return fCallback(new Error('Beacon not found.')); }
+		if (tmpBeacon.Runtime !== 'container')
+		{
+			return fCallback(new Error(`Beacon '${tmpBeacon.Name}' is not a container beacon; nothing to rebuild.`));
+		}
+
+		let tmpStore = this.fable.LabStateStore;
+		let tmpDocker = this.fable.LabDockerManager;
+
+		tmpStore.update('Beacon', 'IDBeacon', pID,
+			{ Status: 'rebuilding', StatusDetail: 'Stopping container...' });
+		tmpStore.recordEvent(
+			{
+				EntityType: 'Beacon', EntityID: pID, EntityName: tmpBeacon.Name,
+				EventType: 'beacon-rebuild-started', Severity: 'info',
+				Message: `Rebuilding image for '${tmpBeacon.Name}' (was ${tmpBeacon.ImageTag || 'no tag'})`
+			});
+
+		let fAfterRmi = () =>
+		{
+			// Clear ContainerID + ImageTag so startBeacon takes the
+			// create-fresh branch.  ConfigJSON, ConfigPath, Name, Port, and
+			// the UV binding all stay.
+			tmpStore.update('Beacon', 'IDBeacon', pID,
+				{
+					ContainerID:   '',
+					ImageTag:      '',
+					ImageVersion:  '',
+					ContainerName: '',
+					StatusDetail:  'Rebuilding image...'
+				});
+			this.startBeacon(pID, fCallback);
+		};
+
+		let fRemoveImage = () =>
+		{
+			if (!tmpBeacon.ImageTag) { return fAfterRmi(); }
+			tmpDocker.rmi(tmpBeacon.ImageTag,
+				(pRmiErr) =>
+				{
+					if (pRmiErr)
+					{
+						// Image is still in use by other beacons or another
+						// container.  Not fatal -- the cached image just
+						// remains, and we recreate this beacon's container
+						// against it.  User can rebuild the other beacons
+						// individually to propagate the upgrade.
+						tmpStore.recordEvent(
+							{
+								EntityType: 'Beacon', EntityID: pID, EntityName: tmpBeacon.Name,
+								EventType: 'beacon-rebuild-image-cached', Severity: 'warning',
+								Message: `Image '${tmpBeacon.ImageTag}' still referenced by other containers; rebuilt '${tmpBeacon.Name}'s container against cached image. Rebuild other beacons of this type to propagate.`
+							});
+					}
+					return fAfterRmi();
+				});
+		};
+
+		if (tmpBeacon.ContainerID)
+		{
+			tmpDocker.rm(tmpBeacon.ContainerID, true,
+				(pRmErr) =>
+				{
+					if (pRmErr)
+					{
+						// Fall through regardless -- the container might
+						// already be gone, and we still want to proceed.
+						this.fable.log.warn(`[Rebuild] container rm for ${tmpBeacon.Name} failed: ${pRmErr.message}`);
+					}
+					fRemoveImage();
+				});
+		}
+		else
+		{
+			fRemoveImage();
+		}
+	}
+
+	// ── Switch build source (container-mode beacons only) ──────────────────
+	/**
+	 * Toggle a beacon between npm-built and source-built images.  Flow:
+	 *   1. Validate the request + beacon state (must be container-mode; type
+	 *      must support source builds when switching TO source).
+	 *   2. Stop + remove the current container.  Leave the old image intact
+	 *      (npm image sticks around so switching back is a cheap re-run, and
+	 *      the per-beacon source tag is scoped by IDBeacon so it doesn't
+	 *      conflict with sibling beacons).
+	 *   3. Update BuildSource on the row.  Clear ContainerID so startBeacon
+	 *      takes the create path, which re-computes the image tag from the
+	 *      new BuildSource and builds/reuses the matching image.
+	 *   4. Call startBeacon.
+	 *
+	 * Switching to source always forces a fresh `npm pack` of the sibling
+	 * checkout (_prepareSourceContext wipes the staging dir each call), so
+	 * repeated switch-to-source hops actually pick up in-flight edits.  The
+	 * image tag for source is `<name>:source-b<IDBeacon>`; this method
+	 * `docker rmi`s that tag before create so switching-to-source always
+	 * yields a fresh build from current disk.  Switching-to-npm skips the
+	 * rmi so the cached npm image is reused.
+	 */
+	switchBeaconBuildSource(pID, pBuildSource, fCallback)
+	{
+		let tmpBeacon = this.getBeacon(pID);
+		if (!tmpBeacon) { return fCallback(new Error('Beacon not found.')); }
+		if (tmpBeacon.Runtime !== 'container')
+		{
+			return fCallback(new Error(`Beacon '${tmpBeacon.Name}' is not a container beacon; nothing to switch.`));
+		}
+
+		let tmpTarget = (pBuildSource === 'source') ? 'source' : 'npm';
+		let tmpCurrent = tmpBeacon.BuildSource || 'npm';
+		if (tmpTarget === tmpCurrent)
+		{
+			return fCallback(null, { Status: 'nochange', BuildSource: tmpCurrent });
+		}
+
+		let tmpType = this.fable.LabBeaconTypeRegistry.get(tmpBeacon.BeaconType);
+		if (!tmpType) { return fCallback(new Error(`Beacon type '${tmpBeacon.BeaconType}' not registered.`)); }
+		if (tmpTarget === 'source' && !this.fable.LabBeaconContainerManager.supportsSourceBuild(tmpType))
+		{
+			return fCallback(new Error(`Beacon type '${tmpType.BeaconType}' doesn't support source builds (capability-provider, or no sibling monorepo checkout).`));
+		}
+
+		let tmpStore = this.fable.LabStateStore;
+		let tmpDocker = this.fable.LabDockerManager;
+
+		tmpStore.update('Beacon', 'IDBeacon', pID,
+			{ Status: 'rebuilding', StatusDetail: `Switching to ${tmpTarget}-built image...` });
+		tmpStore.recordEvent(
+			{
+				EntityType: 'Beacon', EntityID: pID, EntityName: tmpBeacon.Name,
+				EventType: 'beacon-build-source-switch', Severity: 'info',
+				Message: `Switching '${tmpBeacon.Name}' build source ${tmpCurrent} → ${tmpTarget}`
+			});
+
+		let fAfterRmi = () =>
+		{
+			tmpStore.update('Beacon', 'IDBeacon', pID,
+				{
+					ContainerID:   '',
+					ContainerName: '',
+					ImageTag:      '',
+					ImageVersion:  '',
+					BuildSource:   tmpTarget,
+					StatusDetail:  `${tmpTarget === 'source' ? 'Packing monorepo checkout' : 'Rebuilding'}…`
+				});
+			this.startBeacon(pID, fCallback);
+		};
+
+		let fRemoveContainer = () =>
+		{
+			if (!tmpBeacon.ContainerID) { return fAfterRmi(); }
+			tmpDocker.rm(tmpBeacon.ContainerID, true,
+				(pRmErr) =>
+				{
+					if (pRmErr) { this.fable.log.warn(`[SwitchBuildSource] container rm for ${tmpBeacon.Name} failed: ${pRmErr.message}`); }
+					fAfterRmi();
+				});
+		};
+
+		// Pre-flight `docker rmi` only when switching TO source -- the
+		// source tag is per-beacon so removing it won't affect siblings,
+		// and we want the rebuild to reflect current disk state.  Switching
+		// to npm reuses the cached npm image if it already exists (that's
+		// the fast-switch path the user asked for).
+		if (tmpTarget === 'source')
+		{
+			let tmpSourceTag = this.fable.LabBeaconContainerManager.imageTag(tmpType, Object.assign({}, tmpBeacon, { BuildSource: 'source' }));
+			return tmpDocker.rmi(tmpSourceTag,
+				(pRmiErr) =>
+				{
+					// rmi errors are fine here -- the tag might not exist yet.
+					if (pRmiErr) { this.fable.log.debug(`[SwitchBuildSource] rmi ${tmpSourceTag}: ${pRmiErr.message}`); }
+					fRemoveContainer();
+				});
+		}
+		return fRemoveContainer();
 	}
 
 	// Cascade hook called when an Ultravisor is removed.  Beacons registered

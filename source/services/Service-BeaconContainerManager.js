@@ -20,9 +20,12 @@
 'use strict';
 
 const libPath = require('path');
+const libFs = require('fs');
+const libChildProcess = require('child_process');
 const libFableServiceProviderBase = require('fable-serviceproviderbase');
 
 const LAB_NETWORK_NAME = 'ultravisor-lab';
+const NPM_PACK_TIMEOUT_MS = 120000;
 
 class ServiceBeaconContainerManager extends libFableServiceProviderBase
 {
@@ -48,16 +51,34 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 	 * Local image tag the lab builds.  Not pushed anywhere -- this lives in
 	 * the host's docker daemon only.
 	 *
-	 * standalone-service mode: `ultravisor-lab/<image>:<provider-version>`
-	 * capability-provider mode: `ultravisor-lab/<image>:<provider-version>__host-<host-version>`
-	 *   (the host version is part of the tag so upgrading retold-beacon-host
-	 *   invalidates the cache for every provider image)
+	 * npm build source:
+	 *   standalone-service        -- `ultravisor-lab/<image>:<version>`
+	 *   capability-provider       -- `ultravisor-lab/<image>:<version>__host-<host-version>`
+	 *     (host version in the tag so upgrading retold-beacon-host
+	 *      invalidates the cache for every provider image)
+	 *
+	 * source build source:
+	 *   standalone-service        -- `ultravisor-lab/<image>:source-b<IDBeacon>`
+	 *   capability-provider       -- not supported in the first pass (the
+	 *                                host/provider split complicates tarball
+	 *                                preparation; falls back to npm)
+	 *
+	 *   The `source-b<id>` suffix scopes source tags per-beacon so toggling
+	 *   one beacon between npm and source doesn't collide with the image
+	 *   tag of a sibling running in the other mode.
 	 */
-	imageTag(pType)
+	imageTag(pType, pBeacon)
 	{
 		let tmpDocker = (pType && pType.Docker) || {};
 		let tmpName = tmpDocker.Image || pType.BeaconType;
 		let tmpVersion = tmpDocker.Version || pType.PackageVersion || 'latest';
+
+		let tmpBuildSource = this._effectiveBuildSource(pType, pBeacon);
+		if (tmpBuildSource === 'source')
+		{
+			let tmpID = (pBeacon && pBeacon.IDBeacon) || 0;
+			return `ultravisor-lab/${tmpName}:source-b${tmpID}`;
+		}
 
 		if (pType.Mode === 'capability-provider')
 		{
@@ -65,6 +86,35 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 			return `ultravisor-lab/${tmpName}:${tmpVersion}__host-${tmpHostVersion}`;
 		}
 		return `ultravisor-lab/${tmpName}:${tmpVersion}`;
+	}
+
+	/**
+	 * Resolve the actual build source to use for this beacon.  Defaults to
+	 * 'npm' when missing.  Every beacon type that has a docker block and a
+	 * published npm package can toggle to 'source' as long as the sibling
+	 * monorepo checkout exists -- standalone-service packs the module
+	 * itself, capability-provider packs the provider package and keeps
+	 * retold-beacon-host coming from npm.
+	 */
+	_effectiveBuildSource(pType, pBeacon)
+	{
+		let tmpRequested = (pBeacon && pBeacon.BuildSource) || 'npm';
+		return (tmpRequested === 'source') ? 'source' : 'npm';
+	}
+
+	/**
+	 * True when the beacon type can run in source-build mode: has a docker
+	 * block, carries a package name (all scanned modules do), and has a
+	 * sibling monorepo checkout the lab can `npm pack` from.  Used by the
+	 * UI + switch endpoint to gate the toggle.  Capability-provider mode
+	 * is supported; the host comes from npm, only the provider is packed.
+	 */
+	supportsSourceBuild(pType)
+	{
+		if (!pType || !pType.Docker) { return false; }
+		if (!pType.PackageName) { return false; }
+		let tmpRoot = this.fable.LabBeaconTypeRegistry.siblingModuleRoot(pType.PackageName);
+		return !!tmpRoot;
 	}
 
 	/**
@@ -83,13 +133,29 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 	/**
 	 * Absolute path to the lab-owned Dockerfile for a type.  Resolved
 	 * against the lab module's `docker/` directory.
+	 *
+	 * Source-build mode looks for a sibling `<name>.source.Dockerfile`
+	 * next to the npm-mode Dockerfile, e.g. `retold-databeacon.Dockerfile`
+	 * → `retold-databeacon.source.Dockerfile`.  Missing source variant
+	 * throws so the caller surfaces a clear error.
 	 */
-	dockerfilePath(pType)
+	dockerfilePath(pType, pBuildSource)
 	{
 		let tmpDocker = (pType && pType.Docker) || {};
 		let tmpFile = tmpDocker.Dockerfile;
 		if (!tmpFile) { throw new Error(`Beacon type '${pType.BeaconType}' has no docker.dockerfile in its retoldBeacon stanza.`); }
-		return libPath.resolve(__dirname, '..', '..', 'docker', tmpFile);
+		let tmpPath = libPath.resolve(__dirname, '..', '..', 'docker', tmpFile);
+		if (pBuildSource === 'source')
+		{
+			let tmpSourceFile = tmpFile.replace(/\.Dockerfile$/i, '.source.Dockerfile');
+			let tmpSourcePath = libPath.resolve(__dirname, '..', '..', 'docker', tmpSourceFile);
+			if (!libFs.existsSync(tmpSourcePath))
+			{
+				throw new Error(`Beacon type '${pType.BeaconType}' has no source-mode Dockerfile at ${tmpSourcePath}.`);
+			}
+			return tmpSourcePath;
+		}
+		return tmpPath;
 	}
 
 	/**
@@ -125,28 +191,63 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 	create(pType, pBeacon, fCallback, fProgress)
 	{
 		let tmpDocker = this.fable.LabDockerManager;
-		let tmpImageTag = this.imageTag(pType);
-		let tmpDockerfilePath = this.dockerfilePath(pType);
+		let tmpBuildSource = this._effectiveBuildSource(pType, pBeacon);
+		let tmpImageTag = this.imageTag(pType, pBeacon);
 
 		let tmpProviderVersion = (pType.Docker && pType.Docker.Version) || pType.PackageVersion || 'latest';
+		let tmpDockerfilePath;
 		let tmpBuildArgs;
 		let tmpContextDir;
 
-		// Three Dockerfile shapes:
-		//   standalone-service        -- VERSION build arg.  Context dir
-		//                                doesn't matter; our Dockerfiles
-		//                                don't COPY anything.
-		//   lab-local capability-prov -- HOST_VERSION build arg only.
-		//                                Context = LocalProviderDir (the
-		//                                Dockerfile COPYs . into the image).
-		//   published  capability-prov -- HOST_VERSION + PROVIDER_PACKAGE +
-		//                                PROVIDER_VERSION.  Kept around for
-		//                                providers that might be published
-		//                                later; not used today.
-		if (pType.Mode === 'capability-provider' && pType.LocalProviderDir)
+		// Four Dockerfile shapes:
+		//   standalone-service (npm)      -- VERSION build arg.  Context dir
+		//                                    doesn't matter; Dockerfiles don't
+		//                                    COPY anything.
+		//   standalone-service (source)   -- SOURCE_TARBALL build arg pointing
+		//                                    at an npm-pack output the lab
+		//                                    stages next to the Dockerfile.
+		//                                    Context = that staging dir.
+		//   capability-provider (npm)     -- HOST_VERSION + PROVIDER_PACKAGE +
+		//                                    PROVIDER_VERSION.  Dockerfile
+		//                                    `npm install`s both packages from
+		//                                    the registry.
+		//   capability-provider (source)  -- HOST_VERSION + SOURCE_TARBALL.
+		//                                    Host still comes from npm (at the
+		//                                    stanza's HostVersion); only the
+		//                                    provider is packed from the
+		//                                    sibling monorepo checkout.  If a
+		//                                    developer needs to debug the host
+		//                                    too, they npm-link it.
+		try
 		{
-			tmpBuildArgs = { HOST_VERSION: this._resolveHostVersion(pType) };
-			tmpContextDir = pType.LocalProviderDir;
+			tmpDockerfilePath = this.dockerfilePath(pType, tmpBuildSource);
+		}
+		catch (pDfErr) { return fCallback(pDfErr); }
+
+		if (tmpBuildSource === 'source')
+		{
+			// Stage a tarball of the sibling checkout into a per-beacon dir
+			// we copy the Dockerfile into, then point docker build at that
+			// directory.  Same shape for standalone-service + capability-
+			// provider; the only difference is that capability-provider adds
+			// a HOST_VERSION build arg for the beacon-host install step.
+			let tmpStaging;
+			try
+			{
+				tmpStaging = this._prepareSourceContext(pType, pBeacon, tmpDockerfilePath);
+			}
+			catch (pStageErr) { return fCallback(pStageErr); }
+			tmpDockerfilePath = tmpStaging.DockerfilePath;
+			tmpContextDir = tmpStaging.ContextDir;
+			tmpBuildArgs =
+				{
+					SOURCE_TARBALL: tmpStaging.TarballName,
+					SOURCE_VERSION: tmpStaging.SourceVersion
+				};
+			if (pType.Mode === 'capability-provider')
+			{
+				tmpBuildArgs.HOST_VERSION = this._resolveHostVersion(pType);
+			}
 		}
 		else if (pType.Mode === 'capability-provider')
 		{
@@ -262,13 +363,25 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 							{
 								if (pRunErr) { return fCallback(pRunErr); }
 								fEmit('container-started', { ContainerName: tmpName, ContainerID: pRunResult.ContainerID });
+								// ImageVersion tags the image with a human label
+								// of what went into it.  Source mode overrides
+								// the provider-registry version with
+								// `source:<pkgver>` so the UI + events log make
+								// it obvious the image carries an unpublished build.
+								let tmpImageVersion = tmpProviderVersion;
+								if (tmpBuildSource === 'source')
+								{
+									let tmpPkgVer = this._siblingPackageVersion(pType) || tmpProviderVersion;
+									tmpImageVersion = `source:${tmpPkgVer}`;
+								}
 								return fCallback(null,
 									{
 										ContainerID:   pRunResult.ContainerID,
 										ContainerName: tmpName,
 										ImageTag:      tmpImageTag,
-										ImageVersion:  tmpProviderVersion,
+										ImageVersion:  tmpImageVersion,
 										ImageBuilt:    pImgResult.Built === true,
+										BuildSource:   tmpBuildSource,
 										NetworkName:   LAB_NETWORK_NAME
 									});
 							});
@@ -310,13 +423,13 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 			tmpUltravisorURL = `http://host.docker.internal:${tmpInstance.Port}`;
 		}
 
-		// Lab-local provider Dockerfiles COPY the build context into
-		// /app/provider/ and retold-beacon-host's --provider accepts an
-		// absolute path (node's require() resolves it via the provider's
-		// package.json main).  Published providers pass by npm name.
-		let tmpProvider = pType.LocalProviderDir
-			? '/app/provider'
-			: (pType.ProviderPackage || pType.PackageName);
+		// All capability-provider containers install the provider package
+		// under /app/node_modules/<name>/... at build time.  retold-beacon-host's
+		// --provider accepts a bare npm name (uses the package's main) or a
+		// `<package>/<subpath>` require spec for providers whose class lives
+		// off the package's main entry point.  The registry assembles the
+		// right string into ProviderRequireSpec -- we just pass it through.
+		let tmpProvider = pType.ProviderRequireSpec || pType.ProviderPackage || pType.PackageName;
 
 		let tmpConfigMount = (pType.Docker && pType.Docker.ConfigMountPath) || '/app/data/config.json';
 
@@ -529,6 +642,127 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 			case 'mongodb':    return 27017;
 			default:           return 0;
 		}
+	}
+
+	// ── Source-build staging ────────────────────────────────────────────────
+	/**
+	 * Prepare a docker build context for source-build mode.  Steps:
+	 *   1. Resolve the sibling monorepo checkout for the type's PackageName.
+	 *   2. `npm pack --pack-destination=<staging>` inside that checkout
+	 *      (respects the module's package.json `files` field so the tarball
+	 *      mirrors what an `npm publish` would ship).
+	 *   3. Rename the produced `.tgz` to a stable filename (source.tgz) so
+	 *      the Dockerfile's ARG default resolves without ceremony.
+	 *   4. Copy the .source.Dockerfile into the staging dir (keeps the build
+	 *      context small -- just the tarball + dockerfile, not the whole
+	 *      docker/ directory -- so `docker build` doesn't stream megabytes
+	 *      of unrelated Dockerfiles to the daemon).
+	 *
+	 * Staging lives at `<labDataDir>/source-build-staging/<IDBeacon>/`.
+	 * Wiped on every invocation to force a fresh tarball capture -- that's
+	 * the whole point of source mode.
+	 *
+	 * Returns { ContextDir, DockerfilePath, TarballName, SourceVersion }.
+	 * Throws if the sibling checkout can't be found, or npm pack fails.
+	 */
+	_prepareSourceContext(pType, pBeacon, pOriginalDockerfilePath)
+	{
+		if (!pType || !pType.PackageName)
+		{
+			throw new Error(`Beacon type '${pType && pType.BeaconType}' has no PackageName; cannot source-build.`);
+		}
+		let tmpSiblingRoot = this.fable.LabBeaconTypeRegistry.siblingModuleRoot(pType.PackageName);
+		if (!tmpSiblingRoot)
+		{
+			throw new Error(`No sibling monorepo checkout found for '${pType.PackageName}'. Expected retold/modules/<group>/${pType.PackageName}/.`);
+		}
+
+		let tmpStateStore = this.fable.LabStateStore;
+		let tmpStagingDir = libPath.join(tmpStateStore.dataDir, 'source-build-staging', String(pBeacon.IDBeacon || 0));
+		this._rmrf(tmpStagingDir);
+		libFs.mkdirSync(tmpStagingDir, { recursive: true });
+
+		// Produce the tarball.  `--ignore-scripts` skips prepack lifecycle
+		// scripts that would try to run the module's own build tooling -- the
+		// lab packs whatever's on disk as-is and trusts the Dockerfile to do
+		// any in-container build steps.
+		this.fable.log.info(`[ContainerManager] npm pack '${pType.PackageName}' from ${tmpSiblingRoot} → ${tmpStagingDir}`);
+		try
+		{
+			libChildProcess.execFileSync('npm',
+				['pack', '--ignore-scripts', `--pack-destination=${tmpStagingDir}`],
+				{
+					cwd:     tmpSiblingRoot,
+					stdio:   ['ignore', 'pipe', 'pipe'],
+					timeout: NPM_PACK_TIMEOUT_MS
+				});
+		}
+		catch (pPackErr)
+		{
+			let tmpStderr = pPackErr.stderr ? pPackErr.stderr.toString().trim() : pPackErr.message;
+			throw new Error(`npm pack failed for ${pType.PackageName}: ${tmpStderr}`);
+		}
+
+		// `npm pack` produces a single .tgz in the destination.  Rename to a
+		// stable filename the Dockerfile can COPY without ARG acrobatics.
+		let tmpProduced = libFs.readdirSync(tmpStagingDir).filter((pF) => pF.endsWith('.tgz'));
+		if (tmpProduced.length === 0)
+		{
+			throw new Error(`npm pack for ${pType.PackageName} produced no .tgz in ${tmpStagingDir}.`);
+		}
+		let tmpFirst = tmpProduced[0];
+		let tmpStable = 'source.tgz';
+		if (tmpFirst !== tmpStable)
+		{
+			libFs.renameSync(libPath.join(tmpStagingDir, tmpFirst), libPath.join(tmpStagingDir, tmpStable));
+		}
+
+		// Copy the .source.Dockerfile alongside the tarball so docker build
+		// -f points at a file inside the context dir.
+		let tmpDockerfileTarget = libPath.join(tmpStagingDir, libPath.basename(pOriginalDockerfilePath));
+		libFs.copyFileSync(pOriginalDockerfilePath, tmpDockerfileTarget);
+
+		return {
+			ContextDir:     tmpStagingDir,
+			DockerfilePath: tmpDockerfileTarget,
+			TarballName:    tmpStable,
+			SourceVersion:  this._siblingPackageVersion(pType) || 'source'
+		};
+	}
+
+	/**
+	 * Read the on-disk sibling checkout's package.json `version` for the
+	 * type's PackageName.  Used for tagging images + labelling events so a
+	 * user rebuilding after bumping the sibling sees the new version in the
+	 * UI immediately.  Falls back to null if the sibling isn't present.
+	 */
+	_siblingPackageVersion(pType)
+	{
+		if (!pType || !pType.PackageName) { return null; }
+		let tmpRoot = this.fable.LabBeaconTypeRegistry.siblingModuleRoot(pType.PackageName);
+		if (!tmpRoot) { return null; }
+		try
+		{
+			let tmpPkg = JSON.parse(libFs.readFileSync(libPath.join(tmpRoot, 'package.json'), 'utf8'));
+			return tmpPkg.version || null;
+		}
+		catch (pErr) { return null; }
+	}
+
+	/**
+	 * Tiny recursive rmdir.  Avoids a dep on fs.rm (node 14.14+) compatibility
+	 * quirks; the lab already pins node >= 18 but this stays minimal.
+	 */
+	_rmrf(pDir)
+	{
+		if (!libFs.existsSync(pDir)) { return; }
+		let tmpStat = libFs.statSync(pDir);
+		if (!tmpStat.isDirectory()) { libFs.unlinkSync(pDir); return; }
+		for (let tmpName of libFs.readdirSync(pDir))
+		{
+			this._rmrf(libPath.join(pDir, tmpName));
+		}
+		libFs.rmdirSync(pDir);
 	}
 }
 

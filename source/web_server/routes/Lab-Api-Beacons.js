@@ -35,7 +35,15 @@ module.exports = function registerBeaconRoutes(pCore)
 	tmpOrator.serviceServer.doGet('/api/lab/beacon-types',
 		(pReq, pRes, pNext) =>
 		{
-			let tmpList = tmpRegistry.list().map((pEntry) => tmpRegistry.publicDescriptor(pEntry));
+			// Decorate the public descriptor with SupportsSourceBuild so the
+			// UI can hide the build-source toggle on types that can't source-
+			// build (capability-provider, or missing sibling checkout).
+			let tmpList = tmpRegistry.list().map((pEntry) =>
+				{
+					let tmpDesc = tmpRegistry.publicDescriptor(pEntry);
+					tmpDesc.SupportsSourceBuild = tmpContainer.supportsSourceBuild(pEntry);
+					return tmpDesc;
+				});
 			pRes.send({ BeaconTypes: tmpList });
 			return pNext();
 		});
@@ -103,6 +111,38 @@ module.exports = function registerBeaconRoutes(pCore)
 				{
 					if (pErr) { pRes.send(400, { Error: pErr.message }); return pNext(); }
 					pRes.send(pResult);
+					return pNext();
+				});
+		});
+
+	tmpOrator.serviceServer.doPost('/api/lab/beacons/:id/rebuild',
+		(pReq, pRes, pNext) =>
+		{
+			tmpMgr.rebuildBeaconImage(parseInt(pReq.params.id, 10),
+				(pErr, pResult) =>
+				{
+					if (pErr) { pRes.send(400, { Error: pErr.message }); return pNext(); }
+					pRes.send(202, pResult || { Status: 'rebuilding' });
+					return pNext();
+				});
+		});
+
+	// POST /api/lab/beacons/:id/build-source  body: { BuildSource: 'npm'|'source' }
+	// Swap the beacon's image source between the published npm tarball and
+	// a tarball packed from the sibling monorepo checkout.  Full flow lives
+	// in BeaconManager.switchBeaconBuildSource (see comment there).  Default
+	// for new beacons is always 'npm'; this endpoint opts-in to 'source'.
+	tmpOrator.serviceServer.doPost('/api/lab/beacons/:id/build-source',
+		(pReq, pRes, pNext) =>
+		{
+			let tmpID = parseInt(pReq.params.id, 10);
+			let tmpBody = pReq.body || {};
+			let tmpTarget = (tmpBody.BuildSource === 'source') ? 'source' : 'npm';
+			tmpMgr.switchBeaconBuildSource(tmpID, tmpTarget,
+				(pErr, pResult) =>
+				{
+					if (pErr) { pRes.send(400, { Error: pErr.message }); return pNext(); }
+					pRes.send(202, pResult || { Status: 'rebuilding', BuildSource: tmpTarget });
 					return pNext();
 				});
 		});

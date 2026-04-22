@@ -922,6 +922,62 @@ class LabBrowserApplication extends libPictApplication
 				});
 	}
 
+	rebuildBeaconImage(pID)
+	{
+		this._modal().confirm(
+			'Rebuild this beacon\'s image?  The running container will be stopped and recreated from the current stanza version.  This is safe; the beacon\'s config and data dir are preserved.',
+			{
+				title: 'Rebuild beacon image',
+				confirmLabel: 'Rebuild',
+				cancelLabel: 'Cancel'
+			})
+			.then((pConfirmed) =>
+				{
+					if (!pConfirmed) { return; }
+					this._toast('Rebuilding… (first build of a new version can take a few minutes)', 'info');
+					this.pict.providers.LabApi.rebuildBeaconImage(pID,
+						(pErr) =>
+						{
+							if (pErr) { this._toastError('Rebuild failed: ' + pErr.message); return; }
+							this.refreshAll(() => {});
+						});
+				});
+	}
+
+	/**
+	 * Toggle a beacon's image between published-npm and local-monorepo-source
+	 * builds.  Routed from the beacon card's Source dropdown anchors
+	 * (#/beacons/:id/build-source/npm and /source).  The server-side flow
+	 * stops + removes the container, wipes the source tag when switching TO
+	 * source (so the next build picks up current disk), and starts fresh --
+	 * see BeaconManager.switchBeaconBuildSource.
+	 */
+	switchBeaconBuildSource(pID, pBuildSource)
+	{
+		let tmpTarget = (pBuildSource === 'source') ? 'source' : 'npm';
+		let tmpBody = (tmpTarget === 'source')
+			? 'Switch this beacon to a SOURCE build?  The image will be packed from your local monorepo checkout (npm pack of the sibling repo).  Transitive dependencies still come from npm.  The existing npm image stays cached so you can switch back quickly.'
+			: 'Switch this beacon back to an NPM build?  The cached npm image will be reused if present, otherwise it\'s rebuilt from the registry version in the stanza.  Your source image stays cached for next time.';
+		this._modal().confirm(
+			tmpBody,
+			{
+				title: `Switch to ${tmpTarget}-built image`,
+				confirmLabel: 'Switch',
+				cancelLabel: 'Cancel'
+			})
+			.then((pConfirmed) =>
+				{
+					if (!pConfirmed) { return; }
+					this._toast(`Switching to ${tmpTarget} build…`, 'info');
+					this.pict.providers.LabApi.switchBeaconBuildSource(pID, tmpTarget,
+						(pErr) =>
+						{
+							if (pErr) { this._toastError('Switch failed: ' + pErr.message); return; }
+							this.refreshAll(() => {});
+						});
+				});
+	}
+
 	// ── Log viewer (shared across Beacon + DBEngine) ────────────────────────
 
 	openBeaconLogs(pID)  { return this._openLogs('Beacon',   pID); }

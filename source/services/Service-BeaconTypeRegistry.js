@@ -34,10 +34,11 @@
  *     }
  *   }
  *
- * Lab-local overrides (for modules without a stanza yet, or for lab-only
- * custom hosts) live at the top of this file in LOCAL_REGISTRY_ENTRIES.
- * Each local entry carries the same shape but resolves paths against the
- * lab module root rather than a third-party package.
+ * There are no lab-local overrides: every beacon type (standalone-service
+ * or capability-provider) is a published npm package whose own stanza
+ * drives discovery, Dockerfile selection, and image tagging.  Add a new
+ * beacon type by (1) publishing its module with a retoldBeacon stanza and
+ * (2) listing its name in SCANNED_MODULES.
  */
 'use strict';
 
@@ -47,62 +48,18 @@ const libFableServiceProviderBase = require('fable-serviceproviderbase');
 
 // Modules scanned for a retoldBeacon stanza.  Absence is fine; the module
 // just won't contribute a beacon type.  Order here decides UI picker order.
+// Every containerized beacon type -- standalone-service or capability-
+// provider -- lives in its own published npm package with a retoldBeacon
+// stanza.  No lab-local shims: the lab finds providers the same way it
+// finds bins, via the package's own stanza.
 const SCANNED_MODULES =
 [
 	'retold-databeacon',
+	'meadow-integration',
 	'orator-conversion',
 	'retold-facto',
 	'retold-content-system',
 	'retold-remote'
-];
-
-// Lab-local registry entries for capability-provider beacons that ship
-// inside the lab rather than as their own published npm package.  The
-// provider source lives under `docker/providers/<name>/` as its own
-// tiny build context; the lab's docker Dockerfile COPIES it into the
-// container image at build time and retold-beacon-host loads it via
-// `--provider /app/provider` at container-run time.  These entries carry
-// all the stanza fields a published package would, plus:
-//
-//   LocalProviderDir: path (relative to lab root) to the docker build
-//                     context directory.  Becomes the ContextDir passed
-//                     to LabDockerManager.ensureImage.
-const LOCAL_REGISTRY_ENTRIES =
-[
-	{
-		BeaconType:  'meadow-integration',
-		DisplayName: 'Meadow Integration',
-		Description: 'Parse / transform / LabWriter capabilities that seed operations dispatch to via the Ultravisor.',
-		Category:    'integration',
-		Mode:        'capability-provider',
-		Capability:  'MeadowIntegration',
-		DefaultPort: 54400,
-		RequiresUltravisor: true,
-		HealthCheck: { Path: '/' },
-		ConfigForm:  { Fields: [] },
-		LocalProviderDir: 'docker/providers/meadow-integration',
-		Docker:
-		{
-			Image:           'retold-beacon-host-meadow-integration',
-			Version:         '0.0.1',  // bump when the provider source changes shape
-			Dockerfile:      'retold-beacon-host-meadow-integration.Dockerfile',
-			DataMountPath:   '/app/data',
-			ConfigMountPath: '/app/data/config.json',
-			ExposedPort:     54400,
-			HostPackage:     'retold-beacon-host',
-			HostVersion:     '',   // resolved dynamically by lookupPackageVersion
-			// Data dirs the lab bind-mounts read-only into the container so
-			// capability actions (e.g. MeadowIntegration.ParseFile) can read
-			// them.  `Source` is relative to the lab root; the container
-			// manager resolves it.  These are shared across all beacons of
-			// this type -- each beacon gets the same mount at the same
-			// container path.
-			ExtraMounts:
-			[
-				{ Source: 'seed_datasets', Target: '/app/seed_datasets', ReadOnly: true }
-			]
-		}
-	}
 ];
 
 class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
@@ -143,15 +100,6 @@ class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 	{
 		let tmpMap = new Map();
 
-		// Start with the lab-local entries so they're present even if the
-		// matching npm module doesn't declare a stanza.  Package-level
-		// stanzas override a lab-local entry with the same BeaconType.
-		for (let i = 0; i < LOCAL_REGISTRY_ENTRIES.length; i++)
-		{
-			let tmpEntry = this._normalizeLocal(LOCAL_REGISTRY_ENTRIES[i]);
-			if (tmpEntry) { tmpMap.set(tmpEntry.BeaconType, tmpEntry); }
-		}
-
 		for (let j = 0; j < SCANNED_MODULES.length; j++)
 		{
 			let tmpName = SCANNED_MODULES[j];
@@ -161,30 +109,6 @@ class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 
 		this.fable.log.info(`BeaconTypeRegistry: ${tmpMap.size} beacon type(s) registered`);
 		return tmpMap;
-	}
-
-	_normalizeLocal(pEntry)
-	{
-		let tmpLabRoot = libPath.resolve(__dirname, '..', '..');
-		let tmpResolved = Object.assign({}, pEntry);
-		if (pEntry.Bin) { tmpResolved.BinPath = libPath.resolve(tmpLabRoot, pEntry.Bin); }
-		if (pEntry.ProviderPath)
-		{
-			tmpResolved.ProviderPath = libPath.resolve(tmpLabRoot, pEntry.ProviderPath);
-		}
-		// Lab-local capability-provider entries carry a build-context path
-		// the Dockerfile COPYs into /app/provider/.  Resolve it to absolute
-		// so the container manager can hand it straight to docker build.
-		if (pEntry.LocalProviderDir)
-		{
-			tmpResolved.LocalProviderDir = libPath.resolve(tmpLabRoot, pEntry.LocalProviderDir);
-		}
-		tmpResolved.PackageRoot = tmpLabRoot;
-		tmpResolved.Source = 'lab-local';
-		tmpResolved.ConfigForm = this._resolveConfigForm(tmpLabRoot, pEntry.ConfigForm);
-		// Preserve Docker block verbatim (it's already an object in the
-		// literal; Object.assign above did the shallow copy).
-		return tmpResolved;
 	}
 
 	_loadFromPackage(pModuleName)
@@ -246,31 +170,32 @@ class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 		{
 			tmpDescriptor.Capability = tmpStanza.capability;
 		}
-		// For capability-provider packages whose class is loaded inside the
-		// beacon-host container, we don't need ProviderPath on the host.
-		// `providerPackage` in the stanza carries the npm name for the
-		// Dockerfile's `npm install` step; default to the package's own
-		// name so providers don't have to restate themselves.
+		// Capability-provider lookup feeds two different consumers:
 		//
-		// If `providerPath` is present in the stanza, the class lives at a
-		// submodule path of the package -- we compose the in-container
-		// require spec as `<package>/<providerPath>` (leading `./` stripped)
-		// so node's require() resolves to the right file inside
-		// /app/node_modules/<package>/...  This lets published modules whose
-		// `main` is something else (e.g. orator-conversion's
-		// Orator-File-Translation) still surface the provider class to
-		// retold-beacon-host.
+		//   ProviderPackage     -- bare npm name, used by the Dockerfile's
+		//                          `npm install` step (PROVIDER_PACKAGE build
+		//                          arg).  Defaults to the module's own name.
+		//   ProviderRequireSpec -- full in-container require spec passed to
+		//                          retold-beacon-host as `--provider`.  When
+		//                          the stanza declares `providerPath`, this
+		//                          is `<package>/<providerPath>` (leading
+		//                          `./` stripped) so node's require resolves
+		//                          the class off /app/node_modules/<package>/...
+		//                          even when the package's `main` is something
+		//                          else (e.g. orator-conversion's main is
+		//                          Orator-File-Translation).
 		if (tmpStanza.mode === 'capability-provider')
 		{
 			let tmpBase = tmpStanza.providerPackage || pModuleName;
+			tmpDescriptor.ProviderPackage = tmpBase;
 			if (tmpStanza.providerPath)
 			{
 				let tmpSub = tmpStanza.providerPath.replace(/^\.\//, '');
-				tmpDescriptor.ProviderPackage = `${tmpBase}/${tmpSub}`;
+				tmpDescriptor.ProviderRequireSpec = `${tmpBase}/${tmpSub}`;
 			}
 			else
 			{
-				tmpDescriptor.ProviderPackage = tmpBase;
+				tmpDescriptor.ProviderRequireSpec = tmpBase;
 			}
 		}
 
@@ -330,6 +255,18 @@ class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 			return tmpPkg.version || 'latest';
 		}
 		catch (pErr) { return 'latest'; }
+	}
+
+	/**
+	 * Public: return the sibling checkout directory for a module, or null if
+	 * none is found.  Used by the container manager's source-mode build so
+	 * `npm pack` can run against the user's working copy.
+	 */
+	siblingModuleRoot(pModuleName)
+	{
+		let tmpPath = this._resolveSiblingPackageJson(pModuleName);
+		if (!tmpPath) { return null; }
+		return libPath.dirname(tmpPath);
 	}
 
 	/**
