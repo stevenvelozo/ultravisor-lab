@@ -1,9 +1,13 @@
 data
-.test_staging_queue
 .ultravisor.json
 .data
-.test_staging_paged
 .DS_Store
+
+# Test scratch directories — created at suite-setup time, wiped on
+# teardown. Glob covers anything matching the .test_<name> convention,
+# at the package root or under test/.
+.test_*/
+test/.test_*/
 
 package-lock.json
 

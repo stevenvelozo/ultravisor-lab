@@ -242,6 +242,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<span class="lab-beacon-type-badge">{~D:Record.TypeDisplay~}</span>
 	</div>
 	<div class="lab-beacons-form-desc">{~D:Record.TypeDescription~}</div>
+	<div class="lab-beacons-form-deprecation" style="display:{~D:Record.DeprecationDisplay~};" title="{~D:Record.DeprecationNote~}">⚠️ {~D:Record.DeprecationNote~}</div>
 	<label>Name
 		<input type="text" id="Lab-BeaconForm-Name" placeholder="e.g. warehouse-001"
 			value="{~D:Record.Name~}">
@@ -498,6 +499,12 @@ class LabBeaconsView extends libPictView
 			Port:                 tmpForm.Port || 0,
 			TypeDisplay:          tmpActiveType ? this._escape(tmpActiveType.DisplayName) : '',
 			TypeDescription:      tmpActiveType ? this._escape(tmpActiveType.Description) : '',
+			// Legacy / deprecated beacon types surface a warning banner so
+			// new deployments steer toward retold-databeacon + the lab's
+			// Persistence assignment for queue / manifest persistence.
+			// See modules/apps/ultravisor/docs/features/persistence-via-databeacon.md.
+			DeprecationDisplay:   (tmpActiveType && tmpActiveType.Deprecated) ? 'block' : 'none',
+			DeprecationNote:      (tmpActiveType && tmpActiveType.Deprecated) ? this._escape(tmpActiveType.DeprecationNote || '') : '',
 			UltravisorDisplay:    (tmpActiveType && tmpActiveType.RequiresUltravisor) ? 'flex' : 'none',
 			UltravisorOptionsHTML: tmpUvHtml,
 			ConfigFieldsHTML:     this._renderConfigFields(tmpActiveType, tmpForm.Config || {}),

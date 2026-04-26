@@ -65,6 +65,25 @@ const SCANNED_MODULES =
 	'ultravisor-manifest-beacon'
 ];
 
+// Beacon types that are marked deprecated in the lab UI. They still
+// work — the modules ship as the reference Provider implementation
+// for embedded deployments — but the lab's recommended path for
+// queue / manifest persistence is `retold-databeacon` plus the
+// "Persistence" assignment on the UV detail view. See the
+// persistence-via-databeacon design doc for the rationale.
+const DEPRECATED_BEACON_TYPES = new Set(
+[
+	'ultravisor-queue-beacon',
+	'ultravisor-manifest-beacon'
+]);
+
+// Operator-facing message shown in the beacon-create form when one
+// of the DEPRECATED_BEACON_TYPES is picked. Mirrors the rationale
+// captured in the design doc and the Session 4 plan.
+const LEGACY_TOOLTIP =
+	'Legacy type. New deployments should use `retold-databeacon` + the lab\'s ' +
+	'Persistence assignment on the UV detail view for queue / manifest persistence.';
+
 class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 {
 	constructor(pFable, pOptions, pServiceHash)
@@ -139,10 +158,18 @@ class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 
 		let tmpPackageRoot = libPath.dirname(tmpPackageJsonPath);
 
+		let tmpBeaconType = tmpStanza.beaconType || pModuleName;
+		let tmpDisplayName = tmpStanza.displayName || pModuleName;
+		let tmpDeprecated = DEPRECATED_BEACON_TYPES.has(tmpBeaconType) || !!tmpStanza.deprecated;
+		if (tmpDeprecated && tmpDisplayName.indexOf('(legacy)') < 0)
+		{
+			tmpDisplayName = tmpDisplayName + ' (legacy)';
+		}
+
 		let tmpDescriptor =
 		{
-			BeaconType:         tmpStanza.beaconType || pModuleName,
-			DisplayName:        tmpStanza.displayName || pModuleName,
+			BeaconType:         tmpBeaconType,
+			DisplayName:        tmpDisplayName,
 			Description:        tmpStanza.description || '',
 			Category:           tmpStanza.category || 'uncategorized',
 			Mode:               tmpStanza.mode || 'standalone-service',
@@ -154,7 +181,9 @@ class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 			HealthCheck:        this._normalizeHealthCheck(tmpStanza.healthCheck),
 			ConfigForm:         this._resolveConfigForm(tmpPackageRoot, tmpStanza.configForm),
 			ConfigTemplate:     tmpStanza.configTemplate || null,
-			Source:             'package'
+			Source:             'package',
+			Deprecated:         tmpDeprecated,
+			DeprecationNote:    tmpDeprecated ? LEGACY_TOOLTIP : ''
 		};
 
 		if (tmpStanza.bin)
@@ -346,7 +375,9 @@ class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 			RequiresUltravisor: !!pEntry.RequiresUltravisor,
 			Capability:         pEntry.Capability || null,
 			ConfigForm:         pEntry.ConfigForm || null,
-			Source:             pEntry.Source
+			Source:             pEntry.Source,
+			Deprecated:         !!pEntry.Deprecated,
+			DeprecationNote:    pEntry.DeprecationNote || ''
 		};
 	}
 }
