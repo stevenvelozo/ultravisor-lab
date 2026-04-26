@@ -59,7 +59,10 @@ const SCANNED_MODULES =
 	'orator-conversion',
 	'retold-facto',
 	'retold-content-system',
-	'retold-remote'
+	'retold-remote',
+	'ultravisor-auth-beacon',
+	'ultravisor-queue-beacon',
+	'ultravisor-manifest-beacon'
 ];
 
 class ServiceBeaconTypeRegistry extends libFableServiceProviderBase

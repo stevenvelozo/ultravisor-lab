@@ -79,6 +79,24 @@ module.exports = function registerBeaconRoutes(pCore)
 			return pNext();
 		});
 
+	// Proxy: list connections inside a running databeacon. Used by the
+	// persistence-beacon picker (Session 3) to populate the connection
+	// dropdown after the operator selects a beacon. Live-fetched rather
+	// than cached so a connection just created on the databeacon shows
+	// up immediately.
+	tmpOrator.serviceServer.doGet('/api/lab/beacons/:id/connections',
+		(pReq, pRes, pNext) =>
+		{
+			let tmpID = parseInt(pReq.params.id, 10);
+			tmpUvMgr.listBeaconConnections(tmpID,
+				(pErr, pResult) =>
+				{
+					if (pErr) { pRes.send(502, { Error: pErr.message }); return pNext(); }
+					pRes.send(pResult);
+					return pNext();
+				});
+		});
+
 	tmpOrator.serviceServer.doPost('/api/lab/beacons',
 		(pReq, pRes, pNext) =>
 		{

@@ -48,20 +48,22 @@ CREATE TABLE IF NOT EXISTS Database
 
 CREATE TABLE IF NOT EXISTS UltravisorInstance
 (
-	IDUltravisorInstance INTEGER PRIMARY KEY AUTOINCREMENT,
-	Name                 TEXT    NOT NULL,
-	Port                 INTEGER NOT NULL,
-	PID                  INTEGER DEFAULT 0,
-	ContainerID          TEXT    DEFAULT '',
-	ContainerName        TEXT    DEFAULT '',
-	ImageTag             TEXT    DEFAULT '',
-	ImageVersion         TEXT    DEFAULT '',
-	Runtime              TEXT    DEFAULT 'process',
-	ConfigPath           TEXT    DEFAULT '',
-	Status               TEXT    DEFAULT 'pending',
-	StatusDetail         TEXT    DEFAULT '',
-	CreatedAt            TEXT    DEFAULT (datetime('now')),
-	UpdatedAt            TEXT    DEFAULT (datetime('now'))
+	IDUltravisorInstance    INTEGER PRIMARY KEY AUTOINCREMENT,
+	Name                    TEXT    NOT NULL,
+	Port                    INTEGER NOT NULL,
+	PID                     INTEGER DEFAULT 0,
+	ContainerID             TEXT    DEFAULT '',
+	ContainerName           TEXT    DEFAULT '',
+	ImageTag                TEXT    DEFAULT '',
+	ImageVersion            TEXT    DEFAULT '',
+	Runtime                 TEXT    DEFAULT 'process',
+	ConfigPath              TEXT    DEFAULT '',
+	Status                  TEXT    DEFAULT 'pending',
+	StatusDetail            TEXT    DEFAULT '',
+	IDPersistenceBeacon     INTEGER DEFAULT 0,
+	IDPersistenceConnection INTEGER DEFAULT 0,
+	CreatedAt               TEXT    DEFAULT (datetime('now')),
+	UpdatedAt               TEXT    DEFAULT (datetime('now'))
 );
 
 -- Unified beacon registry: any supervised process that registers (or could
@@ -237,11 +239,14 @@ class ServiceStateStore extends libFableServiceProviderBase
 			// debug the image-resident code against an unpublished version.
 			{ Table: 'Beacon',             Column: 'BuildSource',   Def: `TEXT DEFAULT 'npm'` },
 			{ Table: 'DBEngine',           Column: 'InternalPort',  Def: `INTEGER DEFAULT 0` },
-			{ Table: 'UltravisorInstance', Column: 'ContainerID',   Def: `TEXT DEFAULT ''` },
-			{ Table: 'UltravisorInstance', Column: 'ContainerName', Def: `TEXT DEFAULT ''` },
-			{ Table: 'UltravisorInstance', Column: 'ImageTag',      Def: `TEXT DEFAULT ''` },
-			{ Table: 'UltravisorInstance', Column: 'ImageVersion',  Def: `TEXT DEFAULT ''` },
-			{ Table: 'UltravisorInstance', Column: 'Runtime',       Def: `TEXT DEFAULT 'process'` }
+			{ Table: 'UltravisorInstance', Column: 'ContainerID',             Def: `TEXT DEFAULT ''` },
+			{ Table: 'UltravisorInstance', Column: 'ContainerName',           Def: `TEXT DEFAULT ''` },
+			{ Table: 'UltravisorInstance', Column: 'ImageTag',                Def: `TEXT DEFAULT ''` },
+			{ Table: 'UltravisorInstance', Column: 'ImageVersion',            Def: `TEXT DEFAULT ''` },
+			{ Table: 'UltravisorInstance', Column: 'Runtime',                 Def: `TEXT DEFAULT 'process'` },
+			// Session 3 — persistence-beacon assignment.
+			{ Table: 'UltravisorInstance', Column: 'IDPersistenceBeacon',     Def: `INTEGER DEFAULT 0` },
+			{ Table: 'UltravisorInstance', Column: 'IDPersistenceConnection', Def: `INTEGER DEFAULT 0` }
 		];
 
 		for (let i = 0; i < tmpMigrations.length; i++)

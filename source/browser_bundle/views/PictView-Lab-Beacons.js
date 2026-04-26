@@ -78,6 +78,45 @@ const _ViewConfiguration =
 .lab-beacons-form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
 .lab-beacons-form-error { grid-column: 1 / -1; color: #b91c1c; font-size: 13px; }
 
+.lab-beacons-advanced
+{
+	border-top: 1px dashed #cbd5e1; padding-top: 10px;
+	font-size: 13px;
+}
+.lab-beacons-advanced summary
+{
+	cursor: pointer; color: #475569; font-weight: 500;
+	padding: 4px 0; user-select: none;
+}
+.lab-beacons-advanced summary:hover { color: #1d4ed8; }
+.lab-beacons-advanced[open] summary { color: #0f172a; }
+.lab-beacons-advanced-body
+{
+	display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px;
+	padding: 8px 4px 4px;
+}
+.lab-beacons-advanced-body label
+{
+	display: flex; flex-direction: column; gap: 4px;
+	font-size: 12px; color: #475569;
+}
+.lab-beacons-advanced-body label.lab-uv-form-checkbox
+{
+	flex-direction: row; align-items: flex-start; gap: 8px;
+}
+.lab-beacons-advanced-body input[type="text"]
+{
+	width: 100%; box-sizing: border-box; padding: 6px 10px;
+	border: 1px solid #cfd5dd; border-radius: 6px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+	font-size: 12px;
+}
+.lab-beacons-advanced-hint
+{
+	grid-column: 1 / -1; font-size: 12px; color: #64748b;
+	margin: 0 0 4px;
+}
+
 .lab-beacon-card
 {
 	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px;
@@ -215,6 +254,24 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<select id="Lab-BeaconForm-Ultravisor">{~D:Record.UltravisorOptionsHTML~}</select>
 	</label>
 	<div class="full-width">{~D:Record.ConfigFieldsHTML~}</div>
+	<details class="lab-beacons-advanced full-width">
+		<summary>Advanced — admission credentials</summary>
+		<div class="lab-beacons-advanced-body">
+			<p class="lab-beacons-advanced-hint">
+				In Secure mode, the lab automatically assigns the parent Ultravisor's bootstrap secret as this beacon's join credential.
+				Override these to test rejection or promiscuous-mode behaviors.
+			</p>
+			<label>JoinSecret override (blank = auto-assign)
+				<input type="text" id="Lab-BeaconForm-JoinSecretOverride"
+					placeholder="hex string, blank for auto"
+					value="{~D:Record.JoinSecretOverride~}">
+			</label>
+			<label class="lab-uv-form-checkbox">
+				<input type="checkbox" id="Lab-BeaconForm-SkipJoinSecret" {~D:Record.SkipJoinSecretChecked~}>
+				<span>Skip JoinSecret entirely (sends no credential — for testing Secure-mode rejection)</span>
+			</label>
+		</div>
+	</details>
 	<div class="lab-beacons-form-actions">
 		<a class="lab-btn secondary" href="#/beacons/form/suggest-port">↻ Suggest port</a>
 		<a class="lab-btn secondary" href="#/beacons/form/close">Cancel</a>
@@ -444,6 +501,10 @@ class LabBeaconsView extends libPictView
 			UltravisorDisplay:    (tmpActiveType && tmpActiveType.RequiresUltravisor) ? 'flex' : 'none',
 			UltravisorOptionsHTML: tmpUvHtml,
 			ConfigFieldsHTML:     this._renderConfigFields(tmpActiveType, tmpForm.Config || {}),
+			// Advanced — admission credential overrides. Plain attribute
+			// values; the consumer reads them at submit time via _domValue.
+			JoinSecretOverride:   this._escape(tmpForm.JoinSecretOverride || ''),
+			SkipJoinSecretChecked: tmpForm.SkipJoinSecret ? 'checked' : '',
 			Error:                this._escape(tmpForm.Error || '')
 		};
 		return this.pict.parseTemplateByHash('Lab-Beacons-FormBody-Template', tmpRecord);

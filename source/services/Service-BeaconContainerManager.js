@@ -494,6 +494,11 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 	 *                   bind-mounted by _resolveConfigMounts when the beacon
 	 *                   config specifies HostContentPath.  Types that don't
 	 *                   need a content dir can ignore this token.
+	 *   JoinSecret      the parent UltravisorInstance's BootstrapAuthSecret
+	 *                   when in Secure mode. Empty string when the UV is
+	 *                   in promiscuous mode — the auth-beacon stanza's
+	 *                   argTemplate references this; other beacons just
+	 *                   omit the token from their template and never see it.
 	 *
 	 * Empty strings skip their flag pair so {{UltravisorURL}} omission
 	 * doesn't leave a dangling "-u" on the CLI.
@@ -541,6 +546,7 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 		let tmpContentMount = (pType.Docker && pType.Docker.ContentMountPath) || '/app/content';
 
 		let tmpUltravisorURL = '';
+		let tmpJoinSecret = '';
 		if (pBeacon.IDUltravisorInstance)
 		{
 			let tmpInstance = this.fable.LabUltravisorManager.getInstance(pBeacon.IDUltravisorInstance);
@@ -554,7 +560,26 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 				{
 					tmpUltravisorURL = `http://host.docker.internal:${tmpInstance.Port}`;
 				}
+				// Surface the parent UV's bootstrap secret so a stanza that
+				// declares { fromLabPath: 'JoinSecret' } in its argTemplate
+				// gets the right value injected without the lab needing to
+				// know which beacon types care.
+				if (tmpInstance.Secure && tmpInstance.BootstrapAuthSecret)
+				{
+					tmpJoinSecret = tmpInstance.BootstrapAuthSecret;
+				}
 			}
+		}
+		// Admission overrides on the beacon row override the auto-assigned
+		// JoinSecret. Same precedence as the host-process spawn path:
+		// SkipJoinSecret > JoinSecretOverride > parent UV's BootstrapAuthSecret.
+		if (pBeacon.SkipJoinSecret)
+		{
+			tmpJoinSecret = '';
+		}
+		else if (pBeacon.JoinSecretOverride)
+		{
+			tmpJoinSecret = pBeacon.JoinSecretOverride;
 		}
 
 		return {
@@ -562,7 +587,8 @@ class ServiceBeaconContainerManager extends libFableServiceProviderBase
 			ConfigPath:    tmpConfigMount,
 			ContentPath:   tmpContentMount,
 			BeaconName:    pBeacon.Name,
-			UltravisorURL: tmpUltravisorURL
+			UltravisorURL: tmpUltravisorURL,
+			JoinSecret:    tmpJoinSecret
 		};
 	}
 

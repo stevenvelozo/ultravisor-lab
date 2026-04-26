@@ -1,0 +1,12 @@
+{
+	"version": "0.0.1",
+	"configurations":
+	[
+		{
+			"name": "ultravisor-lab",
+			"runtimeExecutable": "node",
+			"runtimeArgs": ["lab.js", "--web", "--no-open"],
+			"port": 44443
+		}
+	]
+}

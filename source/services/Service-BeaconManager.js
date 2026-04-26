@@ -105,6 +105,17 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 		// already sitting in docker (rare; tested via curl more than UI).
 		let tmpBuildSource = (pRequest.BuildSource === 'source') ? 'source' : 'npm';
 
+		// Admission overrides — frozen on the row at create time so a
+		// stop/start cycle uses the same admission shape the operator
+		// chose. Empty / false means "fall back to lab's auto-assignment"
+		// (parent UV's BootstrapAuthSecret in Secure mode, no secret
+		// otherwise). These exist only to support testing different
+		// security configurations from the lab UI; production beacons
+		// should leave them at defaults.
+		let tmpJoinSecretOverride = (typeof pRequest.JoinSecretOverride === 'string')
+			? pRequest.JoinSecretOverride : '';
+		let tmpSkipJoinSecret = !!pRequest.SkipJoinSecret;
+
 		let tmpID = tmpStore.insert('Beacon',
 			{
 				Name:                 tmpName,
@@ -114,6 +125,8 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 				ConfigJSON:           JSON.stringify(tmpConfig),
 				Runtime:              tmpRuntime,
 				BuildSource:          tmpBuildSource,
+				JoinSecretOverride:   tmpJoinSecretOverride,
+				SkipJoinSecret:       tmpSkipJoinSecret,
 				Status:               'provisioning',
 				StatusDetail:         'Preparing spawn...'
 			});
@@ -154,6 +167,9 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 			// can read per-beacon bind sources (e.g. HostContentPath) from the
 			// saved config.  Otherwise the stub row is missing the field and
 			// config-driven mounts silently fall back to anonymous volumes.
+			// Carry the admission overrides too so the container path's
+			// _standaloneServiceTokens can short-circuit the auto-assigned
+			// JoinSecret when the operator explicitly opted out.
 			let tmpBeaconRow =
 				{
 					IDBeacon:             tmpID,
@@ -161,7 +177,9 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 					Port:                 tmpPort,
 					IDUltravisorInstance: tmpUvID,
 					ConfigJSON:           JSON.stringify(tmpConfig),
-					BuildSource:          tmpBuildSource
+					BuildSource:          tmpBuildSource,
+					JoinSecretOverride:   tmpJoinSecretOverride,
+					SkipJoinSecret:       tmpSkipJoinSecret
 				};
 
 			let fProgress = this._buildContainerProgressEmitter(
@@ -212,7 +230,17 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 		let tmpSpawn;
 		try
 		{
-			tmpSpawn = this._buildSpawnSpec(tmpType, tmpID, tmpName, tmpPort, tmpInstance, tmpConfigPath);
+			// Build a stub Beacon row with just the admission-override
+			// fields _buildSpawnSpec needs. (The full row hasn't been
+			// reloaded from the store yet; this is the shortest-path
+			// option that doesn't introduce a re-read for create.)
+			let tmpStubRow =
+			{
+				IDBeacon: tmpID, Name: tmpName, Port: tmpPort,
+				JoinSecretOverride: tmpJoinSecretOverride,
+				SkipJoinSecret: tmpSkipJoinSecret
+			};
+			tmpSpawn = this._buildSpawnSpec(tmpType, tmpID, tmpName, tmpPort, tmpInstance, tmpConfigPath, tmpStubRow);
 		}
 		catch (pErr)
 		{
@@ -240,23 +268,52 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 		tmpStore.update('Beacon', 'IDBeacon', tmpID,
 			{ PID: tmpPid, StatusDetail: 'Waiting for HTTP readiness...' });
 
-		this._waitForHttp(tmpPort, tmpType.HealthCheck && tmpType.HealthCheck.Path, 0,
-			(pReady) =>
+		// Beacons that don't run their own HTTP server (e.g. the auth
+		// beacon — pure WS client connecting up to ultravisor) declare
+		// `defaultPort: 0` in their stanza. For those, polling
+		// 127.0.0.1:Port would never succeed; we wait briefly for the
+		// process to stabilize and mark it ready. A more rigorous check
+		// would query ultravisor's beacon list for our Name; that's
+		// follow-up work.
+		let tmpNeedsHTTP = pPort && pPort > 0;
+		if (!tmpNeedsHTTP)
+		{
+			tmpStore.update('Beacon', 'IDBeacon', tmpID,
+				{ StatusDetail: 'Process started; non-HTTP beacon, skipping HTTP poll...' });
+			setTimeout(() =>
 			{
-				if (!pReady)
-				{
-					this._markFailed(tmpID, tmpName, 'beacon did not come up');
-					return;
-				}
+				let tmpRow = tmpStore.getById('Beacon', 'IDBeacon', tmpID);
+				if (!tmpRow || tmpRow.Status === 'failed' || tmpRow.Status === 'stopped') return;
 				tmpStore.update('Beacon', 'IDBeacon', tmpID,
 					{ Status: 'running', StatusDetail: '' });
 				tmpStore.recordEvent(
 					{
 						EntityType: 'Beacon', EntityID: tmpID, EntityName: tmpName,
 						EventType: 'beacon-ready', Severity: 'info',
-						Message: `${tmpType.DisplayName} beacon '${tmpName}' ready on port ${tmpPort}`
+						Message: `${tmpType.DisplayName} beacon '${tmpName}' running (no HTTP server)`
 					});
-			});
+			}, 3000);
+		}
+		else
+		{
+			this._waitForHttp(tmpPort, tmpType.HealthCheck && tmpType.HealthCheck.Path, 0,
+				(pReady) =>
+				{
+					if (!pReady)
+					{
+						this._markFailed(tmpID, tmpName, 'beacon did not come up');
+						return;
+					}
+					tmpStore.update('Beacon', 'IDBeacon', tmpID,
+						{ Status: 'running', StatusDetail: '' });
+					tmpStore.recordEvent(
+						{
+							EntityType: 'Beacon', EntityID: tmpID, EntityName: tmpName,
+							EventType: 'beacon-ready', Severity: 'info',
+							Message: `${tmpType.DisplayName} beacon '${tmpName}' ready on port ${tmpPort}`
+						});
+				});
+		}
 
 		return fCallback(null, { IDBeacon: tmpID, PID: tmpPid, Runtime: 'process', Status: 'provisioning' });
 	}
@@ -369,13 +426,44 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 
 	// ── Spawn spec assembly ─────────────────────────────────────────────────
 
-	_buildSpawnSpec(pType, pID, pName, pPort, pInstance, pConfigPath)
+	_buildSpawnSpec(pType, pID, pName, pPort, pInstance, pConfigPath, pBeaconRow)
 	{
 		if (pType.Mode === 'standalone-service')
 		{
 			if (!pType.BinPath) { throw new Error(`Type '${pType.BeaconType}' has no bin path.`); }
 			let tmpTemplate = pType.ArgTemplate || [];
-			let tmpCtx = { Port: pPort, BeaconName: pName, ConfigPath: pConfigPath, UltravisorURL: pInstance ? `http://127.0.0.1:${pInstance.Port}` : '' };
+			// JoinSecret resolution, in order of precedence:
+			//   1. SkipJoinSecret on the beacon row → '' (sends nothing,
+			//      always rejected by Secure UVs — useful for testing)
+			//   2. JoinSecretOverride on the beacon row → that literal
+			//      (lets the operator try a wrong secret, an expired one,
+			//      a known-good per-beacon credential, etc.)
+			//   3. Parent UV's BootstrapAuthSecret when Secure → auto
+			//   4. Empty string (promiscuous mode → field omitted on wire)
+			//
+			// Beacons whose argTemplate doesn't reference
+			// {fromLabPath:'JoinSecret'} just ignore whatever lands here.
+			let tmpJoinSecret = '';
+			if (pBeaconRow && pBeaconRow.SkipJoinSecret)
+			{
+				tmpJoinSecret = '';
+			}
+			else if (pBeaconRow && pBeaconRow.JoinSecretOverride)
+			{
+				tmpJoinSecret = pBeaconRow.JoinSecretOverride;
+			}
+			else if (pInstance && pInstance.Secure && pInstance.BootstrapAuthSecret)
+			{
+				tmpJoinSecret = pInstance.BootstrapAuthSecret;
+			}
+			let tmpCtx =
+			{
+				Port: pPort,
+				BeaconName: pName,
+				ConfigPath: pConfigPath,
+				UltravisorURL: pInstance ? `http://127.0.0.1:${pInstance.Port}` : '',
+				JoinSecret: tmpJoinSecret
+			};
 			return {
 				Command: process.execPath,
 				Args: [pType.BinPath].concat(this._expandArgTemplate(tmpTemplate, tmpCtx))
@@ -630,7 +718,10 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 		let tmpSpawn;
 		try
 		{
-			tmpSpawn = this._buildSpawnSpec(tmpType, pID, tmpBeacon.Name, tmpBeacon.Port, tmpInstance, tmpBeacon.ConfigPath);
+			// Reused start path — tmpBeacon is the full row from the
+			// state store, so the admission-override fields ride
+			// through directly without a stub.
+			tmpSpawn = this._buildSpawnSpec(tmpType, pID, tmpBeacon.Name, tmpBeacon.Port, tmpInstance, tmpBeacon.ConfigPath, tmpBeacon);
 		}
 		catch (pErr) { return fCallback(pErr); }
 

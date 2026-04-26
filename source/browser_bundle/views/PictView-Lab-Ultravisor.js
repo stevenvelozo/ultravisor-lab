@@ -90,6 +90,45 @@ const _ViewConfiguration =
 .lab-uv-detail-value a:hover { text-decoration: underline; }
 .lab-uv-status-detail { font-size: 12px; color: #92400e; font-style: italic; }
 
+/* Secure-mode chrome — badge sits next to the running/stopped pill, the
+   actions row sits below the status detail and only renders when the UV
+   is in Secure mode (rendered HTML decides visibility). */
+.lab-uv-secure-badge
+{
+	font-size: 11px; padding: 2px 8px; border-radius: 10px;
+	font-weight: 600; letter-spacing: 0.3px;
+	background: #fef3c7; color: #92400e;
+	border: 1px solid #fde68a;
+}
+.lab-uv-secure-badge.bootstrapped
+{
+	background: #dcfce7; color: #166534; border-color: #86efac;
+}
+.lab-uv-security-actions
+{
+	display: flex; align-items: center; gap: 12px;
+	padding: 10px 14px; border-radius: 6px;
+	background: #fffbeb; border: 1px solid #fde68a;
+}
+.lab-uv-security-hint { flex: 1; font-size: 12px; color: #78350f; }
+
+.lab-uv-persistence-row
+{
+	display: flex; align-items: center; gap: 12px;
+	padding: 10px 14px; border-radius: 6px;
+	background: #f8fafc; border: 1px solid #e2e8f0;
+}
+.lab-uv-persistence-pill
+{
+	font-size: 11px; padding: 2px 8px; border-radius: 10px;
+	white-space: nowrap; font-weight: 500;
+}
+.lab-uv-persistence-pill.unassigned         { background: #e2e8f0; color: #475569; }
+.lab-uv-persistence-pill.waiting-for-beacon { background: #fef3c7; color: #92400e; }
+.lab-uv-persistence-pill.bootstrapping      { background: #dbeafe; color: #1e40af; }
+.lab-uv-persistence-pill.bootstrapped       { background: #dcfce7; color: #166534; }
+.lab-uv-persistence-pill.error              { background: #fee2e2; color: #991b1b; cursor: help; }
+
 .lab-uv-empty
 {
 	padding: 32px 20px; text-align: center; color: #64748b;
@@ -147,6 +186,10 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<input type="number" id="Lab-UltravisorForm-Port" min="1" max="65535"
 			value="{~D:Record.Port~}">
 	</label>
+	<label class="lab-uv-form-secure">
+		<input type="checkbox" id="Lab-UltravisorForm-Secure" {~D:Record.SecureChecked~}>
+		<span>Secure mode (non-promiscuous, requires auth beacon to admit other beacons)</span>
+	</label>
 	<div class="lab-uv-form-actions">
 		<a class="lab-btn secondary" href="#/ultravisor/form/toggle">Cancel</a>
 		<a class="lab-btn" href="#/ultravisor/submit">Create Ultravisor</a>
@@ -166,6 +209,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	<div class="lab-uv-card-header">
 		<h3>{~D:Record.Name~}</h3>
 		<span class="lab-uv-status {~D:Record.Status~}">{~D:Record.Status~}</span>
+		{~D:Record.SecureBadgeHTML~}
 		<div class="lab-uv-actions">
 			<a class="lab-btn secondary small {~D:Record.StartDisabled~}" href="#/ultravisor/{~D:Record.IDUltravisorInstance~}/start">Start</a>
 			<a class="lab-btn secondary small {~D:Record.StopDisabled~}"  href="#/ultravisor/{~D:Record.IDUltravisorInstance~}/stop">Stop</a>
@@ -173,6 +217,8 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		</div>
 	</div>
 	<div class="lab-uv-status-detail" style="display: {~D:Record.DetailDisplay~};">{~D:Record.StatusDetail~}</div>
+	{~D:Record.SecurityActionsHTML~}
+	{~D:Record.PersistenceRowHTML~}
 	<div class="lab-uv-details">
 		<div>
 			<div class="label">API port</div>
@@ -263,6 +309,11 @@ class LabUltravisorView extends libPictView
 			{
 				Name:  this._escape(tmpForm.Name || ''),
 				Port:  tmpForm.Port || 0,
+				// `checked` only when truthy — the template injects this
+				// value verbatim into the input attribute, so an empty
+				// string keeps the checkbox unchecked without any extra
+				// conditional rendering.
+				SecureChecked: tmpForm.Secure ? 'checked' : '',
 				Error: this._escape(tmpForm.Error || '')
 			});
 	}
@@ -310,11 +361,116 @@ class LabUltravisorView extends libPictView
 					Port:              tmpUv.Port,
 					PID:               tmpUv.PID || '--',
 					BeaconSummaryHTML: tmpBeaconSummaryHtml,
+					SecureBadgeHTML:    this._secureBadgeHTML(tmpUv),
+					SecurityActionsHTML: this._securityActionsHTML(tmpUv, tmpPaired),
+					PersistenceRowHTML: this._persistenceRowHTML(tmpUv),
 					StartDisabled:     (tmpUv.Status === 'running' || tmpUv.Status === 'starting' || tmpUv.Status === 'provisioning') ? 'disabled' : '',
 					StopDisabled:      (tmpUv.Status !== 'running') ? 'disabled' : ''
 				});
 		}
 		return tmpHtml;
+	}
+
+	// ── Secure-mode card chrome ────────────────────────────────────────────
+	//
+	// The badge is a small read-only indicator next to the running/stopped
+	// pill. Security actions live in their own row under the status detail
+	// because they only show conditionally and would otherwise compete with
+	// the existing Start/Stop/Remove cluster for visual real estate.
+
+	_secureBadgeHTML(pUv)
+	{
+		if (!pUv.Secure) { return ''; }
+		if (pUv.Bootstrapped)
+		{
+			return '<span class="lab-uv-secure-badge bootstrapped" title="Secure mode, admin bootstrapped">🔒 secure</span>';
+		}
+		return '<span class="lab-uv-secure-badge" title="Secure mode, awaiting admin bootstrap">🔒 secure (pending)</span>';
+	}
+
+	_securityActionsHTML(pUv, pPaired)
+	{
+		if (!pUv.Secure) { return ''; }
+
+		// "Has auth beacon" is determined by checking the paired beacons
+		// for one whose BeaconType matches the auth-beacon stanza. We
+		// don't gate on Status here — even a 'failed' or 'starting' auth
+		// beacon counts as "exists" so the operator doesn't accidentally
+		// spawn two.
+		let tmpHasAuth = (pPaired || []).some((pB) => pB.BeaconType === 'ultravisor-auth-beacon');
+
+		// UV must be running before either action makes sense — both
+		// require an HTTP roundtrip to the Ultravisor process.
+		let tmpDisabled = (pUv.Status !== 'running') ? ' disabled' : '';
+
+		let tmpInner = '';
+		if (!tmpHasAuth)
+		{
+			tmpInner = ''
+				+ '<span class="lab-uv-security-hint">No auth beacon yet — required to admit other beacons.</span>'
+				+ `<a class="lab-btn small${tmpDisabled}" href="#/ultravisor/${pUv.IDUltravisorInstance}/add-auth-beacon">Add auth beacon</a>`;
+		}
+		else if (!pUv.Bootstrapped)
+		{
+			tmpInner = ''
+				+ '<span class="lab-uv-security-hint">Auth beacon connected — bootstrap the first admin to finish setup.</span>'
+				+ `<a class="lab-btn small${tmpDisabled}" href="#/ultravisor/${pUv.IDUltravisorInstance}/bootstrap-admin">Bootstrap admin</a>`;
+		}
+		else
+		{
+			tmpInner = '<span class="lab-uv-security-hint">Secure environment is ready. Sign in via the Ultravisor UI to manage users.</span>';
+		}
+		return '<div class="lab-uv-security-actions">' + tmpInner + '</div>';
+	}
+
+	// ── Persistence-beacon row (Session 3) ────────────────────────────
+	//
+	// One row per UV showing the assigned databeacon (if any) plus a
+	// status pill that the lab's fast-poll keeps fresh. Always rendered
+	// regardless of Secure mode; persistence is orthogonal to auth.
+
+	_persistenceRowHTML(pUv)
+	{
+		let tmpPersistence = pUv.Persistence || { State: 'unassigned' };
+		let tmpState = tmpPersistence.State || 'unassigned';
+		let tmpLabel;
+		switch (tmpState)
+		{
+			case 'unassigned':         tmpLabel = 'unassigned'; break;
+			case 'waiting-for-beacon': tmpLabel = 'waiting for beacon'; break;
+			case 'bootstrapping':      tmpLabel = 'bootstrapping…'; break;
+			case 'bootstrapped':       tmpLabel = 'bootstrapped'; break;
+			case 'error':              tmpLabel = 'error'; break;
+			default:                   tmpLabel = tmpState;
+		}
+		let tmpTitle = '';
+		if (tmpState === 'error' && tmpPersistence.LastError)
+		{
+			tmpTitle = ' title="' + this._escape(tmpPersistence.LastError) + '"';
+		}
+		let tmpBeacon = tmpPersistence.BeaconRecord;
+		let tmpHint;
+		if (tmpState === 'unassigned')
+		{
+			tmpHint = '<span class="lab-uv-security-hint">No persistence beacon — queue + manifest stay in-process.</span>';
+		}
+		else if (tmpBeacon && tmpBeacon.Name)
+		{
+			tmpHint = '<span class="lab-uv-security-hint">Routed to <strong>'
+				+ this._escape(tmpBeacon.Name) + '</strong> (connection ' + (tmpPersistence.IDPersistenceConnection || 0) + ').</span>';
+		}
+		else
+		{
+			tmpHint = '<span class="lab-uv-security-hint">Beacon ID ' + (tmpPersistence.IDPersistenceBeacon || 0) + ' (no record).</span>';
+		}
+		let tmpDisabled = (pUv.Status !== 'running') ? ' disabled' : '';
+		let tmpButtonLabel = (tmpState === 'unassigned') ? 'Assign persistence' : 'Change persistence';
+		return '<div class="lab-uv-persistence-row">'
+			+ '<span class="lab-uv-persistence-pill ' + tmpState + '"' + tmpTitle + '>Persistence: ' + tmpLabel + '</span>'
+			+ tmpHint
+			+ '<a class="lab-btn small' + tmpDisabled + '" href="#/ultravisor/' + pUv.IDUltravisorInstance + '/set-persistence-beacon">'
+			+ tmpButtonLabel + '</a>'
+			+ '</div>';
 	}
 
 	_escape(pStr)

@@ -31,9 +31,12 @@
 
 		{ "path": "/ultravisor/form/toggle",  "template": "{~LV:Pict.PictApplication.toggleUltravisorForm()~}" },
 		{ "path": "/ultravisor/submit",       "template": "{~LV:Pict.PictApplication.submitUltravisorForm()~}" },
-		{ "path": "/ultravisor/:id/start",    "template": "{~LV:Pict.PictApplication.startUltravisor(Record.data.id)~}" },
-		{ "path": "/ultravisor/:id/stop",     "template": "{~LV:Pict.PictApplication.stopUltravisor(Record.data.id)~}" },
-		{ "path": "/ultravisor/:id/remove",   "template": "{~LV:Pict.PictApplication.removeUltravisor(Record.data.id)~}" },
+		{ "path": "/ultravisor/:id/start",            "template": "{~LV:Pict.PictApplication.startUltravisor(Record.data.id)~}" },
+		{ "path": "/ultravisor/:id/stop",             "template": "{~LV:Pict.PictApplication.stopUltravisor(Record.data.id)~}" },
+		{ "path": "/ultravisor/:id/remove",           "template": "{~LV:Pict.PictApplication.removeUltravisor(Record.data.id)~}" },
+		{ "path": "/ultravisor/:id/add-auth-beacon",  "template": "{~LV:Pict.PictApplication.addAuthBeacon(Record.data.id)~}" },
+		{ "path": "/ultravisor/:id/bootstrap-admin",  "template": "{~LV:Pict.PictApplication.bootstrapAdmin(Record.data.id)~}" },
+		{ "path": "/ultravisor/:id/set-persistence-beacon", "template": "{~LV:Pict.PictApplication.setPersistenceBeacon(Record.data.id)~}" },
 
 		{ "path": "/beacons/form/open/:type",  "template": "{~LV:Pict.PictApplication.openBeaconFormForType(Record.data.type)~}" },
 		{ "path": "/beacons/form/close",       "template": "{~LV:Pict.PictApplication.closeBeaconForm()~}" },

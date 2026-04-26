@@ -86,14 +86,14 @@ class LabBrowserApplication extends libPictApplication
 			{
 				FormOpen:  false,
 				Instances: [],
-				Form:      { Name: '', Port: 54321, Error: '' }
+				Form:      { Name: '', Port: 54321, Secure: false, Error: '' }
 			},
 			Beacons:
 			{
 				FormOpen: false,
 				Types:    [],
 				Beacons:  [],
-				Form:     { Name: '', BeaconType: '', Port: 0, IDUltravisorInstance: 0, Config: {}, Error: '' }
+				Form:     { Name: '', BeaconType: '', Port: 0, IDUltravisorInstance: 0, Config: {}, JoinSecretOverride: '', SkipJoinSecret: false, Error: '' }
 			},
 			SeedDatasets:
 			{
@@ -257,10 +257,16 @@ class LabBrowserApplication extends libPictApplication
 			tmpPending--;
 			if (tmpPending <= 0)
 			{
-				this._applySeedTargetDefaults();
-				this._refreshActiveList();
-				this.pict.views['Lab-Navigation'].render();
-				return fCallback();
+				// Inflate per-UV persistence state, then re-arm the
+				// transient-state fast-poll, then re-render.
+				this._refreshAllUvPersistence(() =>
+				{
+					this._applySeedTargetDefaults();
+					this._refreshActiveList();
+					this.pict.views['Lab-Navigation'].render();
+					this._pumpPersistencePollers();
+					return fCallback();
+				});
 			}
 		};
 
@@ -360,6 +366,73 @@ class LabBrowserApplication extends libPictApplication
 						tmpNext();
 					});
 			})(pEngines[i]);
+		}
+	}
+
+	/**
+	 * For each UV row, attach a Persistence object to power the lab's
+	 * status pill. Unassigned UVs get a synthesized stub (no HTTP); UVs
+	 * with an assignment get a fresh fetch from the lab API. The fast-
+	 * poll loop (_pumpPersistencePollers) takes over for transient
+	 * states once steady refreshes complete.
+	 */
+	_refreshAllUvPersistence(fCallback)
+	{
+		let tmpInstances = (this.pict.AppData.Lab.Ultravisor && this.pict.AppData.Lab.Ultravisor.Instances) || [];
+		if (tmpInstances.length === 0) { return fCallback(); }
+
+		let tmpRemaining = tmpInstances.length;
+		let tmpNext = () =>
+		{
+			tmpRemaining--;
+			if (tmpRemaining <= 0) { return fCallback(); }
+		};
+
+		let tmpApi = this.pict.providers.LabApi;
+		for (let i = 0; i < tmpInstances.length; i++)
+		{
+			((pUv) =>
+			{
+				let tmpAssigned = parseInt(pUv.IDPersistenceBeacon, 10) || 0;
+				if (tmpAssigned === 0)
+				{
+					pUv.Persistence =
+					{
+						IDPersistenceBeacon: 0,
+						IDPersistenceConnection: 0,
+						BeaconRecord: null,
+						ConnectionRecord: null,
+						State: 'unassigned',
+						LastError: null,
+						BootstrappedAt: null
+					};
+					return tmpNext();
+				}
+				tmpApi.getUltravisorPersistenceStatus(pUv.IDUltravisorInstance,
+					(pErr, pPayload) =>
+					{
+						if (!pErr && pPayload && pPayload.Persistence)
+						{
+							pUv.Persistence = pPayload.Persistence;
+						}
+						else if (!pUv.Persistence)
+						{
+							// Unable to reach the UV — surface a waiting
+							// state so the pill renders something.
+							pUv.Persistence =
+							{
+								IDPersistenceBeacon: tmpAssigned,
+								IDPersistenceConnection: parseInt(pUv.IDPersistenceConnection, 10) || 0,
+								BeaconRecord: null,
+								ConnectionRecord: null,
+								State: 'waiting-for-beacon',
+								LastError: pErr ? pErr.message : 'No persistence status returned',
+								BootstrappedAt: null
+							};
+						}
+						tmpNext();
+					});
+			})(tmpInstances[i]);
 		}
 	}
 
@@ -833,6 +906,13 @@ class LabBrowserApplication extends libPictApplication
 		tmpForm.Name                 = (this._domValue('#Lab-BeaconForm-Name') || '').trim();
 		tmpForm.Port                 = parseInt(this._domValue('#Lab-BeaconForm-Port') || '0', 10);
 		tmpForm.IDUltravisorInstance = parseInt(this._domValue('#Lab-BeaconForm-Ultravisor') || '0', 10);
+		// Advanced — admission credential overrides. The override slot
+		// is read as text; the SkipJoinSecret toggle is read directly
+		// from the DOM (checkbox value isn't surfaced via _domValue).
+		tmpForm.JoinSecretOverride = (this._domValue('#Lab-BeaconForm-JoinSecretOverride') || '').trim();
+		let tmpSkipEl = (typeof document !== 'undefined')
+			? document.getElementById('Lab-BeaconForm-SkipJoinSecret') : null;
+		tmpForm.SkipJoinSecret = !!(tmpSkipEl && tmpSkipEl.checked);
 		tmpForm.Error                = '';
 
 		// Read each declared config field from the DOM and stuff it into
@@ -890,13 +970,22 @@ class LabBrowserApplication extends libPictApplication
 				BeaconType:           tmpForm.BeaconType,
 				Port:                 tmpForm.Port,
 				IDUltravisorInstance: tmpForm.IDUltravisorInstance,
-				Config:               tmpConfig
+				Config:               tmpConfig,
+				// Optional admission overrides. When both are blank/false,
+				// the lab falls back to its automatic JoinSecret assignment
+				// (parent UV's BootstrapAuthSecret). The server interprets
+				// SkipJoinSecret as "send no credential" — useful for
+				// forcing rejection in non-promiscuous mode.
+				JoinSecretOverride:   tmpForm.JoinSecretOverride || '',
+				SkipJoinSecret:       !!tmpForm.SkipJoinSecret
 			},
 			(pErr) =>
 			{
 				if (pErr) { tmpForm.Error = pErr.message || 'Create failed.'; this.pict.views['Lab-Beacons'].render('Lab-Beacons-Form'); return; }
 				tmpState.FormOpen = false;
 				tmpForm.Name = '';
+				tmpForm.JoinSecretOverride = '';
+				tmpForm.SkipJoinSecret = false;
 				tmpForm.Config = this._defaultConfigFor(tmpTypeDesc);
 				tmpForm.Error = '';
 				this.pict.views['Lab-Beacons'].render('Lab-Beacons-Form');
@@ -1125,17 +1214,26 @@ class LabBrowserApplication extends libPictApplication
 
 		tmpForm.Name  = (this._domValue('#Lab-UltravisorForm-Name') || '').trim();
 		tmpForm.Port  = parseInt(this._domValue('#Lab-UltravisorForm-Port') || '0', 10);
+		// Read the checkbox directly — the form view doesn't bind it
+		// to the AppData state at edit time, so the source of truth at
+		// submit time is the DOM. Keep the read defensive in case the
+		// element disappeared (e.g. test environments without the form).
+		let tmpSecureEl = (typeof document !== 'undefined')
+			? document.getElementById('Lab-UltravisorForm-Secure') : null;
+		tmpForm.Secure = !!(tmpSecureEl && tmpSecureEl.checked);
 		tmpForm.Error = '';
 
 		if (!tmpForm.Name) { tmpForm.Error = 'Name is required.'; this.pict.views['Lab-Ultravisor'].render('Lab-Ultravisor-Form'); return; }
 		if (!tmpForm.Port || tmpForm.Port < 1) { tmpForm.Error = 'Port is required.'; this.pict.views['Lab-Ultravisor'].render('Lab-Ultravisor-Form'); return; }
 
-		this.pict.providers.LabApi.createUltravisor({ Name: tmpForm.Name, Port: tmpForm.Port },
+		this.pict.providers.LabApi.createUltravisor(
+			{ Name: tmpForm.Name, Port: tmpForm.Port, Secure: tmpForm.Secure },
 			(pErr) =>
 			{
 				if (pErr) { tmpForm.Error = pErr.message || 'Create failed.'; this.pict.views['Lab-Ultravisor'].render('Lab-Ultravisor-Form'); return; }
 				tmpState.FormOpen = false;
 				tmpForm.Name = '';
+				tmpForm.Secure = false;
 				tmpForm.Error = '';
 				this.pict.views['Lab-Ultravisor'].render('Lab-Ultravisor-Form');
 				this.refreshAll(() => {});
@@ -1158,6 +1256,368 @@ class LabBrowserApplication extends libPictApplication
 							this.refreshAll(() => {});
 						});
 				});
+	}
+
+	// ── Secure-mode shortcuts ────────────────────────────────────────────
+	//
+	// "Add auth beacon" creates a beacon paired with a Secure UV without
+	// the operator having to fill in the generic beacon form. We pick the
+	// type, derive a name from the UV's name, and let the lab's existing
+	// createBeacon flow do the spawn + JoinSecret plumbing.
+
+	addAuthBeacon(pID)
+	{
+		let tmpUv = (this.pict.AppData.Lab.Ultravisor.Instances || [])
+			.find((pU) => pU.IDUltravisorInstance === pID);
+		if (!tmpUv) { this._toastError('Ultravisor not found in local state.'); return; }
+		if (!tmpUv.Secure)
+		{
+			this._toastError('Ultravisor is not in Secure mode — auth beacon would be ignored.');
+			return;
+		}
+		// Auto-name "<UV-Name>-auth" so the operator doesn't have to think
+		// of one. If they want a different name they can use the generic
+		// beacon form.
+		let tmpName = `${tmpUv.Name}-auth`;
+		this.pict.providers.LabApi.createBeacon(
+		{
+			Name:                 tmpName,
+			BeaconType:           'ultravisor-auth-beacon',
+			Port:                 0,
+			IDUltravisorInstance: pID,
+			Config:               {}
+		}, (pErr) =>
+		{
+			if (pErr) { this._toastError('Add auth beacon failed: ' + pErr.message); return; }
+			this._toastSuccess(`Auth beacon '${tmpName}' starting…`);
+			this.refreshAll(() => {});
+		});
+	}
+
+	bootstrapAdmin(pID)
+	{
+		let tmpUv = (this.pict.AppData.Lab.Ultravisor.Instances || [])
+			.find((pU) => pU.IDUltravisorInstance === pID);
+		if (!tmpUv) { this._toastError('Ultravisor not found.'); return; }
+		if (tmpUv.Bootstrapped) { this._toastError('Already bootstrapped.'); return; }
+
+		// Modal-driven prompt — Username + Password fields read at submit
+		// time via _domValue. We DON'T persist these to AppData; the form
+		// value is only ever held in the DOM during the dialog's lifetime.
+		let tmpContent = ''
+			+ '<p>Mint the first admin user for <strong>' + this._htmlEscape(tmpUv.Name) + '</strong>.</p>'
+			+ '<p style="font-size:12px;color:#64748b;margin-top:8px;">'
+			+ 'This consumes the one-time bootstrap token. Subsequent users go through the auth-beacon\'s normal admin-gated path.</p>'
+			+ '<label style="display:block;margin-top:10px;">Username'
+			+ '<input type="text" id="Lab-UV-BootstrapAdmin-Username" autocomplete="username" autofocus '
+			+ 'style="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid #cfd5dd;border-radius:6px;margin-top:4px;">'
+			+ '</label>'
+			+ '<label style="display:block;margin-top:10px;">Password'
+			+ '<input type="password" id="Lab-UV-BootstrapAdmin-Password" autocomplete="new-password" '
+			+ 'style="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid #cfd5dd;border-radius:6px;margin-top:4px;">'
+			+ '</label>';
+		this._modal().show(
+		{
+			title: 'Bootstrap admin',
+			content: tmpContent,
+			closeable: true,
+			buttons:
+			[
+				{ Hash: 'cancel', Label: 'Cancel' },
+				{ Hash: 'go',     Label: 'Create admin', Style: 'primary' }
+			]
+		}).then((pChoice) =>
+		{
+			if (pChoice !== 'go') { return; }
+			let tmpUsername = (this._domValue('#Lab-UV-BootstrapAdmin-Username') || '').trim();
+			let tmpPassword = this._domValue('#Lab-UV-BootstrapAdmin-Password') || '';
+			if (!tmpUsername || !tmpPassword)
+			{
+				this._toastError('Username and password are both required.');
+				return;
+			}
+			this.pict.providers.LabApi.bootstrapAdminForUltravisor(pID,
+				{ Username: tmpUsername, Password: tmpPassword },
+				(pErr, pBody) =>
+				{
+					if (pErr)
+					{
+						let tmpReason = (pErr.body && pErr.body.Reason) || pErr.message || 'Bootstrap failed';
+						this._toastError('Bootstrap failed: ' + tmpReason);
+						return;
+					}
+					if (pBody && pBody.Success === false)
+					{
+						this._toastError('Bootstrap rejected: ' + (pBody.Reason || 'Unknown reason'));
+						return;
+					}
+					this._toastSuccess(`Admin '${tmpUsername}' created. Sign into the Ultravisor UI to continue.`);
+					this.refreshAll(() => {});
+				});
+		});
+	}
+
+	// Local HTML escape for modal content (no shared util in this app yet).
+	_htmlEscape(pStr)
+	{
+		return String(pStr == null ? '' : pStr)
+			.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+	}
+
+	// ── Persistence-beacon assignment (Session 3) ────────────────────────────
+
+	setPersistenceBeacon(pID)
+	{
+		let tmpUv = (this.pict.AppData.Lab.Ultravisor.Instances || [])
+			.find((pU) => pU.IDUltravisorInstance === pID);
+		if (!tmpUv) { this._toastError('Ultravisor not found in local state.'); return; }
+		if (tmpUv.Status !== 'running')
+		{
+			this._toastError('Ultravisor must be running before assigning persistence.');
+			return;
+		}
+
+		// Step 1: dropdown of running databeacons. Filter to type +
+		// status so the operator can't pick something nonsensical. The
+		// connections sub-select gets populated lazily on beacon change.
+		let tmpDataBeacons = (this.pict.AppData.Lab.Beacons.Beacons || [])
+			.filter((pB) => pB.BeaconType === 'retold-databeacon' && pB.Status === 'running');
+
+		if (tmpDataBeacons.length === 0)
+		{
+			this._modal().show(
+			{
+				title: 'No databeacons available',
+				content: '<p>Spawn a <strong>retold-databeacon</strong> first, then add a connection inside it.</p>',
+				closeable: true,
+				buttons: [{ Hash: 'ok', Label: 'OK', Style: 'primary' }]
+			});
+			return;
+		}
+
+		let tmpCurrentBeaconID = parseInt(tmpUv.IDPersistenceBeacon, 10) || 0;
+		let tmpCurrentConnID = parseInt(tmpUv.IDPersistenceConnection, 10) || 0;
+		let tmpBeaconOptions = '<option value="0">— select a databeacon —</option>';
+		for (let b = 0; b < tmpDataBeacons.length; b++)
+		{
+			let tmpBeacon = tmpDataBeacons[b];
+			let tmpSel = (tmpBeacon.IDBeacon === tmpCurrentBeaconID) ? ' selected' : '';
+			tmpBeaconOptions += '<option value="' + tmpBeacon.IDBeacon + '"' + tmpSel + '>'
+				+ this._htmlEscape(tmpBeacon.Name) + ' (port ' + tmpBeacon.Port + ')</option>';
+		}
+
+		let tmpContent = ''
+			+ '<p>Route queue + manifest persistence for <strong>' + this._htmlEscape(tmpUv.Name) + '</strong> through a databeacon.</p>'
+			+ '<p style="font-size:12px;color:#64748b;margin-top:8px;">'
+			+ 'The databeacon needs at least one connection configured (engine + database). Pick a connection and the bridge will create the UV* tables on first save.</p>'
+			+ '<label style="display:block;margin-top:10px;">Databeacon'
+			+ '<select id="Lab-UV-PersistenceBeacon-Beacon" '
+			+ 'style="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid #cfd5dd;border-radius:6px;margin-top:4px;">'
+			+ tmpBeaconOptions + '</select></label>'
+			+ '<label style="display:block;margin-top:10px;">Connection'
+			+ '<select id="Lab-UV-PersistenceBeacon-Connection" disabled '
+			+ 'style="width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid #cfd5dd;border-radius:6px;margin-top:4px;">'
+			+ '<option value="0">— pick a databeacon first —</option></select></label>'
+			+ '<div id="Lab-UV-PersistenceBeacon-ConnHelp" style="font-size:11px;color:#94a3b8;margin-top:4px;"></div>';
+
+		// Hook the beacon-select change AFTER the modal renders so the
+		// connection list refreshes lazily. setTimeout(0) gives the modal
+		// a tick to insert the content into the DOM.
+		setTimeout(() =>
+		{
+			let tmpBeaconEl = document.getElementById('Lab-UV-PersistenceBeacon-Beacon');
+			let tmpConnEl = document.getElementById('Lab-UV-PersistenceBeacon-Connection');
+			let tmpHelpEl = document.getElementById('Lab-UV-PersistenceBeacon-ConnHelp');
+			if (!tmpBeaconEl || !tmpConnEl) return;
+
+			let fLoadConnections = (pBID) =>
+			{
+				let tmpBeaconID = parseInt(pBID, 10) || 0;
+				if (!tmpBeaconID)
+				{
+					tmpConnEl.innerHTML = '<option value="0">— pick a databeacon first —</option>';
+					tmpConnEl.disabled = true;
+					tmpHelpEl.textContent = '';
+					return;
+				}
+				tmpConnEl.innerHTML = '<option value="0">loading…</option>';
+				tmpConnEl.disabled = true;
+				this.pict.providers.LabApi.listBeaconConnections(tmpBeaconID,
+					(pErr, pPayload) =>
+					{
+						if (pErr)
+						{
+							tmpConnEl.innerHTML = '<option value="0">— error loading connections —</option>';
+							tmpHelpEl.textContent = pErr.message || 'Failed to load connections.';
+							return;
+						}
+						let tmpConnections = (pPayload && Array.isArray(pPayload.Connections)) ? pPayload.Connections : (Array.isArray(pPayload) ? pPayload : []);
+						if (tmpConnections.length === 0)
+						{
+							tmpConnEl.innerHTML = '<option value="0">— no connections in this databeacon —</option>';
+							tmpHelpEl.textContent = 'Add a connection inside the databeacon first.';
+							return;
+						}
+						let tmpHTML = '<option value="0">— select a connection —</option>';
+						for (let c = 0; c < tmpConnections.length; c++)
+						{
+							let tmpConn = tmpConnections[c];
+							let tmpConnID = tmpConn.IDBeaconConnection || tmpConn.ID || 0;
+							let tmpName = tmpConn.Name || ('Connection ' + tmpConnID);
+							let tmpType = tmpConn.Type || '';
+							let tmpSel = (tmpConnID === tmpCurrentConnID && tmpBeaconID === tmpCurrentBeaconID) ? ' selected' : '';
+							tmpHTML += '<option value="' + tmpConnID + '"' + tmpSel + '>'
+								+ this._htmlEscape(tmpName) + (tmpType ? ' (' + this._htmlEscape(tmpType) + ')' : '')
+								+ '</option>';
+						}
+						tmpConnEl.innerHTML = tmpHTML;
+						tmpConnEl.disabled = false;
+						tmpHelpEl.textContent = '';
+					});
+			};
+
+			tmpBeaconEl.addEventListener('change', (pEv) => fLoadConnections(pEv.target.value));
+			// Pre-load if the UV already has an assignment.
+			if (tmpCurrentBeaconID > 0) { fLoadConnections(tmpCurrentBeaconID); }
+		}, 0);
+
+		let tmpButtons =
+		[
+			{ Hash: 'cancel', Label: 'Cancel' }
+		];
+		if (tmpCurrentBeaconID > 0)
+		{
+			tmpButtons.push({ Hash: 'clear', Label: 'Clear assignment' });
+		}
+		tmpButtons.push({ Hash: 'save', Label: 'Save', Style: 'primary' });
+
+		this._modal().show(
+		{
+			title: 'Persistence beacon',
+			content: tmpContent,
+			closeable: true,
+			buttons: tmpButtons
+		}).then((pChoice) =>
+		{
+			if (pChoice === 'cancel') { return; }
+			let tmpBody;
+			if (pChoice === 'clear')
+			{
+				tmpBody = { IDBeacon: null, IDBeaconConnection: 0 };
+			}
+			else
+			{
+				let tmpIDBeacon = parseInt(this._domValue('#Lab-UV-PersistenceBeacon-Beacon') || '0', 10);
+				let tmpIDConn = parseInt(this._domValue('#Lab-UV-PersistenceBeacon-Connection') || '0', 10);
+				if (tmpIDBeacon === 0)
+				{
+					this._toastError('Pick a databeacon (or use Clear assignment).');
+					return;
+				}
+				if (tmpIDConn === 0)
+				{
+					this._toastError('Pick a connection inside the databeacon.');
+					return;
+				}
+				tmpBody = { IDBeacon: tmpIDBeacon, IDBeaconConnection: tmpIDConn };
+			}
+
+			this.pict.providers.LabApi.setPersistenceBeacon(pID, tmpBody,
+				(pErr) =>
+				{
+					if (pErr)
+					{
+						this._toastError('Persistence assignment failed: ' + (pErr.message || 'Unknown error'));
+						return;
+					}
+					this._toastSuccess(pChoice === 'clear' ? 'Persistence assignment cleared.' : 'Persistence assignment saved — bootstrapping…');
+					this.refreshAll(() => {});
+				});
+		});
+	}
+
+	// ── Persistence pill fast-poll ───────────────────────────────────────────
+	// While a UV's persistence is in a transient state (waiting-for-beacon /
+	// bootstrapping), we poll its /persistence-status every 2s so the pill
+	// reflects state changes faster than the global 10s refresh. Pollers
+	// stop themselves once steady, and clean up on view destroy.
+
+	_pumpPersistencePollers()
+	{
+		this._persistencePollers = this._persistencePollers || {};
+		let tmpInstances = (this.pict.AppData.Lab.Ultravisor && this.pict.AppData.Lab.Ultravisor.Instances) || [];
+		let tmpActiveIDs = new Set();
+		for (let i = 0; i < tmpInstances.length; i++)
+		{
+			let tmpUv = tmpInstances[i];
+			let tmpState = tmpUv.Persistence && tmpUv.Persistence.State;
+			if (tmpState === 'waiting-for-beacon' || tmpState === 'bootstrapping')
+			{
+				tmpActiveIDs.add(tmpUv.IDUltravisorInstance);
+				if (!this._persistencePollers[tmpUv.IDUltravisorInstance])
+				{
+					this._startPersistencePoller(tmpUv.IDUltravisorInstance);
+				}
+			}
+		}
+		// Stop pollers for UVs that no longer exist or are now steady.
+		let tmpKeys = Object.keys(this._persistencePollers);
+		for (let k = 0; k < tmpKeys.length; k++)
+		{
+			let tmpID = parseInt(tmpKeys[k], 10);
+			if (!tmpActiveIDs.has(tmpID))
+			{
+				this._stopPersistencePoller(tmpID);
+			}
+		}
+	}
+
+	_startPersistencePoller(pID)
+	{
+		this._persistencePollers = this._persistencePollers || {};
+		if (this._persistencePollers[pID]) return;
+		this._persistencePollers[pID] = setInterval(() =>
+		{
+			this.pict.providers.LabApi.getUltravisorPersistenceStatus(pID,
+				(pErr, pPayload) =>
+				{
+					if (pErr || !pPayload || !pPayload.Persistence) return;
+					let tmpInstances = (this.pict.AppData.Lab.Ultravisor && this.pict.AppData.Lab.Ultravisor.Instances) || [];
+					let tmpRow = tmpInstances.find((pU) => pU.IDUltravisorInstance === pID);
+					if (tmpRow)
+					{
+						tmpRow.Persistence = pPayload.Persistence;
+					}
+					this._refreshActiveList();
+					// Stop ourselves once we see a steady state — let
+					// _pumpPersistencePollers handle re-arming if it
+					// flips back to transient on the next refreshAll.
+					let tmpState = pPayload.Persistence.State;
+					if (tmpState !== 'waiting-for-beacon' && tmpState !== 'bootstrapping')
+					{
+						this._stopPersistencePoller(pID);
+					}
+				});
+		}, 2000);
+	}
+
+	_stopPersistencePoller(pID)
+	{
+		if (!this._persistencePollers || !this._persistencePollers[pID]) return;
+		clearInterval(this._persistencePollers[pID]);
+		delete this._persistencePollers[pID];
+	}
+
+	_stopAllPersistencePollers()
+	{
+		if (!this._persistencePollers) return;
+		let tmpKeys = Object.keys(this._persistencePollers);
+		for (let k = 0; k < tmpKeys.length; k++)
+		{
+			clearInterval(this._persistencePollers[tmpKeys[k]]);
+		}
+		this._persistencePollers = {};
 	}
 
 	// ── Seed dataset actions ────────────────────────────────────────────────

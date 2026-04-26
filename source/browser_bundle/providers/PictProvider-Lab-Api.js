@@ -140,6 +140,33 @@ class LabApiProvider extends libFableServiceProviderBase
 	removeUltravisor(pID, fCallback) { return _request('DELETE', '/api/lab/ultravisor-instances/' + pID, null, fCallback); }
 	getNextUltravisorPort(fCallback) { return _request('GET', '/api/lab/ultravisor-instances/next-port', null, fCallback); }
 
+	// One-time admin bootstrap for a Secure-mode UV. Body: {Username, Password}.
+	bootstrapAdminForUltravisor(pID, pBody, fCallback)
+	{
+		return _request('POST', '/api/lab/ultravisor-instances/' + pID + '/bootstrap-admin',
+			pBody, fCallback);
+	}
+
+	// Persistence-beacon assignment (Session 3). Body: {IDBeacon, IDBeaconConnection}.
+	setPersistenceBeacon(pID, pBody, fCallback)
+	{
+		return _request('POST', '/api/lab/ultravisor-instances/' + pID + '/persistence-beacon',
+			pBody, fCallback);
+	}
+
+	// Fast-poll surface for the persistence status pill while in transient states.
+	getUltravisorPersistenceStatus(pID, fCallback)
+	{
+		return _request('GET', '/api/lab/ultravisor-instances/' + pID + '/persistence-status', null, fCallback);
+	}
+
+	// Live connection list inside a running databeacon — populates the
+	// step-2 dropdown of the persistence-beacon picker.
+	listBeaconConnections(pBeaconID, fCallback)
+	{
+		return _request('GET', '/api/lab/beacons/' + pBeaconID + '/connections', null, fCallback);
+	}
+
 	// ── Beacons (unified; any registered BeaconType) ────────────────────────
 
 	getBeaconTypes(fCallback) { return _request('GET', '/api/lab/beacon-types', null, fCallback); }
