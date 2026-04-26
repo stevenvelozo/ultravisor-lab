@@ -1,6 +1,6 @@
 {
 	"name": "ultravisor-lab",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"description": "Web-based orchestration and monitoring for dockerized DB engines, retold-databeacons, Ultravisor, and Facto instances",
 	"main": "lab.js",
 	"bin": {
