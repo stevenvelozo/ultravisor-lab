@@ -9,6 +9,11 @@
  *
  * All mutations round-trip through the LabApi provider so the server is
  * the source of truth -- this view is purely presentational.
+ *
+ * Data flow: persisted state lives in `AppData.Lab.DBEngines`. The
+ * derived display records land in `AppData.Lab.Computed.DBEngines`
+ * during onBeforeRender; templates iterate via {~TS:~} and pick
+ * branches via single-element-array slot patterns.
  */
 'use strict';
 
@@ -255,7 +260,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 <div class="lab-engines">
 	<div class="lab-engines-toolbar">
 		<h2>DB Engines</h2>
-		<a class="lab-btn" href="#/dbengines/form/toggle">{~D:AppData.Lab.DBEngines.FormButtonLabel~}</a>
+		<a class="lab-btn" href="#/dbengines/form/toggle">{~D:AppData.Lab.Computed.DBEngines.FormButtonLabel~}</a>
 	</div>
 	<div id="Lab-Engines-FormSlot"></div>
 	<div id="Lab-Engines-ListSlot"></div>
@@ -263,11 +268,13 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		},
 		{
 			Hash: 'Lab-DBEngines-List-Template',
-			Template: /*html*/`{~D:AppData.Lab.DBEngines.ListHTML~}`
+			Template: /*html*/`
+{~TS:Lab-DBEngines-Empty-Template:AppData.Lab.Computed.DBEngines.EmptySlot~}
+{~TS:Lab-DBEngines-Card-Template:AppData.Lab.Computed.DBEngines.Rows~}`
 		},
 		{
 			Hash: 'Lab-DBEngines-Form-Template',
-			Template: /*html*/`{~D:AppData.Lab.DBEngines.FormHTML~}`
+			Template: /*html*/`{~TS:Lab-DBEngines-FormBody-Template:AppData.Lab.Computed.DBEngines.FormSlot~}`
 		},
 
 		{
@@ -278,7 +285,9 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<input type="text" id="Lab-EngineForm-Name" placeholder="e.g. warehouse-mysql" value="{~D:Record.Name~}">
 	</label>
 	<label>Engine
-		<select id="Lab-EngineForm-Type">{~D:Record.EngineTypeOptionsHTML~}</select>
+		<select id="Lab-EngineForm-Type">
+			{~TS:Lab-DBEngines-EngineTypeOption-Template:Record.EngineTypeOptions~}
+		</select>
 	</label>
 	<label>Host port
 		<input type="number" id="Lab-EngineForm-Port" value="{~D:Record.Port~}" min="1" max="65535">
@@ -294,11 +303,14 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	<div class="lab-engine-form-error" id="Lab-EngineForm-Error">{~D:Record.Error~}</div>
 </div>`
 		},
+		{
+			Hash: 'Lab-DBEngines-EngineTypeOption-Template',
+			Template: /*html*/`<option value="{~D:Record.EngineType~}" data-default-port="{~D:Record.DefaultPort~}" {~D:Record.SelectedAttr~}>{~D:Record.DisplayName~}</option>`
+		},
 
 		{
 			Hash: 'Lab-DBEngines-Empty-Template',
-			Template: /*html*/`
-<div class="lab-engines-empty">No DB engines yet.  Click "Add DB Engine" above to provision one.</div>`
+			Template: /*html*/`<div class="lab-engines-empty">No DB engines yet.  Click "Add DB Engine" above to provision one.</div>`
 		},
 
 		{
@@ -316,7 +328,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 			<a class="lab-btn danger small" href="#/dbengines/{~D:Record.IDDBEngine~}/remove">Remove</a>
 		</div>
 	</div>
-	<div class="lab-engine-status-detail" style="display: {~D:Record.DetailDisplay~};">{~D:Record.StatusDetail~}</div>
+	{~TS:Lab-DBEngines-StatusDetail-Template:Record.StatusDetailSlot~}
 	<div class="lab-engine-details">
 		<div>
 			<div class="label">Host / port</div>
@@ -341,12 +353,27 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	</div>
 	<div class="lab-engine-databases">
 		<h4>{~D:Record.NounPluralUpper~} ({~D:Record.DatabaseCount~})</h4>
-		<div id="Lab-Engine-{~D:Record.IDDBEngine~}-Databases">{~D:Record.DatabaseRowsHTML~}</div>
-		<div class="lab-engine-database-form" style="display: {~D:Record.DatabaseFormDisplay~};">
-			<input type="text" placeholder="new {~D:Record.NounSingular~} name" id="Lab-Engine-{~D:Record.IDDBEngine~}-NewDB">
-			<a class="lab-btn secondary small {~D:Record.CreateDBDisabled~}" href="#/dbengines/{~D:Record.IDDBEngine~}/databases/create">+ {~D:Record.NounSingularUpper~}</a>
+		<div id="Lab-Engine-{~D:Record.IDDBEngine~}-Databases">
+			{~TS:Lab-DBEngines-NoDatabases-Template:Record.DatabasesEmptySlot~}
+			{~TS:Lab-DBEngines-DatabaseRow-Template:Record.Databases~}
 		</div>
+		{~TS:Lab-DBEngines-DatabaseForm-Template:Record.DatabaseFormSlot~}
 	</div>
+</div>`
+		},
+		{
+			Hash: 'Lab-DBEngines-StatusDetail-Template',
+			Template: /*html*/`<div class="lab-engine-status-detail">{~D:Record.StatusDetail~}</div>`
+		},
+		{
+			Hash: 'Lab-DBEngines-NoDatabases-Template',
+			Template: /*html*/`<div style="font-size:12px;color:#64748b;padding:4px 0;">No databases yet.</div>`
+		},
+		{
+			Hash: 'Lab-DBEngines-DatabaseForm-Template',
+			Template: /*html*/`<div class="lab-engine-database-form">
+	<input type="text" placeholder="new {~D:Record.NounSingular~} name" id="Lab-Engine-{~D:Record.IDDBEngine~}-NewDB">
+	<a class="lab-btn secondary small {~D:Record.CreateDBDisabled~}" href="#/dbengines/{~D:Record.IDDBEngine~}/databases/create">+ {~D:Record.NounSingularUpper~}</a>
 </div>`
 		},
 
@@ -390,21 +417,16 @@ class LabDBEnginesView extends libPictView
 	onBeforeRender(pRenderable)
 	{
 		if (!this.pict.AppData.Lab.DBEngines) { this.pict.AppData.Lab.DBEngines = {}; }
+		if (!this.pict.AppData.Lab.Computed) { this.pict.AppData.Lab.Computed = {}; }
 		let tmpState = this.pict.AppData.Lab.DBEngines;
-		let tmpHash = pRenderable && pRenderable.RenderableHash;
 
-		if (tmpHash === 'Lab-DBEngines-Main' || !tmpHash)
+		this.pict.AppData.Lab.Computed.DBEngines =
 		{
-			tmpState.FormButtonLabel = tmpState.FormOpen ? 'Close form' : '+ Add DB Engine';
-		}
-		if (tmpHash === 'Lab-DBEngines-List' || tmpHash === 'Lab-DBEngines-Main' || !tmpHash)
-		{
-			tmpState.ListHTML = this._buildListHTML(tmpState);
-		}
-		if (tmpHash === 'Lab-DBEngines-Form' || tmpHash === 'Lab-DBEngines-Main' || !tmpHash)
-		{
-			tmpState.FormHTML = tmpState.FormOpen ? this._buildFormHTML(tmpState) : '';
-		}
+			FormButtonLabel: tmpState.FormOpen ? 'Close form' : '+ Add DB Engine',
+			FormSlot:        tmpState.FormOpen ? [this._buildFormRecord(tmpState)] : [],
+			Rows:            this._buildRows(tmpState),
+			EmptySlot:       ((tmpState.Engines || []).length === 0) ? [{}] : []
+		};
 
 		return super.onBeforeRender(pRenderable);
 	}
@@ -423,95 +445,91 @@ class LabDBEnginesView extends libPictView
 		return super.onAfterRender(pRenderable, pAddress, pRecord, pContent);
 	}
 
-	_buildFormHTML(pState)
+	// ====================================================================
+	// Computed-record builders. Shape data only; iteration / branching
+	// happens in the templates above via {~TS:~} and slot arrays.
+	// ====================================================================
+
+	_buildFormRecord(pState)
 	{
-		// Build the <option>s for the engine type dropdown from the fetched
-		// registry.  Selection reflects AppData.Form.EngineType at open time.
 		let tmpForm = pState.Form || {};
 		let tmpTypes = pState.EngineTypes || [];
-		let tmpOptionsHtml = '';
-		for (let i = 0; i < tmpTypes.length; i++)
-		{
-			let tmpType = tmpTypes[i];
-			let tmpSelected = (tmpForm.EngineType === tmpType.EngineType) ? ' selected' : '';
-			tmpOptionsHtml += `<option value="${tmpType.EngineType}" data-default-port="${tmpType.DefaultPort}"${tmpSelected}>${this._escape(tmpType.DisplayName)}</option>`;
-		}
-
-		return this.pict.parseTemplateByHash('Lab-DBEngines-FormBody-Template',
+		let tmpEngineTypeOptions = tmpTypes.map((pT) => (
 			{
-				Name:                  this._escape(tmpForm.Name || ''),
-				Port:                  tmpForm.Port || 0,
-				Password:              this._escape(tmpForm.Password || ''),
-				EngineTypeOptionsHTML: tmpOptionsHtml,
-				Error:                 this._escape(tmpForm.Error || '')
-			});
+				EngineType:   pT.EngineType,
+				DefaultPort:  pT.DefaultPort,
+				DisplayName:  this._escape(pT.DisplayName),
+				SelectedAttr: (tmpForm.EngineType === pT.EngineType) ? 'selected' : ''
+			}));
+
+		return {
+			Name:               this._escape(tmpForm.Name || ''),
+			Port:               tmpForm.Port || 0,
+			Password:           this._escape(tmpForm.Password || ''),
+			EngineTypeOptions:  tmpEngineTypeOptions,
+			Error:              this._escape(tmpForm.Error || '')
+		};
 	}
 
-	_buildListHTML(pState)
+	_buildRows(pState)
 	{
 		let tmpEngines = pState.Engines || [];
-		if (tmpEngines.length === 0)
-		{
-			return this.pict.parseTemplateByHash('Lab-DBEngines-Empty-Template', {});
-		}
+		if (tmpEngines.length === 0) { return []; }
 
 		let tmpRevealed = pState.RevealedCredentials || {};
 		let tmpDatabasesByEngine = pState.DatabasesByEngine || {};
 		let tmpTypesByKey = this._engineTypesByKey(pState.EngineTypes || []);
 		let tmpEngineTypeMetaByKey = this._engineTypeMetaByKey(pState.EngineTypes || []);
 
-		let tmpCardsHtml = '';
-		for (let i = 0; i < tmpEngines.length; i++)
+		return tmpEngines.map((pEngine) =>
 		{
-			let tmpEngine = tmpEngines[i];
-			let tmpDatabases = tmpDatabasesByEngine[tmpEngine.IDDBEngine] || [];
-			let tmpIsRevealed = !!tmpRevealed[tmpEngine.IDDBEngine];
+			let tmpDatabases = tmpDatabasesByEngine[pEngine.IDDBEngine] || [];
+			let tmpIsRevealed = !!tmpRevealed[pEngine.IDDBEngine];
 
-			let tmpRows = '';
-			for (let j = 0; j < tmpDatabases.length; j++)
-			{
-				tmpRows += this.pict.parseTemplateByHash('Lab-DBEngines-DatabaseRow-Template',
-					{
-						IDDBEngine: tmpEngine.IDDBEngine,
-						IDDatabase: tmpDatabases[j].IDDatabase,
-						Name:       this._escape(tmpDatabases[j].Name)
-					});
-			}
-			if (tmpDatabases.length === 0)
-			{
-				tmpRows = '<div style="font-size:12px;color:#64748b;padding:4px 0;">No databases yet.</div>';
-			}
+			let tmpDatabaseRows = tmpDatabases.map((pD) => (
+				{
+					IDDBEngine: pEngine.IDDBEngine,
+					IDDatabase: pD.IDDatabase,
+					Name:       this._escape(pD.Name)
+				}));
 
-			let tmpMeta = tmpEngineTypeMetaByKey[tmpEngine.EngineType] || { DatabaseNoun: 'database', SupportsMultipleDatabases: true };
+			let tmpMeta = tmpEngineTypeMetaByKey[pEngine.EngineType] || { DatabaseNoun: 'database', SupportsMultipleDatabases: true };
 			let tmpNounSingular = tmpMeta.DatabaseNoun || 'database';
 			let tmpNounPlural   = this._pluralize(tmpNounSingular);
+			let tmpRunning = (pEngine.Status === 'running');
 
-			tmpCardsHtml += this.pict.parseTemplateByHash('Lab-DBEngines-Card-Template',
-				{
-					IDDBEngine:            tmpEngine.IDDBEngine,
-					Name:                  this._escape(tmpEngine.Name),
-					EngineType:            tmpEngine.EngineType,
-					EngineTypeDisplay:     tmpTypesByKey[tmpEngine.EngineType] || tmpEngine.EngineType,
-					Status:                tmpEngine.Status,
-					StatusDetail:          this._escape(tmpEngine.StatusDetail || ''),
-					DetailDisplay:         tmpEngine.StatusDetail ? 'block' : 'none',
-					Port:                  tmpEngine.Port,
-					RootUsername:          this._escape(tmpEngine.RootUsername),
-					PasswordDisplay:       tmpIsRevealed ? this._escape(tmpEngine.RootPassword) : '••••••••',
-					RevealLabel:           tmpIsRevealed ? 'Hide' : 'Reveal',
-					ConnectionDisplay:     this._connectionString(tmpEngine, tmpIsRevealed),
-					DatabaseCount:         tmpDatabases.length,
-					DatabaseRowsHTML:      tmpRows,
-					StartDisabled:         (tmpEngine.Status === 'running' || tmpEngine.Status === 'starting' || tmpEngine.Status === 'provisioning') ? 'disabled' : '',
-					StopDisabled:          (tmpEngine.Status !== 'running') ? 'disabled' : '',
-					CreateDBDisabled:      (tmpEngine.Status !== 'running') ? 'disabled' : '',
-					NounSingular:          tmpNounSingular,
-					NounSingularUpper:     this._capitalize(tmpNounSingular),
-					NounPluralUpper:       this._capitalize(tmpNounPlural),
-					DatabaseFormDisplay:   tmpMeta.SupportsMultipleDatabases ? 'flex' : 'none'
-				});
-		}
-		return tmpCardsHtml;
+			return {
+				IDDBEngine:        pEngine.IDDBEngine,
+				Name:              this._escape(pEngine.Name),
+				EngineType:        pEngine.EngineType,
+				EngineTypeDisplay: tmpTypesByKey[pEngine.EngineType] || pEngine.EngineType,
+				Status:            pEngine.Status,
+				StatusDetailSlot:  pEngine.StatusDetail
+					? [{ StatusDetail: this._escape(pEngine.StatusDetail) }]
+					: [],
+				Port:              pEngine.Port,
+				RootUsername:      this._escape(pEngine.RootUsername),
+				PasswordDisplay:   tmpIsRevealed ? this._escape(pEngine.RootPassword) : '••••••••',
+				RevealLabel:       tmpIsRevealed ? 'Hide' : 'Reveal',
+				ConnectionDisplay: this._connectionString(pEngine, tmpIsRevealed),
+				DatabaseCount:     tmpDatabases.length,
+				Databases:         tmpDatabaseRows,
+				DatabasesEmptySlot: tmpDatabases.length === 0 ? [{}] : [],
+				DatabaseFormSlot:  tmpMeta.SupportsMultipleDatabases
+					? [
+						{
+							IDDBEngine:        pEngine.IDDBEngine,
+							NounSingular:      tmpNounSingular,
+							NounSingularUpper: this._capitalize(tmpNounSingular),
+							CreateDBDisabled:  tmpRunning ? '' : 'disabled'
+						}
+					]
+					: [],
+				StartDisabled:     (pEngine.Status === 'running' || pEngine.Status === 'starting' || pEngine.Status === 'provisioning') ? 'disabled' : '',
+				StopDisabled:      tmpRunning ? '' : 'disabled',
+				NounPluralUpper:   this._capitalize(tmpNounPlural)
+			};
+		});
 	}
 
 	_connectionString(pEngine, pRevealed)

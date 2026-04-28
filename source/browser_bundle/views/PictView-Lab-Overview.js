@@ -4,6 +4,11 @@
  * Dashboard view: counts per entity, docker status, last reconcile summary.
  * Reads directly from `AppData.Lab.Status`; stashes derived display strings
  * under `AppData.Lab.Computed.Overview` for the template to consume.
+ *
+ * The "Clean environment" call-to-action toggles between an idle button and
+ * an in-progress spinner. Rather than building HTML in JS, the view sets two
+ * sibling slot arrays (one populated, one empty) and the template's `TS`
+ * tags pick exactly one branch — see `AppData.Lab.Overview.Teardown*Slot`.
  */
 'use strict';
 
@@ -109,40 +114,31 @@ const _ViewConfiguration =
 	Templates:
 	[
 		{
+			Hash: 'Lab-Overview-Card-Template',
+			Template: /*html*/`
+<div class="lab-card">
+	<h3>{~D:Record.Title~}</h3>
+	<div class="lab-card-value">{~D:Record.Value~}</div>
+	<div class="lab-card-sub">{~D:Record.SubTitle~}</div>
+</div>`
+		},
+		{
+			// Renders inside the danger-zone "action" slot when teardown is
+			// already running — driven by a single-element TS array.
+			Hash: 'Lab-Overview-TeardownBusy-Template',
+			Template: /*html*/`<span class="lab-danger-progress"><span class="lab-spinner"></span>Cleaning environment…</span>`
+		},
+		{
+			// Renders inside the danger-zone "action" slot when teardown is idle.
+			Hash: 'Lab-Overview-TeardownIdle-Template',
+			Template: /*html*/`<a class="lab-danger-btn" href="#/system/teardown">Clean environment</a>`
+		},
+		{
 			Hash: 'Lab-Overview-Main-Template',
 			Template: /*html*/`
 <div class="lab-content">
 	<div class="lab-overview">
-		<div class="lab-card">
-			<h3>DB Engines</h3>
-			<div class="lab-card-value">{~D:AppData.Lab.Status.Counts.DBEngine~}</div>
-			<div class="lab-card-sub">dockerized MySQL/MSSQL/Postgres</div>
-		</div>
-		<div class="lab-card">
-			<h3>Databases</h3>
-			<div class="lab-card-value">{~D:AppData.Lab.Status.Counts.Database~}</div>
-			<div class="lab-card-sub">provisioned inside the engines</div>
-		</div>
-		<div class="lab-card">
-			<h3>Databeacons</h3>
-			<div class="lab-card-value">{~D:AppData.Lab.Status.Counts.Databeacon~}</div>
-			<div class="lab-card-sub">supervised standalone processes</div>
-		</div>
-		<div class="lab-card">
-			<h3>Ultravisor</h3>
-			<div class="lab-card-value">{~D:AppData.Lab.Status.Counts.UltravisorInstance~}</div>
-			<div class="lab-card-sub">workflow engines</div>
-		</div>
-		<div class="lab-card">
-			<h3>Facto</h3>
-			<div class="lab-card-value">{~D:AppData.Lab.Status.Counts.FactoInstance~}</div>
-			<div class="lab-card-sub">warehouse instances</div>
-		</div>
-		<div class="lab-card">
-			<h3>Ingestion Jobs</h3>
-			<div class="lab-card-value">{~D:AppData.Lab.Status.Counts.IngestionJob~}</div>
-			<div class="lab-card-sub">pipeline history</div>
-		</div>
+		{~TS:Lab-Overview-Card-Template:AppData.Lab.Computed.Overview.Cards~}
 	</div>
 
 	<div class="lab-meta">
@@ -167,7 +163,10 @@ const _ViewConfiguration =
 			<strong>Clean environment</strong>
 			Removes every lab-managed docker container, supervised process, and database row (DB engines, databases, databeacons, ultravisors, ingestion history).  Seed dataset fixtures and lab itself stay.
 		</div>
-		<div class="lab-danger-action">{~D:AppData.Lab.Computed.Overview.TeardownControlHTML~}</div>
+		<div class="lab-danger-action">
+			{~TS:Lab-Overview-TeardownBusy-Template:AppData.Lab.Computed.Overview.TeardownBusySlot~}
+			{~TS:Lab-Overview-TeardownIdle-Template:AppData.Lab.Computed.Overview.TeardownIdleSlot~}
+		</div>
 	</div>
 </div>`
 		}
@@ -195,6 +194,7 @@ class LabOverviewView extends libPictView
 		let tmpStatus    = this.pict.AppData.Lab.Status || {};
 		let tmpDocker    = tmpStatus.Docker || { Available: false, Version: '', Error: '' };
 		let tmpReconcile = tmpStatus.LastReconcile || null;
+		let tmpCounts    = tmpStatus.Counts || {};
 
 		let tmpDockerLine;
 		if (tmpDocker.Available)
@@ -225,18 +225,32 @@ class LabOverviewView extends libPictView
 
 		if (!this.pict.AppData.Lab.Computed) { this.pict.AppData.Lab.Computed = {}; }
 		let tmpOverview = this.pict.AppData.Lab.Overview || {};
-		// Teardown runs for several seconds; swap the danger button for an
-		// inline "Cleaning..." indicator so the user knows work is underway.
-		let tmpTeardownHtml = tmpOverview.TeardownInProgress
-			? `<span class="lab-danger-progress"><span class="lab-spinner"></span>Cleaning environment…</span>`
-			: `<a class="lab-danger-btn" href="#/system/teardown">Clean environment</a>`;
+
+		// Card grid is data-driven so each tile is one row in a TS array;
+		// adding a card is one entry, no template surgery.
+		let tmpCards =
+		[
+			{ Title: 'DB Engines',     Value: tmpCounts.DBEngine || 0,           SubTitle: 'dockerized MySQL/MSSQL/Postgres' },
+			{ Title: 'Databases',      Value: tmpCounts.Database || 0,           SubTitle: 'provisioned inside the engines' },
+			{ Title: 'Databeacons',    Value: tmpCounts.Databeacon || 0,         SubTitle: 'supervised standalone processes' },
+			{ Title: 'Ultravisor',     Value: tmpCounts.UltravisorInstance || 0, SubTitle: 'workflow engines' },
+			{ Title: 'Facto',          Value: tmpCounts.FactoInstance || 0,      SubTitle: 'warehouse instances' },
+			{ Title: 'Ingestion Jobs', Value: tmpCounts.IngestionJob || 0,       SubTitle: 'pipeline history' }
+		];
+
+		// Two sibling slot arrays drive the if/else for the danger-zone
+		// action: exactly one is populated, the other is empty. Empty
+		// arrays render nothing through TS.
+		let tmpBusy = !!tmpOverview.TeardownInProgress;
 
 		this.pict.AppData.Lab.Computed.Overview =
 		{
-			DockerLine:          tmpDockerLine,
-			ReconcileLine:       tmpReconcileLine,
-			ServerTimeLabel:     tmpStatus.ServerTime ? new Date(tmpStatus.ServerTime).toLocaleTimeString() : '--',
-			TeardownControlHTML: tmpTeardownHtml
+			Cards:            tmpCards,
+			DockerLine:       tmpDockerLine,
+			ReconcileLine:    tmpReconcileLine,
+			ServerTimeLabel:  tmpStatus.ServerTime ? new Date(tmpStatus.ServerTime).toLocaleTimeString() : '--',
+			TeardownBusySlot: tmpBusy ? [{}] : [],
+			TeardownIdleSlot: tmpBusy ? []   : [{}]
 		};
 
 		return super.onBeforeRender(pRenderable);

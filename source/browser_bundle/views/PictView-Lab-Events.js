@@ -3,6 +3,13 @@
  *
  * Timeline of InfrastructureEvent rows, newest first.  Severity drives row
  * color.  Phase 1 shows the boot event + any drift detections.
+ *
+ * Events flow data-only through `AppData.Lab.Computed.Events`:
+ *   - `Rows`: pre-shaped row records the table iterates via `{~TS:~}`.
+ *   - `EmptySlot`: 1-element array when there are no events (drives the
+ *     "No events yet" message); empty otherwise.
+ *   - `TableSlot`: the inverse — populated when there are events.
+ * No HTML construction in JS, no `assignContent` calls.
  */
 'use strict';
 
@@ -64,10 +71,17 @@ const _ViewConfiguration =
 			Template: /*html*/`
 <div class="lab-events">
 	<h2>Infrastructure Events</h2>
-	<div id="Lab-Events-List"></div>
+	{~TS:Lab-Events-Empty-Template:AppData.Lab.Computed.Events.EmptySlot~}
+	{~TS:Lab-Events-Table-Template:AppData.Lab.Computed.Events.TableSlot~}
 </div>`
 		},
 		{
+			Hash: 'Lab-Events-Empty-Template',
+			Template: /*html*/`<div class="lab-events-empty">No events yet.</div>`
+		},
+		{
+			// Rendered once when there is at least one event. Hosts the
+			// per-row TS so the rows iterate from AppData.
 			Hash: 'Lab-Events-Table-Template',
 			Template: /*html*/`
 <table>
@@ -80,7 +94,7 @@ const _ViewConfiguration =
 			<th>Message</th>
 		</tr>
 	</thead>
-	<tbody id="Lab-Events-Body"></tbody>
+	<tbody>{~TS:Lab-Events-Row-Template:AppData.Lab.Computed.Events.Rows~}</tbody>
 </table>`
 		},
 		{
@@ -89,15 +103,21 @@ const _ViewConfiguration =
 <tr>
 	<td>{~D:Record.TimeLabel~}</td>
 	<td class="sev-{~D:Record.Severity~}">{~D:Record.Severity~}</td>
-	<td>{~D:Record.EntityLabel~}</td>
+	<td>{~TS:Lab-Events-EntityLink-Template:Record.LinkSlot~}{~TS:Lab-Events-EntityText-Template:Record.PlainSlot~}</td>
 	<td>{~D:Record.EventType~}</td>
 	<td>{~D:Record.Message~}</td>
 </tr>`
 		},
 		{
-			Hash: 'Lab-Events-Empty-Template',
-			Template: /*html*/`
-<div class="lab-events-empty">No events yet.</div>`
+			// Single-row slot — populated when a log href is available.
+			// Record fields: Href, Text.
+			Hash: 'Lab-Events-EntityLink-Template',
+			Template: /*html*/`<a class="lab-events-log-link" href="{~D:Record.Href~}" title="Open logs">{~D:Record.Text~}</a>`
+		},
+		{
+			// Single-row slot — populated when no log href is available.
+			Hash: 'Lab-Events-EntityText-Template',
+			Template: /*html*/`{~D:Record.Text~}`
 		}
 	],
 
@@ -118,54 +138,44 @@ class LabEventsView extends libPictView
 		super(pFable, pOptions, pServiceHash);
 	}
 
-	onAfterRender(pRenderable, pAddress, pRecord, pContent)
+	onBeforeRender(pRenderable)
 	{
 		let tmpEvents = this.pict.AppData.Lab.Events || [];
 
-		if (tmpEvents.length === 0)
-		{
-			let tmpEmpty = this.pict.parseTemplateByHash('Lab-Events-Empty-Template', {});
-			this.pict.ContentAssignment.assignContent('#Lab-Events-List', tmpEmpty);
-		}
-		else
-		{
-			let tmpTable = this.pict.parseTemplateByHash('Lab-Events-Table-Template', {});
-			this.pict.ContentAssignment.assignContent('#Lab-Events-List', tmpTable);
+		if (!this.pict.AppData.Lab.Computed) { this.pict.AppData.Lab.Computed = {}; }
 
-			let tmpRowsHtml = '';
-			for (let i = 0; i < tmpEvents.length; i++)
+		let tmpRows = tmpEvents.map((pEvt) =>
+		{
+			let tmpText = pEvt.EntityName ? `${pEvt.EntityType}/${pEvt.EntityName}` : pEvt.EntityType;
+			let tmpHref = '';
+			if (pEvt.EntityID)
 			{
-				let tmpEvt = tmpEvents[i];
-
-				// Make the entity label a clickable log-viewer link when
-				// we know how to resolve it.  Beacon + DBEngine both have
-				// log routes; other entity types (System, etc.) render flat.
-				let tmpText = tmpEvt.EntityName ? `${tmpEvt.EntityType}/${tmpEvt.EntityName}` : tmpEvt.EntityType;
-				let tmpEntityLabel = this._escape(tmpText);
-				let tmpLogHref = '';
-				if (tmpEvt.EntityID)
-				{
-					if (tmpEvt.EntityType === 'Beacon')   { tmpLogHref = `#/beacons/${tmpEvt.EntityID}/logs`; }
-					else if (tmpEvt.EntityType === 'DBEngine') { tmpLogHref = `#/dbengines/${tmpEvt.EntityID}/logs`; }
-				}
-				if (tmpLogHref)
-				{
-					tmpEntityLabel = `<a class="lab-events-log-link" href="${tmpLogHref}" title="Open logs">${this._escape(tmpText)}</a>`;
-				}
-
-				let tmpRecord =
-				{
-					TimeLabel:   this._formatTime(tmpEvt.Timestamp),
-					Severity:    tmpEvt.Severity || 'info',
-					EntityLabel: tmpEntityLabel,
-					EventType:   tmpEvt.EventType,
-					Message:     this._escape(tmpEvt.Message || '')
-				};
-				tmpRowsHtml += this.pict.parseTemplateByHash('Lab-Events-Row-Template', tmpRecord);
+				if      (pEvt.EntityType === 'Beacon')   { tmpHref = `#/beacons/${pEvt.EntityID}/logs`; }
+				else if (pEvt.EntityType === 'DBEngine') { tmpHref = `#/dbengines/${pEvt.EntityID}/logs`; }
 			}
-			this.pict.ContentAssignment.assignContent('#Lab-Events-Body', tmpRowsHtml);
-		}
+			let tmpEntity = { Href: tmpHref, Text: this._escape(tmpText) };
+			return {
+				TimeLabel: this._formatTime(pEvt.Timestamp),
+				Severity:  pEvt.Severity || 'info',
+				EventType: pEvt.EventType,
+				Message:   this._escape(pEvt.Message || ''),
+				LinkSlot:  tmpHref ? [tmpEntity] : [],
+				PlainSlot: tmpHref ? []          : [tmpEntity]
+			};
+		});
 
+		this.pict.AppData.Lab.Computed.Events =
+		{
+			Rows:      tmpRows,
+			EmptySlot: tmpRows.length === 0 ? [{}] : [],
+			TableSlot: tmpRows.length === 0 ? []   : [{}]
+		};
+
+		return super.onBeforeRender(pRenderable);
+	}
+
+	onAfterRender(pRenderable, pAddress, pRecord, pContent)
+	{
 		this.pict.CSSMap.injectCSS();
 		return super.onAfterRender(pRenderable, pAddress, pRecord, pContent);
 	}

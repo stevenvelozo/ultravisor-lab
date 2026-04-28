@@ -24,6 +24,13 @@
  *     values from the DOM at commit time.
  *   - Type selection is clicking a per-type "+ Add <Type>" link rather
  *     than a dropdown with an onchange handler.
+ *
+ * Data flow:
+ *   `AppData.Lab.Beacons` is the persisted state (Beacons array, Types
+ *   array, Form object, FormOpen flag).  `onBeforeRender` derives display-
+ *   ready records into `AppData.Lab.Computed.Beacons` (rows, single-element
+ *   slots, option arrays). Every template tag reads from those addresses;
+ *   no HTML is built in JS.
  */
 'use strict';
 
@@ -75,6 +82,16 @@ const _ViewConfiguration =
 .lab-beacons-form-header h3 { margin: 0; font-size: 14px; color: #0f172a; }
 .lab-beacons-form-header .lab-beacon-type-badge { font-size: 11px; }
 .lab-beacons-form-desc { grid-column: 1 / -1; font-size: 12px; color: #475569; font-style: italic; }
+.lab-beacons-form-deprecation
+{
+	grid-column: 1 / -1;
+	background: #fef3c7;
+	border: 1px solid #fcd34d;
+	border-radius: 6px;
+	padding: 8px 12px;
+	font-size: 12px;
+	color: #78350f;
+}
 .lab-beacons-form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
 .lab-beacons-form-error { grid-column: 1 / -1; color: #b91c1c; font-size: 13px; }
 
@@ -108,95 +125,72 @@ const _ViewConfiguration =
 {
 	width: 100%; box-sizing: border-box; padding: 6px 10px;
 	border: 1px solid #cfd5dd; border-radius: 6px;
-	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-	font-size: 12px;
+	font-size: 13px; height: 32px;
+}
+.lab-beacons-advanced-body label.lab-uv-form-checkbox input[type="checkbox"]
+{
+	height: auto; padding: 0;
 }
 .lab-beacons-advanced-hint
 {
-	grid-column: 1 / -1; font-size: 12px; color: #64748b;
-	margin: 0 0 4px;
+	grid-column: 1 / -1; margin: 0 0 6px; padding: 8px 10px;
+	background: #f8fafc; border-radius: 5px; color: #475569;
+	font-size: 12px; line-height: 1.5;
 }
 
 .lab-beacon-card
 {
-	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px;
-	display: flex; flex-direction: column; gap: 12px;
+	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px;
+	display: flex; flex-direction: column; gap: 8px;
 }
 .lab-beacon-card-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.lab-beacon-card-header h3 { margin: 0; font-size: 15px; color: #0f172a; }
+.lab-beacon-card-header h3 { margin: 0; font-size: 14px; color: #0f172a; }
 .lab-beacon-type-badge
 {
-	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
-	padding: 2px 8px; border-radius: 10px; background: #dbeafe; color: #1e40af; font-weight: 600;
+	background: #1e3a8a; color: #dbeafe; font-size: 11px; padding: 2px 8px;
+	border-radius: 999px; letter-spacing: 0.3px; font-weight: 600;
 }
 .lab-beacon-status
 {
-	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
-	padding: 2px 8px; border-radius: 10px; font-weight: 600;
+	margin-left: auto; padding: 2px 10px; border-radius: 12px;
+	font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569;
 }
-.lab-beacon-status.running       { background: #dcfce7; color: #166534; }
-.lab-beacon-status.stopped       { background: #e2e8f0; color: #475569; }
-.lab-beacon-status.provisioning,
-.lab-beacon-status.starting,
-.lab-beacon-status.stopping      { background: #fef3c7; color: #92400e; }
-.lab-beacon-status.failed        { background: #fee2e2; color: #991b1b; }
-
-.lab-beacon-actions { margin-left: auto; display: flex; gap: 8px; }
-.lab-beacon-details
+.lab-beacon-status.running     { background: #dcfce7; color: #166534; }
+.lab-beacon-status.starting    { background: #fef9c3; color: #854d0e; }
+.lab-beacon-status.provisioning { background: #fef3c7; color: #92400e; }
+.lab-beacon-status.failed      { background: #fee2e2; color: #991b1b; }
+.lab-beacon-status-detail
 {
-	display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-	gap: 8px 20px;
-	background: #f8fafc; padding: 10px 14px; border-radius: 6px; font-size: 13px;
+	font-size: 12px; color: #475569; font-style: italic;
 }
-.lab-beacon-details .label
+.lab-beacon-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.lab-beacon-actions .lab-btn.disabled
 {
-	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
-	color: #64748b; font-weight: 600; margin-bottom: 2px;
+	opacity: 0.45; pointer-events: none; cursor: default;
 }
-.lab-beacon-detail-value a { color: #1d4ed8; text-decoration: none; }
-.lab-beacon-detail-value a:hover { text-decoration: underline; }
-.lab-beacon-status-detail { font-size: 12px; color: #92400e; font-style: italic; }
-
-.lab-beacons-empty
-{
-	padding: 32px 20px; text-align: center; color: #64748b;
-	background: #fff; border: 1px dashed #cbd5e1; border-radius: 8px;
-}
-
-.lab-btn
-{
-	background: #1d4ed8; color: #fff; border: 1px solid #1d4ed8;
-	border-radius: 6px; padding: 6px 14px; font-size: 13px;
-	font-weight: 500; cursor: pointer;
-}
-a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
-.lab-btn:hover { background: #1e40af; border-color: #1e40af; }
-.lab-btn.secondary { background: transparent; color: #0f172a; border-color: #cbd5e1; }
-.lab-btn.secondary:hover { background: #f1f5f9; border-color: #94a3b8; }
-.lab-btn.danger { background: transparent; color: #b91c1c; border-color: #fecaca; }
-.lab-btn.danger:hover { background: #fef2f2; border-color: #f87171; }
-.lab-btn.small { padding: 4px 10px; font-size: 12px; }
-.lab-btn:disabled,
-.lab-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
-
-/* Build-source chip cluster.  Visible on container-mode beacon cards when
-   the beacon type has a sibling monorepo checkout.  The active chip is
-   darkened; the inactive one is a light link the user clicks to switch. */
 .lab-beacon-build-source
 {
 	display: inline-flex; align-items: center; gap: 4px;
-	padding: 0 6px; border-left: 1px solid #e2e8f0; margin-left: 4px;
+	font-size: 11px; color: #475569;
 }
-.lab-beacon-build-source .label
+.lab-beacon-build-source .label { color: #64748b; }
+.lab-beacon-details
 {
-	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
-	color: #64748b; font-weight: 600;
+	display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 10px 16px;
+	font-size: 12px;
 }
+.lab-beacon-details .label
+{
+	font-size: 11px; font-weight: 600; color: #64748b;
+	text-transform: uppercase; letter-spacing: 0.3px;
+}
+.lab-beacon-detail-value { font-size: 13px; color: #0f172a; word-break: break-word; }
+
 .lab-chip
 {
-	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
-	padding: 2px 8px; border-radius: 10px; text-decoration: none;
-	background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+	border: 1px solid #cbd5e1; border-radius: 999px; padding: 1px 8px;
+	background: #f1f5f9; color: #475569; text-decoration: none; font-size: 11px;
 	cursor: pointer; line-height: 1.4;
 }
 .lab-chip:hover { background: #e2e8f0; color: #0f172a; }
@@ -215,19 +209,26 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 <div class="lab-beacons">
 	<div class="lab-beacons-toolbar">
 		<h2>Ultravisor Beacons</h2>
-		<div class="lab-beacons-type-buttons">{~D:AppData.Lab.Beacons.TypeButtonsHTML~}</div>
+		<div class="lab-beacons-type-buttons">{~TS:Lab-Beacons-TypeButton-Template:AppData.Lab.Beacons.Types~}</div>
 	</div>
 	<div id="Lab-Beacons-FormSlot"></div>
 	<div id="Lab-Beacons-ListSlot"></div>
 </div>`
 		},
 		{
+			// List slot — picks one of two single-element TS arrays so
+			// the empty-state and the populated card grid share one
+			// renderable. AppData.Lab.Computed.Beacons.{EmptySlot,RowsSlot}
+			// are inverse one-element arrays driven by row count.
 			Hash: 'Lab-Beacons-List-Template',
-			Template: /*html*/`{~D:AppData.Lab.Beacons.ListHTML~}`
+			Template: /*html*/`
+{~TS:Lab-Beacons-Empty-Template:AppData.Lab.Computed.Beacons.EmptySlot~}
+{~TS:Lab-Beacons-Card-Template:AppData.Lab.Computed.Beacons.Rows~}`
 		},
 		{
+			// Form slot — single-element-array drives "is the form open?".
 			Hash: 'Lab-Beacons-Form-Template',
-			Template: /*html*/`{~D:AppData.Lab.Beacons.FormHTML~}`
+			Template: /*html*/`{~TS:Lab-Beacons-FormBody-Template:AppData.Lab.Computed.Beacons.FormSlot~}`
 		},
 		{
 			Hash: 'Lab-Beacons-TypeButton-Template',
@@ -242,7 +243,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<span class="lab-beacon-type-badge">{~D:Record.TypeDisplay~}</span>
 	</div>
 	<div class="lab-beacons-form-desc">{~D:Record.TypeDescription~}</div>
-	<div class="lab-beacons-form-deprecation" style="display:{~D:Record.DeprecationDisplay~};" title="{~D:Record.DeprecationNote~}">⚠️ {~D:Record.DeprecationNote~}</div>
+	{~TS:Lab-Beacons-FormDeprecation-Template:Record.DeprecationSlot~}
 	<label>Name
 		<input type="text" id="Lab-BeaconForm-Name" placeholder="e.g. warehouse-001"
 			value="{~D:Record.Name~}">
@@ -251,10 +252,14 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<input type="number" id="Lab-BeaconForm-Port" min="1" max="65535"
 			value="{~D:Record.Port~}">
 	</label>
-	<label style="display:{~D:Record.UltravisorDisplay~};">Target Ultravisor
-		<select id="Lab-BeaconForm-Ultravisor">{~D:Record.UltravisorOptionsHTML~}</select>
-	</label>
-	<div class="full-width">{~D:Record.ConfigFieldsHTML~}</div>
+	{~TS:Lab-Beacons-FormUltravisorPicker-Template:Record.UltravisorPickerSlot~}
+	<div class="full-width">
+		<div class="lab-beacons-form" style="border:none;padding:0;">
+			{~TS:Lab-Beacons-ConfigField-Text-Template:Record.ConfigFieldsText~}
+			{~TS:Lab-Beacons-ConfigField-Number-Template:Record.ConfigFieldsNumber~}
+			{~TS:Lab-Beacons-ConfigField-EngineDbPicker-Template:Record.ConfigFieldsEngineDb~}
+		</div>
+	</div>
 	<details class="lab-beacons-advanced full-width">
 		<summary>Advanced — admission credentials</summary>
 		<div class="lab-beacons-advanced-body">
@@ -282,6 +287,25 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 </div>`
 		},
 		{
+			// Single-row slot — populated when the active type is deprecated.
+			Hash: 'Lab-Beacons-FormDeprecation-Template',
+			Template: /*html*/`<div class="lab-beacons-form-deprecation" title="{~D:Record.Note~}">⚠️ {~D:Record.Note~}</div>`
+		},
+		{
+			// Single-row slot — populated when the active type RequiresUltravisor.
+			Hash: 'Lab-Beacons-FormUltravisorPicker-Template',
+			Template: /*html*/`<label>Target Ultravisor
+	<select id="Lab-BeaconForm-Ultravisor">
+		<option value="0">-- choose an Ultravisor --</option>
+		{~TS:Lab-Beacons-UltravisorOption-Template:Record.Options~}
+	</select>
+</label>`
+		},
+		{
+			Hash: 'Lab-Beacons-UltravisorOption-Template',
+			Template: /*html*/`<option value="{~D:Record.Value~}" {~D:Record.SelectedAttr~}>{~D:Record.Label~}</option>`
+		},
+		{
 			Hash: 'Lab-Beacons-ConfigField-Text-Template',
 			Template: /*html*/`<label>{~D:Record.Label~}<input type="text" id="Lab-BeaconForm-Cfg-{~D:Record.Name~}" value="{~D:Record.Value~}"></label>`
 		},
@@ -291,7 +315,14 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		},
 		{
 			Hash: 'Lab-Beacons-ConfigField-EngineDbPicker-Template',
-			Template: /*html*/`<label>{~D:Record.Label~}<select id="Lab-BeaconForm-Cfg-{~D:Record.Name~}">{~D:Record.OptionsHTML~}</select></label>`
+			Template: /*html*/`<label>{~D:Record.Label~}<select id="Lab-BeaconForm-Cfg-{~D:Record.Name~}">
+	<option value="">-- none --</option>
+	{~TS:Lab-Beacons-EngineDbOption-Template:Record.Options~}
+</select></label>`
+		},
+		{
+			Hash: 'Lab-Beacons-EngineDbOption-Template',
+			Template: /*html*/`<option value="{~D:Record.Value~}" {~D:Record.SelectedAttr~}>{~D:Record.Label~}</option>`
 		},
 		{
 			Hash: 'Lab-Beacons-Empty-Template',
@@ -309,16 +340,12 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 			<a class="lab-btn secondary small {~D:Record.StartDisabled~}" href="#/beacons/{~D:Record.IDBeacon~}/start">Start</a>
 			<a class="lab-btn secondary small {~D:Record.StopDisabled~}"  href="#/beacons/{~D:Record.IDBeacon~}/stop">Stop</a>
 			<a class="lab-btn secondary small" href="#/beacons/{~D:Record.IDBeacon~}/logs">Logs</a>
-			<a class="lab-btn secondary small" href="#/beacons/{~D:Record.IDBeacon~}/rebuild" style="display: {~D:Record.RebuildDisplay~};" title="Stop + remove container, drop cached image, rebuild from current stanza version">Rebuild</a>
-			<span class="lab-beacon-build-source" style="display: {~D:Record.BuildSourceDisplay~};" title="Image source for this beacon. Source mode packs your local monorepo checkout instead of the npm registry.">
-				<span class="label">Image:</span>
-				<a class="lab-chip {~D:Record.IsNpmClass~}" href="#/beacons/{~D:Record.IDBeacon~}/build-source/npm" title="Published npm tarball">npm</a>
-				<a class="lab-chip {~D:Record.IsSourceClass~}" href="#/beacons/{~D:Record.IDBeacon~}/build-source/source" title="Local monorepo checkout (npm pack of the sibling repo)">source</a>
-			</span>
+			{~TS:Lab-Beacons-CardRebuild-Template:Record.RebuildSlot~}
+			{~TS:Lab-Beacons-CardBuildSource-Template:Record.BuildSourceSlot~}
 			<a class="lab-btn danger small" href="#/beacons/{~D:Record.IDBeacon~}/remove">Remove</a>
 		</div>
 	</div>
-	<div class="lab-beacon-status-detail" style="display: {~D:Record.DetailDisplay~};">{~D:Record.StatusDetail~}</div>
+	{~TS:Lab-Beacons-CardStatusDetail-Template:Record.StatusDetailSlot~}
 	<div class="lab-beacon-details">
 		<div>
 			<div class="label">Port</div>
@@ -338,6 +365,22 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		</div>
 	</div>
 </div>`
+		},
+		{
+			Hash: 'Lab-Beacons-CardRebuild-Template',
+			Template: /*html*/`<a class="lab-btn secondary small" href="#/beacons/{~D:Record.IDBeacon~}/rebuild" title="Stop + remove container, drop cached image, rebuild from current stanza version">Rebuild</a>`
+		},
+		{
+			Hash: 'Lab-Beacons-CardBuildSource-Template',
+			Template: /*html*/`<span class="lab-beacon-build-source" title="Image source for this beacon. Source mode packs your local monorepo checkout instead of the npm registry.">
+	<span class="label">Image:</span>
+	<a class="lab-chip {~D:Record.IsNpmClass~}" href="#/beacons/{~D:Record.IDBeacon~}/build-source/npm" title="Published npm tarball">npm</a>
+	<a class="lab-chip {~D:Record.IsSourceClass~}" href="#/beacons/{~D:Record.IDBeacon~}/build-source/source" title="Local monorepo checkout (npm pack of the sibling repo)">source</a>
+</span>`
+		},
+		{
+			Hash: 'Lab-Beacons-CardStatusDetail-Template',
+			Template: /*html*/`<div class="lab-beacon-status-detail">{~D:Record.StatusDetail~}</div>`
 		}
 	],
 
@@ -371,31 +414,20 @@ class LabBeaconsView extends libPictView
 	onBeforeRender(pRenderable)
 	{
 		if (!this.pict.AppData.Lab.Beacons) { this.pict.AppData.Lab.Beacons = {}; }
+		if (!this.pict.AppData.Lab.Computed) { this.pict.AppData.Lab.Computed = {}; }
 		let tmpState = this.pict.AppData.Lab.Beacons;
 		let tmpHash = pRenderable && pRenderable.RenderableHash;
 
-		if (tmpHash === 'Lab-Beacons-Main' || !tmpHash)
+		// Always build computed records — `onBeforeRender` is cheap and the
+		// Main shell plus the two slot renderables all consume them. Doing
+		// the work unconditionally avoids "did I update Computed before
+		// rendering this slot?" bugs.
+		this.pict.AppData.Lab.Computed.Beacons =
 		{
-			// Rebuild the "+ Add <Type>" button cluster once when the shell
-			// renders (types rarely change during a session).
-			let tmpTypes = tmpState.Types || [];
-			let tmpBtnHtml = '';
-			for (let i = 0; i < tmpTypes.length; i++)
-			{
-				tmpBtnHtml += this.pict.parseTemplateByHash('Lab-Beacons-TypeButton-Template', tmpTypes[i]);
-			}
-			tmpState.TypeButtonsHTML = tmpBtnHtml;
-		}
-
-		if (tmpHash === 'Lab-Beacons-List' || tmpHash === 'Lab-Beacons-Main' || !tmpHash)
-		{
-			tmpState.ListHTML = this._buildListHTML(tmpState);
-		}
-
-		if (tmpHash === 'Lab-Beacons-Form' || tmpHash === 'Lab-Beacons-Main' || !tmpHash)
-		{
-			tmpState.FormHTML = tmpState.FormOpen ? this._buildFormHTML(tmpState) : '';
-		}
+			Rows:      this._buildRows(tmpState),
+			EmptySlot: ((tmpState.Beacons || []).length === 0) ? [{}] : [],
+			FormSlot:  tmpState.FormOpen ? [this._buildFormRecord(tmpState)] : []
+		};
 
 		return super.onBeforeRender(pRenderable);
 	}
@@ -415,125 +447,141 @@ class LabBeaconsView extends libPictView
 		return super.onAfterRender(pRenderable, pAddress, pRecord, pContent);
 	}
 
-	_buildListHTML(pState)
+	// ====================================================================
+	// Computed-record builders. None of these emit HTML — they shape data
+	// for the templates above. Iteration / conditional rendering lives in
+	// the templates via {~TS:~} and the single-element-slot pattern.
+	// ====================================================================
+
+	_buildRows(pState)
 	{
 		let tmpBeacons = pState.Beacons || [];
-		if (tmpBeacons.length === 0)
-		{
-			return this.pict.parseTemplateByHash('Lab-Beacons-Empty-Template', {});
-		}
+		if (tmpBeacons.length === 0) { return []; }
 
 		let tmpInstances = (this.pict.AppData.Lab.Ultravisor && this.pict.AppData.Lab.Ultravisor.Instances) || [];
 		let tmpTypes = pState.Types || [];
 
-		let tmpHtml = '';
-		for (let i = 0; i < tmpBeacons.length; i++)
+		return tmpBeacons.map((pBeacon) =>
 		{
-			let tmpBeacon = tmpBeacons[i];
-			let tmpType = tmpTypes.find((pT) => pT.BeaconType === tmpBeacon.BeaconType);
-			let tmpUv = tmpBeacon.IDUltravisorInstance ? tmpInstances.find((pU) => pU.IDUltravisorInstance === tmpBeacon.IDUltravisorInstance) : null;
-			let tmpUvLabel = tmpUv ? `${this._escape(tmpUv.Name)} (port ${tmpUv.Port})` : (tmpBeacon.IDUltravisorInstance ? '(missing)' : 'n/a');
+			let tmpType = tmpTypes.find((pT) => pT.BeaconType === pBeacon.BeaconType);
+			let tmpUv = pBeacon.IDUltravisorInstance ? tmpInstances.find((pU) => pU.IDUltravisorInstance === pBeacon.IDUltravisorInstance) : null;
+			let tmpUvLabel = tmpUv
+				? `${this._escape(tmpUv.Name)} (port ${tmpUv.Port})`
+				: (pBeacon.IDUltravisorInstance ? '(missing)' : 'n/a');
 
 			// Container-mode beacons don't have a PID; the meaningful ident is
-			// their container + image.  Process-mode beacons stay with PID.
+			// their container + image. Process-mode beacons stay with PID.
 			let tmpRuntimeLabel = 'PID';
-			let tmpRuntimeValue = tmpBeacon.PID ? String(tmpBeacon.PID) : '--';
-			if (tmpBeacon.Runtime === 'container')
+			let tmpRuntimeValue = pBeacon.PID ? String(pBeacon.PID) : '--';
+			if (pBeacon.Runtime === 'container')
 			{
 				tmpRuntimeLabel = 'Image';
-				tmpRuntimeValue = tmpBeacon.ImageTag ? this._escape(tmpBeacon.ImageTag) : '--';
+				tmpRuntimeValue = pBeacon.ImageTag ? this._escape(pBeacon.ImageTag) : '--';
 			}
 
-			// Build-source chip state: visible only for container-mode beacons
-			// whose type supports source builds (capability-provider + missing
-			// sibling checkout both disqualify).  The active chip gets the
-			// `active` class so CSS can highlight it; the other is a link.
+			// Build-source chip slot: visible only for container-mode beacons
+			// whose type supports source builds. Driving as a single-element
+			// slot lets the card template just `{~TS:~}` it.
 			let tmpSupportsSource = !!(tmpType && tmpType.SupportsSourceBuild);
-			let tmpBuildSource = tmpBeacon.BuildSource || 'npm';
-			let tmpShowBuildSource = (tmpBeacon.Runtime === 'container' && tmpSupportsSource);
+			let tmpBuildSource = pBeacon.BuildSource || 'npm';
+			let tmpShowBuildSource = (pBeacon.Runtime === 'container' && tmpSupportsSource);
+			let tmpRebuildVisible = (pBeacon.Runtime === 'container');
 
-			tmpHtml += this.pict.parseTemplateByHash('Lab-Beacons-Card-Template',
-				{
-					IDBeacon:        tmpBeacon.IDBeacon,
-					Name:            this._escape(tmpBeacon.Name),
-					TypeDisplay:     tmpType ? this._escape(tmpType.DisplayName) : this._escape(tmpBeacon.BeaconType),
-					Status:          tmpBeacon.Status,
-					StatusDetail:    this._escape(tmpBeacon.StatusDetail || ''),
-					DetailDisplay:   tmpBeacon.StatusDetail ? 'block' : 'none',
-					Port:            tmpBeacon.Port,
-					RuntimeLabel:    tmpRuntimeLabel,
-					RuntimeValue:    tmpRuntimeValue,
-					UltravisorLabel: tmpUvLabel,
-					StartDisabled:   (tmpBeacon.Status === 'running' || tmpBeacon.Status === 'starting' || tmpBeacon.Status === 'provisioning') ? 'disabled' : '',
-					StopDisabled:    (tmpBeacon.Status !== 'running') ? 'disabled' : '',
-					// Rebuild only makes sense for container-mode beacons.
-					RebuildDisplay:  (tmpBeacon.Runtime === 'container') ? 'inline-flex' : 'none',
-					BuildSourceDisplay: tmpShowBuildSource ? 'inline-flex' : 'none',
-					IsNpmClass:        (tmpBuildSource === 'npm')    ? 'active' : '',
-					IsSourceClass:     (tmpBuildSource === 'source') ? 'active' : ''
-				});
-		}
-		return tmpHtml;
+			return {
+				IDBeacon:         pBeacon.IDBeacon,
+				Name:             this._escape(pBeacon.Name),
+				TypeDisplay:      tmpType ? this._escape(tmpType.DisplayName) : this._escape(pBeacon.BeaconType),
+				Status:           pBeacon.Status,
+				Port:             pBeacon.Port,
+				RuntimeLabel:     tmpRuntimeLabel,
+				RuntimeValue:     tmpRuntimeValue,
+				UltravisorLabel:  tmpUvLabel,
+				StartDisabled:    (pBeacon.Status === 'running' || pBeacon.Status === 'starting' || pBeacon.Status === 'provisioning') ? 'disabled' : '',
+				StopDisabled:     (pBeacon.Status !== 'running') ? 'disabled' : '',
+				StatusDetailSlot: pBeacon.StatusDetail
+					? [{ StatusDetail: this._escape(pBeacon.StatusDetail) }]
+					: [],
+				RebuildSlot: tmpRebuildVisible
+					? [{ IDBeacon: pBeacon.IDBeacon }]
+					: [],
+				BuildSourceSlot: tmpShowBuildSource
+					? [
+						{
+							IDBeacon:       pBeacon.IDBeacon,
+							IsNpmClass:     (tmpBuildSource === 'npm')    ? 'active' : '',
+							IsSourceClass:  (tmpBuildSource === 'source') ? 'active' : ''
+						}
+					]
+					: []
+			};
+		});
 	}
 
-	_buildFormHTML(pState)
+	_buildFormRecord(pState)
 	{
 		let tmpForm = pState.Form || {};
 		let tmpTypes = pState.Types || [];
 		let tmpActiveType = tmpForm.BeaconType ? tmpTypes.find((pT) => pT.BeaconType === tmpForm.BeaconType) : null;
 
-		// Ultravisor <select> (running only)
+		// Ultravisor picker slot — populated only when the active type
+		// requires one. Each option becomes a record the option template
+		// reads via {~D:Record.X~}.
 		let tmpInstances = (this.pict.AppData.Lab.Ultravisor && this.pict.AppData.Lab.Ultravisor.Instances) || [];
-		let tmpUvHtml = '<option value="0">-- choose an Ultravisor --</option>';
-		for (let j = 0; j < tmpInstances.length; j++)
-		{
-			let tmpUv = tmpInstances[j];
-			if (tmpUv.Status !== 'running') { continue; }
-			let tmpSel = (String(tmpForm.IDUltravisorInstance) === String(tmpUv.IDUltravisorInstance)) ? ' selected' : '';
-			tmpUvHtml += `<option value="${tmpUv.IDUltravisorInstance}"${tmpSel}>${this._escape(tmpUv.Name)} (port ${tmpUv.Port})</option>`;
-		}
+		let tmpUvOptions = tmpInstances
+			.filter((pU) => pU.Status === 'running')
+			.map((pU) => (
+				{
+					Value:        pU.IDUltravisorInstance,
+					Label:        this._escape(pU.Name) + ' (port ' + pU.Port + ')',
+					SelectedAttr: (String(tmpForm.IDUltravisorInstance) === String(pU.IDUltravisorInstance)) ? 'selected' : ''
+				}));
+		let tmpUvSlot = (tmpActiveType && tmpActiveType.RequiresUltravisor)
+			? [{ Options: tmpUvOptions }]
+			: [];
 
-		let tmpRecord =
-		{
-			Name:                 this._escape(tmpForm.Name || ''),
-			Port:                 tmpForm.Port || 0,
-			TypeDisplay:          tmpActiveType ? this._escape(tmpActiveType.DisplayName) : '',
-			TypeDescription:      tmpActiveType ? this._escape(tmpActiveType.Description) : '',
-			// Legacy / deprecated beacon types surface a warning banner so
-			// new deployments steer toward retold-databeacon + the lab's
-			// Persistence assignment for queue / manifest persistence.
-			// See modules/apps/ultravisor/docs/features/persistence-via-databeacon.md.
-			DeprecationDisplay:   (tmpActiveType && tmpActiveType.Deprecated) ? 'block' : 'none',
-			DeprecationNote:      (tmpActiveType && tmpActiveType.Deprecated) ? this._escape(tmpActiveType.DeprecationNote || '') : '',
-			UltravisorDisplay:    (tmpActiveType && tmpActiveType.RequiresUltravisor) ? 'flex' : 'none',
-			UltravisorOptionsHTML: tmpUvHtml,
-			ConfigFieldsHTML:     this._renderConfigFields(tmpActiveType, tmpForm.Config || {}),
-			// Advanced — admission credential overrides. Plain attribute
-			// values; the consumer reads them at submit time via _domValue.
-			JoinSecretOverride:   this._escape(tmpForm.JoinSecretOverride || ''),
+		// Config field arrays — one per shape. The form template emits
+		// three TS tags in DOM order. Each field record carries everything
+		// its template needs.
+		let tmpConfigFields = this._buildConfigFieldGroups(tmpActiveType, tmpForm.Config || {});
+
+		// Deprecation slot — populated only when the active type is marked
+		// deprecated in the BeaconTypeRegistry.
+		let tmpDeprecationSlot = (tmpActiveType && tmpActiveType.Deprecated)
+			? [{ Note: this._escape(tmpActiveType.DeprecationNote || '') }]
+			: [];
+
+		return {
+			Name:                  this._escape(tmpForm.Name || ''),
+			Port:                  tmpForm.Port || 0,
+			TypeDisplay:           tmpActiveType ? this._escape(tmpActiveType.DisplayName) : '',
+			TypeDescription:       tmpActiveType ? this._escape(tmpActiveType.Description) : '',
+			DeprecationSlot:       tmpDeprecationSlot,
+			UltravisorPickerSlot:  tmpUvSlot,
+			ConfigFieldsText:      tmpConfigFields.Text,
+			ConfigFieldsNumber:    tmpConfigFields.Number,
+			ConfigFieldsEngineDb:  tmpConfigFields.EngineDb,
+			JoinSecretOverride:    this._escape(tmpForm.JoinSecretOverride || ''),
 			SkipJoinSecretChecked: tmpForm.SkipJoinSecret ? 'checked' : '',
-			Error:                this._escape(tmpForm.Error || '')
+			Error:                 this._escape(tmpForm.Error || '')
 		};
-		return this.pict.parseTemplateByHash('Lab-Beacons-FormBody-Template', tmpRecord);
 	}
 
 	/**
-	 * Render each config field from the type descriptor by dispatching to a
-	 * registered pict template per field shape.  Using parseTemplateByHash
-	 * (rather than concatenating raw HTML) lets pict resolve `{~D:...~}` and
-	 * gives us a single place to fix if the field shape changes.
+	 * Bucket the active type's ConfigForm.Fields into three arrays, one
+	 * per template shape. The form template emits three TS tags in DOM
+	 * order so the visible field order matches the descriptor's order
+	 * within each shape, but text-vs-number-vs-picker fields cluster.
+	 * That's a deliberate tradeoff — the alternative is per-record
+	 * template-dispatch which Pict doesn't have a clean idiom for.
 	 */
-	_renderConfigFields(pType, pCurrentConfig)
+	_buildConfigFieldGroups(pType, pCurrentConfig)
 	{
-		if (!pType || !pType.ConfigForm || !Array.isArray(pType.ConfigForm.Fields) || pType.ConfigForm.Fields.length === 0)
-		{
-			return '';
-		}
+		let tmpGroups = { Text: [], Number: [], EngineDb: [] };
+		if (!pType || !pType.ConfigForm || !Array.isArray(pType.ConfigForm.Fields)) { return tmpGroups; }
 
 		let tmpEngines = (this.pict.AppData.Lab.DBEngines && this.pict.AppData.Lab.DBEngines.Engines) || [];
 		let tmpDbByEngine = (this.pict.AppData.Lab.DBEngines && this.pict.AppData.Lab.DBEngines.DatabasesByEngine) || {};
 
-		let tmpOut = '<div class="lab-beacons-form" style="border:none;padding:0;">';
 		for (let i = 0; i < pType.ConfigForm.Fields.length; i++)
 		{
 			let tmpField = pType.ConfigForm.Fields[i];
@@ -549,17 +597,17 @@ class LabBeaconsView extends libPictView
 
 			if (tmpField.Type === 'number')
 			{
-				tmpOut += this.pict.parseTemplateByHash('Lab-Beacons-ConfigField-Number-Template', tmpRecord);
+				tmpGroups.Number.push(tmpRecord);
 			}
 			else if (tmpField.Type === 'lab-engine-database-picker')
 			{
 				// One combined picker across all (engine, database) pairs so
-				// there's no cascading onchange between two selects.  Value
+				// there's no cascading onchange between two selects. Value
 				// encoded as "engineId:databaseId" and split at submit time.
 				let tmpSelectedEngine = parseInt(pCurrentConfig.IDDBEngine, 10) || 0;
 				let tmpSelectedDb = parseInt(pCurrentConfig.IDDatabase, 10) || 0;
 				let tmpComposite = (tmpSelectedEngine && tmpSelectedDb) ? `${tmpSelectedEngine}:${tmpSelectedDb}` : '';
-				let tmpOptionsHtml = '<option value="">-- none --</option>';
+				let tmpOptions = [];
 				for (let e = 0; e < tmpEngines.length; e++)
 				{
 					let tmpEng = tmpEngines[e];
@@ -569,20 +617,23 @@ class LabBeaconsView extends libPictView
 					{
 						let tmpDb = tmpDbs[d];
 						let tmpValue = `${tmpEng.IDDBEngine}:${tmpDb.IDDatabase}`;
-						let tmpSel = (tmpComposite === tmpValue) ? ' selected' : '';
-						tmpOptionsHtml += `<option value="${tmpValue}"${tmpSel}>${this._escape(tmpEng.Name)} (${this._escape(tmpEng.EngineType)}) / ${this._escape(tmpDb.Name)}</option>`;
+						tmpOptions.push(
+							{
+								Value:        tmpValue,
+								Label:        this._escape(tmpEng.Name) + ' (' + this._escape(tmpEng.EngineType) + ') / ' + this._escape(tmpDb.Name),
+								SelectedAttr: (tmpComposite === tmpValue) ? 'selected' : ''
+							});
 					}
 				}
-				tmpRecord.OptionsHTML = tmpOptionsHtml;
-				tmpOut += this.pict.parseTemplateByHash('Lab-Beacons-ConfigField-EngineDbPicker-Template', tmpRecord);
+				tmpRecord.Options = tmpOptions;
+				tmpGroups.EngineDb.push(tmpRecord);
 			}
 			else
 			{
-				tmpOut += this.pict.parseTemplateByHash('Lab-Beacons-ConfigField-Text-Template', tmpRecord);
+				tmpGroups.Text.push(tmpRecord);
 			}
 		}
-		tmpOut += '</div>';
-		return tmpOut;
+		return tmpGroups;
 	}
 
 	_escape(pStr)

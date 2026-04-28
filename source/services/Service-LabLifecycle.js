@@ -49,17 +49,11 @@ class ServiceLabLifecycle extends libFableServiceProviderBase
 							() =>
 							{
 								// Clear history tables -- keep the schema, just drop rows.
-								try
-								{
-									let tmpIngest = tmpStore.db.prepare('DELETE FROM IngestionJob').run();
-									tmpSummary.IngestionJobsCleared = tmpIngest.changes;
-									let tmpEvents = tmpStore.db.prepare('DELETE FROM InfrastructureEvent').run();
-									tmpSummary.EventsCleared = tmpEvents.changes;
-								}
-								catch (pClearErr)
-								{
-									this.fable.log.warn(`LabLifecycle.teardown: clear-history warning: ${pClearErr.message}`);
-								}
+								// Route through the DAL so the lab has zero raw-SQL
+								// against lab.db; teardown traffic is small (history
+								// tables) so the per-row DELETE cost is fine.
+								tmpSummary.IngestionJobsCleared = this._truncateTable(tmpStore, 'IngestionJob', 'IDIngestionJob');
+								tmpSummary.EventsCleared        = this._truncateTable(tmpStore, 'InfrastructureEvent', 'IDInfrastructureEvent');
 
 								tmpStore.recordEvent(
 									{
@@ -96,6 +90,33 @@ class ServiceLabLifecycle extends libFableServiceProviderBase
 				});
 		};
 		tmpNext();
+	}
+
+	/**
+	 * Wipe every row of a history table by listing IDs and routing each
+	 * through `LabStateStore.remove` (DAL-backed). Returns the count of
+	 * rows actually removed. History tables are small (low hundreds at
+	 * most); the per-row cost is cheaper than dropping into raw SQL.
+	 */
+	_truncateTable(pStore, pTable, pIDColumn)
+	{
+		let tmpRows = [];
+		try { tmpRows = pStore.list(pTable); }
+		catch (pListErr)
+		{
+			this.fable.log.warn(`LabLifecycle.teardown: list ${pTable} failed: ${pListErr.message}`);
+			return 0;
+		}
+		let tmpRemoved = 0;
+		for (let i = 0; i < tmpRows.length; i++)
+		{
+			try { tmpRemoved += pStore.remove(pTable, pIDColumn, tmpRows[i][pIDColumn]) || 0; }
+			catch (pRemoveErr)
+			{
+				this.fable.log.warn(`LabLifecycle.teardown: remove ${pTable}#${tmpRows[i][pIDColumn]} failed: ${pRemoveErr.message}`);
+			}
+		}
+		return tmpRemoved;
 	}
 }
 

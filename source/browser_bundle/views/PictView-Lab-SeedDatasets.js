@@ -4,6 +4,11 @@
  * Browse pre-packaged seed datasets, pick a target Ultravisor + databeacon,
  * and kick off an ETL run through the mesh.  Recent ingestion jobs show
  * below so users can watch their seed complete without leaving the tab.
+ *
+ * Data flow: persisted state lives in `AppData.Lab.SeedDatasets`. The
+ * derived display records — target dropdowns, dataset cards, job rows —
+ * land in `AppData.Lab.Computed.SeedDatasets` during onBeforeRender.
+ * Templates iterate via {~TS:~}; no HTML construction in JS.
  */
 'use strict';
 
@@ -133,13 +138,13 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	</div>
 	<div class="lab-seeds-targets">
 		<label>Target Ultravisor
-			<select id="Lab-SeedTargets-Ultravisor">{~D:AppData.Lab.SeedDatasets.UltravisorOptionsHTML~}</select>
+			<select id="Lab-SeedTargets-Ultravisor">{~TS:Lab-SeedDatasets-TargetOption-Template:AppData.Lab.Computed.SeedDatasets.UltravisorOptions~}</select>
 		</label>
 		<label>Target Databeacon
-			<select id="Lab-SeedTargets-Databeacon">{~D:AppData.Lab.SeedDatasets.DatabeaconOptionsHTML~}</select>
+			<select id="Lab-SeedTargets-Databeacon">{~TS:Lab-SeedDatasets-TargetOption-Template:AppData.Lab.Computed.SeedDatasets.DatabeaconOptions~}</select>
 		</label>
 		<label>Target DB Engine (for quick-seed)
-			<select id="Lab-SeedTargets-DBEngine">{~D:AppData.Lab.SeedDatasets.DBEngineOptionsHTML~}</select>
+			<select id="Lab-SeedTargets-DBEngine">{~TS:Lab-SeedDatasets-TargetOption-Template:AppData.Lab.Computed.SeedDatasets.DBEngineOptions~}</select>
 		</label>
 	</div>
 	<div id="Lab-SeedDatasets-ListSlot"></div>
@@ -148,16 +153,28 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		},
 		{
 			Hash: 'Lab-SeedDatasets-List-Template',
-			Template: /*html*/`{~D:AppData.Lab.SeedDatasets.ListHTML~}`
+			Template: /*html*/`
+{~TS:Lab-SeedDatasets-Empty-Template:AppData.Lab.Computed.SeedDatasets.EmptySlot~}
+{~TS:Lab-SeedDatasets-CardsContainer-Template:AppData.Lab.Computed.SeedDatasets.ListSlot~}`
 		},
 		{
 			Hash: 'Lab-SeedDatasets-JobsSlot-Template',
-			Template: /*html*/`{~D:AppData.Lab.SeedDatasets.JobsSlotHTML~}`
+			Template: /*html*/`{~TS:Lab-SeedDatasets-Jobs-Template:AppData.Lab.Computed.SeedDatasets.JobsSlot~}`
+		},
+		{
+			Hash: 'Lab-SeedDatasets-TargetOption-Template',
+			Template: /*html*/`<option value="{~D:Record.Value~}" {~D:Record.SelectedAttr~} {~D:Record.DisabledAttr~}>{~D:Record.Label~}</option>`
 		},
 		{
 			Hash: 'Lab-SeedDatasets-Empty-Template',
-			Template: /*html*/`
-<div class="lab-seeds-empty">No seed datasets found under <code>seed_datasets/</code>.</div>`
+			Template: /*html*/`<div class="lab-seeds-empty">No seed datasets found under <code>seed_datasets/</code>.</div>`
+		},
+		{
+			// Wrapper container — renders the grid only when there are datasets
+			// (single-element-array slot via ListSlot). Inner TS iterates the
+			// dataset records on the same record context (Record.Cards).
+			Hash: 'Lab-SeedDatasets-CardsContainer-Template',
+			Template: /*html*/`<div class="lab-seeds-list">{~TS:Lab-SeedDatasets-Card-Template:Record.Cards~}</div>`
 		},
 		{
 			Hash: 'Lab-SeedDatasets-Card-Template',
@@ -169,7 +186,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<span><span class="k">Total rows:</span> <span class="v">{~D:Record.TotalRows~}</span></span>
 		<span><span class="k">Correlation:</span> <span class="v">{~D:Record.Correlation~}</span></span>
 	</div>
-	<div class="lab-seed-entities">{~D:Record.EntitiesHTML~}</div>
+	<div class="lab-seed-entities">{~TS:Lab-SeedDatasets-EntityRow-Template:Record.Entities~}</div>
 	<div class="lab-seed-op">Ultravisor op: {~D:Record.OperationHash~}</div>
 	<div class="lab-seed-card-actions">
 		<a class="lab-btn secondary {~D:Record.EngineDisabled~}" href="#/seeds/{~D:Record.Hash~}/seed-to-engine" title="{~D:Record.EngineHint~}">Seed into engine →</a>
@@ -179,10 +196,11 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		},
 		{
 			Hash: 'Lab-SeedDatasets-EntityRow-Template',
-			Template: /*html*/`
-<div class="entity-row"><code>{~D:Record.Name~}</code><span>{~D:Record.RowCount~} rows</span></div>`
+			Template: /*html*/`<div class="entity-row"><code>{~D:Record.Name~}</code><span>{~D:Record.RowCount~} rows</span></div>`
 		},
 		{
+			// Outer block — only rendered when there's at least one job
+			// (driven by AppData.Lab.Computed.SeedDatasets.JobsSlot).
 			Hash: 'Lab-SeedDatasets-Jobs-Template',
 			Template: /*html*/`
 <div class="lab-jobs-block">
@@ -198,7 +216,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 				<th>Detail</th>
 			</tr>
 		</thead>
-		<tbody>{~D:AppData.Lab.SeedDatasets.JobsHTML~}</tbody>
+		<tbody>{~TS:Lab-SeedDatasets-JobRow-Template:Record.Rows~}</tbody>
 	</table>
 </div>`
 		},
@@ -246,25 +264,22 @@ class LabSeedDatasetsView extends libPictView
 	onBeforeRender(pRenderable)
 	{
 		if (!this.pict.AppData.Lab.SeedDatasets) { this.pict.AppData.Lab.SeedDatasets = {}; }
+		if (!this.pict.AppData.Lab.Computed) { this.pict.AppData.Lab.Computed = {}; }
 		let tmpState = this.pict.AppData.Lab.SeedDatasets;
 		if (!tmpState.Targets) { tmpState.Targets = { IDUltravisorInstance: 0, IDBeacon: 0, IDDBEngine: 0 }; }
-		let tmpHash = pRenderable && pRenderable.RenderableHash;
 
-		if (tmpHash === 'Lab-SeedDatasets-Main' || !tmpHash)
+		let tmpDatasets = tmpState.Datasets || [];
+		let tmpJobs = tmpState.Jobs || [];
+
+		this.pict.AppData.Lab.Computed.SeedDatasets =
 		{
-			// Targets live in Main, so their dropdowns are painted once at
-			// view-mount and not touched by polls.  The user's picks persist
-			// in the DOM; seed actions read them via ContentAssignment.
-			this._buildTargetOptions(tmpState);
-		}
-		if (tmpHash === 'Lab-SeedDatasets-List' || tmpHash === 'Lab-SeedDatasets-Main' || !tmpHash)
-		{
-			tmpState.ListHTML = this._buildListHTML(tmpState);
-		}
-		if (tmpHash === 'Lab-SeedDatasets-Jobs' || tmpHash === 'Lab-SeedDatasets-Main' || !tmpHash)
-		{
-			tmpState.JobsSlotHTML = this._buildJobsSlotHTML(tmpState);
-		}
+			UltravisorOptions: this._buildUltravisorOptions(tmpState),
+			DatabeaconOptions: this._buildDatabeaconOptions(tmpState),
+			DBEngineOptions:   this._buildDBEngineOptions(tmpState),
+			EmptySlot:         tmpDatasets.length === 0 ? [{}] : [],
+			ListSlot:          tmpDatasets.length === 0 ? [] : [{ Cards: this._buildCards(tmpState) }],
+			JobsSlot:          tmpJobs.length === 0    ? [] : [{ Rows: this._buildJobRows(tmpJobs) }]
+		};
 
 		return super.onBeforeRender(pRenderable);
 	}
@@ -281,124 +296,109 @@ class LabSeedDatasetsView extends libPictView
 		return super.onAfterRender(pRenderable, pAddress, pRecord, pContent);
 	}
 
-	_buildTargetOptions(pState)
+	// ====================================================================
+	// Computed-record builders
+	//
+	// We show all candidates (not just Status==='running') so the user can
+	// see *why* something they created doesn't appear as a ready target
+	// after a lab restart. Non-running entries are disabled and tagged
+	// with their status.
+	// ====================================================================
+
+	_buildUltravisorOptions(pState)
 	{
-		// We show all candidates (not just Status==='running') so the user
-		// can see *why* something they created doesn't appear as a ready
-		// target after a lab restart.  Non-running entries are disabled and
-		// tagged with their status so the path forward is obvious: go start
-		// it on the matching tab.
 		let tmpInstances = (this.pict.AppData.Lab.Ultravisor && this.pict.AppData.Lab.Ultravisor.Instances) || [];
-		let tmpUvHtml = '<option value="0">-- choose an Ultravisor --</option>';
-		for (let i = 0; i < tmpInstances.length; i++)
+		let tmpHead = [{ Value: 0, Label: '-- choose an Ultravisor --', SelectedAttr: '', DisabledAttr: '' }];
+		let tmpTargetID = (pState.Targets && pState.Targets.IDUltravisorInstance) || 0;
+		return tmpHead.concat(tmpInstances.map((pUv) =>
 		{
-			let tmpUv = tmpInstances[i];
-			let tmpRunning = tmpUv.Status === 'running';
-			let tmpSel = (tmpRunning && String(pState.Targets && pState.Targets.IDUltravisorInstance) === String(tmpUv.IDUltravisorInstance)) ? ' selected' : '';
-			let tmpDis = tmpRunning ? '' : ' disabled';
-			let tmpTag = tmpRunning ? `port ${tmpUv.Port}` : `${tmpUv.Status || 'stopped'}`;
-			tmpUvHtml += `<option value="${tmpUv.IDUltravisorInstance}"${tmpSel}${tmpDis}>${this._escape(tmpUv.Name)} (${tmpTag})</option>`;
-		}
-		pState.UltravisorOptionsHTML = tmpUvHtml;
-
-		// Only retold-databeacon rows are seed-capable.
-		let tmpBeacons = (this.pict.AppData.Lab.Beacons && this.pict.AppData.Lab.Beacons.Beacons) || [];
-		let tmpBeaconHtml = '<option value="0">-- choose a databeacon --</option>';
-		for (let j = 0; j < tmpBeacons.length; j++)
-		{
-			let tmpBeacon = tmpBeacons[j];
-			if (tmpBeacon.BeaconType !== 'retold-databeacon') { continue; }
-			let tmpRunning = tmpBeacon.Status === 'running';
-			let tmpSel = (tmpRunning && String(pState.Targets && pState.Targets.IDBeacon) === String(tmpBeacon.IDBeacon)) ? ' selected' : '';
-			let tmpDis = tmpRunning ? '' : ' disabled';
-			let tmpTag = tmpRunning ? `port ${tmpBeacon.Port}` : `${tmpBeacon.Status || 'stopped'}`;
-			tmpBeaconHtml += `<option value="${tmpBeacon.IDBeacon}"${tmpSel}${tmpDis}>${this._escape(tmpBeacon.Name)} (${tmpTag})</option>`;
-		}
-		pState.DatabeaconOptionsHTML = tmpBeaconHtml;
-
-		let tmpEngines = (this.pict.AppData.Lab.DBEngines && this.pict.AppData.Lab.DBEngines.Engines) || [];
-		let tmpEngHtml = '<option value="0">-- choose a DB engine --</option>';
-		for (let e = 0; e < tmpEngines.length; e++)
-		{
-			let tmpEng = tmpEngines[e];
-			let tmpRunning = tmpEng.Status === 'running';
-			let tmpSel = (tmpRunning && String(pState.Targets && pState.Targets.IDDBEngine) === String(tmpEng.IDDBEngine)) ? ' selected' : '';
-			let tmpDis = tmpRunning ? '' : ' disabled';
-			let tmpTag = tmpRunning ? tmpEng.EngineType : `${tmpEng.EngineType} · ${tmpEng.Status || 'stopped'}`;
-			tmpEngHtml += `<option value="${tmpEng.IDDBEngine}"${tmpSel}${tmpDis}>${this._escape(tmpEng.Name)} (${tmpTag})</option>`;
-		}
-		pState.DBEngineOptionsHTML = tmpEngHtml;
+			let tmpRunning = pUv.Status === 'running';
+			let tmpTag = tmpRunning ? `port ${pUv.Port}` : (pUv.Status || 'stopped');
+			return {
+				Value:        pUv.IDUltravisorInstance,
+				Label:        this._escape(pUv.Name) + ' (' + tmpTag + ')',
+				SelectedAttr: (tmpRunning && String(tmpTargetID) === String(pUv.IDUltravisorInstance)) ? 'selected' : '',
+				DisabledAttr: tmpRunning ? '' : 'disabled'
+			};
+		}));
 	}
 
-	_buildListHTML(pState)
+	_buildDatabeaconOptions(pState)
+	{
+		// Only retold-databeacon rows are seed-capable.
+		let tmpBeacons = (this.pict.AppData.Lab.Beacons && this.pict.AppData.Lab.Beacons.Beacons) || [];
+		let tmpHead = [{ Value: 0, Label: '-- choose a databeacon --', SelectedAttr: '', DisabledAttr: '' }];
+		let tmpTargetID = (pState.Targets && pState.Targets.IDBeacon) || 0;
+		return tmpHead.concat(tmpBeacons
+			.filter((pB) => pB.BeaconType === 'retold-databeacon')
+			.map((pB) =>
+			{
+				let tmpRunning = pB.Status === 'running';
+				let tmpTag = tmpRunning ? `port ${pB.Port}` : (pB.Status || 'stopped');
+				return {
+					Value:        pB.IDBeacon,
+					Label:        this._escape(pB.Name) + ' (' + tmpTag + ')',
+					SelectedAttr: (tmpRunning && String(tmpTargetID) === String(pB.IDBeacon)) ? 'selected' : '',
+					DisabledAttr: tmpRunning ? '' : 'disabled'
+				};
+			}));
+	}
+
+	_buildDBEngineOptions(pState)
+	{
+		let tmpEngines = (this.pict.AppData.Lab.DBEngines && this.pict.AppData.Lab.DBEngines.Engines) || [];
+		let tmpHead = [{ Value: 0, Label: '-- choose a DB engine --', SelectedAttr: '', DisabledAttr: '' }];
+		let tmpTargetID = (pState.Targets && pState.Targets.IDDBEngine) || 0;
+		return tmpHead.concat(tmpEngines.map((pEng) =>
+		{
+			let tmpRunning = pEng.Status === 'running';
+			let tmpTag = tmpRunning ? pEng.EngineType : (pEng.EngineType + ' · ' + (pEng.Status || 'stopped'));
+			return {
+				Value:        pEng.IDDBEngine,
+				Label:        this._escape(pEng.Name) + ' (' + tmpTag + ')',
+				SelectedAttr: (tmpRunning && String(tmpTargetID) === String(pEng.IDDBEngine)) ? 'selected' : '',
+				DisabledAttr: tmpRunning ? '' : 'disabled'
+			};
+		}));
+	}
+
+	_buildCards(pState)
 	{
 		let tmpDatasets = pState.Datasets || [];
-		if (tmpDatasets.length === 0)
-		{
-			return this.pict.parseTemplateByHash('Lab-SeedDatasets-Empty-Template', {});
-		}
-
 		let tmpTargets = pState.Targets || {};
 		let tmpBeaconReady = !!(tmpTargets.IDUltravisorInstance && tmpTargets.IDBeacon);
 		let tmpEngineReady = !!(tmpTargets.IDUltravisorInstance && tmpTargets.IDDBEngine);
 		let tmpBeaconHint = tmpBeaconReady ? 'Seed into the selected databeacon\'s attached database.' : 'Pick both Target Ultravisor and Target Databeacon above.';
 		let tmpEngineHint = tmpEngineReady ? 'Auto-create a database + beacon on the chosen engine and seed.' : 'Pick both Target Ultravisor and Target DB Engine above.';
 
-		let tmpListHtml = '<div class="lab-seeds-list">';
-		for (let i = 0; i < tmpDatasets.length; i++)
-		{
-			let tmpDs = tmpDatasets[i];
-
-			let tmpEntitiesHtml = '';
-			for (let e = 0; e < (tmpDs.Entities || []).length; e++)
+		return tmpDatasets.map((pDs) => (
 			{
-				let tmpEnt = tmpDs.Entities[e];
-				tmpEntitiesHtml += this.pict.parseTemplateByHash('Lab-SeedDatasets-EntityRow-Template',
-					{ Name: this._escape(tmpEnt.Name), RowCount: tmpEnt.RowCount });
-			}
-
-			tmpListHtml += this.pict.parseTemplateByHash('Lab-SeedDatasets-Card-Template',
-				{
-					Hash:           tmpDs.Hash,
-					Name:           this._escape(tmpDs.Name),
-					Description:    this._escape(tmpDs.Description),
-					TotalRows:      tmpDs.TotalRows,
-					Correlation:    this._escape(tmpDs.Correlation || 'n/a'),
-					EntitiesHTML:   tmpEntitiesHtml,
-					OperationHash:  tmpDs.OperationHash,
-					BeaconDisabled: tmpBeaconReady ? '' : 'disabled',
-					EngineDisabled: tmpEngineReady ? '' : 'disabled',
-					BeaconHint:     tmpBeaconHint,
-					EngineHint:     tmpEngineHint
-				});
-		}
-		tmpListHtml += '</div>';
-		return tmpListHtml;
+				Hash:           pDs.Hash,
+				Name:           this._escape(pDs.Name),
+				Description:    this._escape(pDs.Description),
+				TotalRows:      pDs.TotalRows,
+				Correlation:    this._escape(pDs.Correlation || 'n/a'),
+				Entities:       (pDs.Entities || []).map((pE) => (
+					{ Name: this._escape(pE.Name), RowCount: pE.RowCount })),
+				OperationHash:  pDs.OperationHash,
+				BeaconDisabled: tmpBeaconReady ? '' : 'disabled',
+				EngineDisabled: tmpEngineReady ? '' : 'disabled',
+				BeaconHint:     tmpBeaconHint,
+				EngineHint:     tmpEngineHint
+			}));
 	}
 
-	_buildJobsSlotHTML(pState)
+	_buildJobRows(pJobs)
 	{
-		let tmpJobs = pState.Jobs || [];
-		if (tmpJobs.length === 0) { return ''; }
-
-		let tmpRowsHtml = '';
-		for (let k = 0; k < tmpJobs.length; k++)
-		{
-			let tmpJob = tmpJobs[k];
-			let tmpStarted = tmpJob.StartedAt ? new Date(tmpJob.StartedAt).toLocaleTimeString() : '--';
-			tmpRowsHtml += this.pict.parseTemplateByHash('Lab-SeedDatasets-JobRow-Template',
-				{
-					Started:     tmpStarted,
-					DatasetName: this._escape(tmpJob.DatasetName || ''),
-					Status:      tmpJob.Status || 'unknown',
-					Parsed:      tmpJob.ParsedCount || 0,
-					Loaded:      tmpJob.LoadedCount || 0,
-					Detail:      this._escape((tmpJob.ErrorMessage || '').slice(0, 80))
-				});
-		}
-		// The Jobs template expects JobsHTML; stash for the block template.
-		pState.JobsHTML = tmpRowsHtml;
-		return this.pict.parseTemplateByHash('Lab-SeedDatasets-Jobs-Template', {});
+		return pJobs.map((pJob) => (
+			{
+				Started:     pJob.StartedAt ? new Date(pJob.StartedAt).toLocaleTimeString() : '--',
+				DatasetName: this._escape(pJob.DatasetName || ''),
+				Status:      pJob.Status || 'unknown',
+				Parsed:      pJob.ParsedCount || 0,
+				Loaded:      pJob.LoadedCount || 0,
+				Detail:      this._escape((pJob.ErrorMessage || '').slice(0, 80))
+			}));
 	}
 
 	_escape(pStr)

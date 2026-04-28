@@ -1,0 +1,373 @@
+{
+	"_comment": "Ultravisor Lab — meadow DAL schema. Single source of truth for the lab.db tables that Service-StateStore manages. Edits here flow through meadow-migrationmanager (introspect → diff → migrate) on every lab boot, so adding or renaming a column is one edit, not two (no separate CREATE-TABLE-vs-migration-list drift). Lab state is internal; we deliberately omit audit columns (IDUser / GUID / Deleted) — operators don't need them and meadow's DAL works fine without.",
+
+	"Tables":
+	{
+		"DBEngine":
+		{
+			"TableName": "DBEngine",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDDBEngine",    "DataType": "ID" },
+				{ "Column": "Name",          "DataType": "String", "Size": "200" },
+				{ "Column": "EngineType",    "DataType": "String", "Size": "64" },
+				{ "Column": "Port",          "DataType": "Numeric", "Size": "int" },
+				{ "Column": "InternalPort",  "DataType": "Numeric", "Size": "int" },
+				{ "Column": "ContainerID",   "DataType": "String", "Size": "128" },
+				{ "Column": "ContainerName", "DataType": "String", "Size": "200" },
+				{ "Column": "ImageTag",      "DataType": "String", "Size": "200" },
+				{ "Column": "RootUsername",  "DataType": "String", "Size": "200" },
+				{ "Column": "RootPassword",  "DataType": "String", "Size": "200" },
+				{ "Column": "Status",        "DataType": "String", "Size": "32" },
+				{ "Column": "StatusDetail",  "DataType": "Text" },
+				{ "Column": "CreateDate",    "DataType": "DateTime" },
+				{ "Column": "UpdateDate",    "DataType": "DateTime" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "DBEngine",
+				"DefaultIdentifier": "IDDBEngine",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDDBEngine",    "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "Name",          "Type": "String",       "Size": "200" },
+					{ "Column": "EngineType",    "Type": "String",       "Size": "64" },
+					{ "Column": "Port",          "Type": "Integer",      "Size": "int" },
+					{ "Column": "InternalPort",  "Type": "Integer",      "Size": "int" },
+					{ "Column": "ContainerID",   "Type": "String",       "Size": "128" },
+					{ "Column": "ContainerName", "Type": "String",       "Size": "200" },
+					{ "Column": "ImageTag",      "Type": "String",       "Size": "200" },
+					{ "Column": "RootUsername",  "Type": "String",       "Size": "200" },
+					{ "Column": "RootPassword",  "Type": "String",       "Size": "200" },
+					{ "Column": "Status",        "Type": "String",       "Size": "32" },
+					{ "Column": "StatusDetail",  "Type": "Text",         "Size": "Default" },
+					{ "Column": "CreateDate",    "Type": "CreateDate",   "Size": "Default" },
+					{ "Column": "UpdateDate",    "Type": "UpdateDate",   "Size": "Default" }
+				],
+				"DefaultObject":
+				{
+					"IDDBEngine": 0, "Name": "", "EngineType": "", "Port": 0, "InternalPort": 0,
+					"ContainerID": "", "ContainerName": "", "ImageTag": "",
+					"RootUsername": "", "RootPassword": "",
+					"Status": "pending", "StatusDetail": "",
+					"CreateDate": null, "UpdateDate": null
+				}
+			}
+		},
+
+		"Database":
+		{
+			"TableName": "Database",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDDatabase",  "DataType": "ID" },
+				{ "Column": "IDDBEngine",  "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "Name",        "DataType": "String", "Size": "200" },
+				{ "Column": "CreateDate",  "DataType": "DateTime" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "Database",
+				"DefaultIdentifier": "IDDatabase",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDDatabase",  "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "IDDBEngine",  "Type": "ForeignKey",   "Size": "int", "Indexed": true },
+					{ "Column": "Name",        "Type": "String",       "Size": "200" },
+					{ "Column": "CreateDate",  "Type": "CreateDate",   "Size": "Default" }
+				],
+				"DefaultObject":
+				{
+					"IDDatabase": 0, "IDDBEngine": 0, "Name": "", "CreateDate": null
+				}
+			}
+		},
+
+		"UltravisorInstance":
+		{
+			"TableName": "UltravisorInstance",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDUltravisorInstance",    "DataType": "ID" },
+				{ "Column": "Name",                    "DataType": "String", "Size": "200" },
+				{ "Column": "Port",                    "DataType": "Numeric", "Size": "int" },
+				{ "Column": "PID",                     "DataType": "Numeric", "Size": "int" },
+				{ "Column": "ContainerID",             "DataType": "String", "Size": "128" },
+				{ "Column": "ContainerName",           "DataType": "String", "Size": "200" },
+				{ "Column": "ImageTag",                "DataType": "String", "Size": "200" },
+				{ "Column": "ImageVersion",            "DataType": "String", "Size": "64" },
+				{ "Column": "Runtime",                 "DataType": "String", "Size": "32" },
+				{ "Column": "ConfigPath",              "DataType": "String", "Size": "512" },
+				{ "Column": "Status",                  "DataType": "String", "Size": "32" },
+				{ "Column": "StatusDetail",            "DataType": "Text" },
+				{ "Column": "Secure",                  "DataType": "Boolean" },
+				{ "Column": "BootstrapAuthSecret",     "DataType": "String", "Size": "128" },
+				{ "Column": "Bootstrapped",            "DataType": "Boolean" },
+				{ "Column": "IDPersistenceBeacon",     "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "IDPersistenceConnection", "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "CreateDate",              "DataType": "DateTime" },
+				{ "Column": "UpdateDate",              "DataType": "DateTime" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "UltravisorInstance",
+				"DefaultIdentifier": "IDUltravisorInstance",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDUltravisorInstance",    "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "Name",                    "Type": "String",       "Size": "200" },
+					{ "Column": "Port",                    "Type": "Integer",      "Size": "int" },
+					{ "Column": "PID",                     "Type": "Integer",      "Size": "int" },
+					{ "Column": "ContainerID",             "Type": "String",       "Size": "128" },
+					{ "Column": "ContainerName",           "Type": "String",       "Size": "200" },
+					{ "Column": "ImageTag",                "Type": "String",       "Size": "200" },
+					{ "Column": "ImageVersion",            "Type": "String",       "Size": "64" },
+					{ "Column": "Runtime",                 "Type": "String",       "Size": "32" },
+					{ "Column": "ConfigPath",              "Type": "String",       "Size": "512" },
+					{ "Column": "Status",                  "Type": "String",       "Size": "32" },
+					{ "Column": "StatusDetail",            "Type": "Text",         "Size": "Default" },
+					{ "Column": "Secure",                  "Type": "Boolean",      "Size": "Default" },
+					{ "Column": "BootstrapAuthSecret",     "Type": "String",       "Size": "128" },
+					{ "Column": "Bootstrapped",            "Type": "Boolean",      "Size": "Default" },
+					{ "Column": "IDPersistenceBeacon",     "Type": "ForeignKey",   "Size": "int" },
+					{ "Column": "IDPersistenceConnection", "Type": "ForeignKey",   "Size": "int" },
+					{ "Column": "CreateDate",              "Type": "CreateDate",   "Size": "Default" },
+					{ "Column": "UpdateDate",              "Type": "UpdateDate",   "Size": "Default" }
+				],
+				"DefaultObject":
+				{
+					"IDUltravisorInstance": 0, "Name": "", "Port": 0, "PID": 0,
+					"ContainerID": "", "ContainerName": "", "ImageTag": "", "ImageVersion": "",
+					"Runtime": "process", "ConfigPath": "",
+					"Status": "pending", "StatusDetail": "",
+					"Secure": false, "BootstrapAuthSecret": "", "Bootstrapped": false,
+					"IDPersistenceBeacon": 0, "IDPersistenceConnection": 0,
+					"CreateDate": null, "UpdateDate": null
+				}
+			}
+		},
+
+		"Beacon":
+		{
+			"TableName": "Beacon",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDBeacon",             "DataType": "ID" },
+				{ "Column": "Name",                 "DataType": "String", "Size": "200" },
+				{ "Column": "BeaconType",           "DataType": "String", "Size": "64" },
+				{ "Column": "Port",                 "DataType": "Numeric", "Size": "int" },
+				{ "Column": "PID",                  "DataType": "Numeric", "Size": "int" },
+				{ "Column": "ContainerID",          "DataType": "String", "Size": "128" },
+				{ "Column": "ContainerName",        "DataType": "String", "Size": "200" },
+				{ "Column": "ImageTag",             "DataType": "String", "Size": "200" },
+				{ "Column": "ImageVersion",         "DataType": "String", "Size": "64" },
+				{ "Column": "Runtime",              "DataType": "String", "Size": "32" },
+				{ "Column": "BuildSource",          "DataType": "String", "Size": "32" },
+				{ "Column": "IDUltravisorInstance", "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "ConfigPath",           "DataType": "String", "Size": "512" },
+				{ "Column": "ConfigJSON",           "DataType": "Text" },
+				{ "Column": "Status",               "DataType": "String", "Size": "32" },
+				{ "Column": "StatusDetail",         "DataType": "Text" },
+				{ "Column": "JoinSecretOverride",   "DataType": "String", "Size": "128" },
+				{ "Column": "SkipJoinSecret",       "DataType": "Boolean" },
+				{ "Column": "CreateDate",           "DataType": "DateTime" },
+				{ "Column": "UpdateDate",           "DataType": "DateTime" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "Beacon",
+				"DefaultIdentifier": "IDBeacon",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDBeacon",             "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "Name",                 "Type": "String",       "Size": "200" },
+					{ "Column": "BeaconType",           "Type": "String",       "Size": "64", "Indexed": true },
+					{ "Column": "Port",                 "Type": "Integer",      "Size": "int" },
+					{ "Column": "PID",                  "Type": "Integer",      "Size": "int" },
+					{ "Column": "ContainerID",          "Type": "String",       "Size": "128" },
+					{ "Column": "ContainerName",        "Type": "String",       "Size": "200" },
+					{ "Column": "ImageTag",             "Type": "String",       "Size": "200" },
+					{ "Column": "ImageVersion",         "Type": "String",       "Size": "64" },
+					{ "Column": "Runtime",              "Type": "String",       "Size": "32" },
+					{ "Column": "BuildSource",          "Type": "String",       "Size": "32" },
+					{ "Column": "IDUltravisorInstance", "Type": "ForeignKey",   "Size": "int", "Indexed": true },
+					{ "Column": "ConfigPath",           "Type": "String",       "Size": "512" },
+					{ "Column": "ConfigJSON",           "Type": "Text",         "Size": "Default" },
+					{ "Column": "Status",               "Type": "String",       "Size": "32" },
+					{ "Column": "StatusDetail",         "Type": "Text",         "Size": "Default" },
+					{ "Column": "JoinSecretOverride",   "Type": "String",       "Size": "128" },
+					{ "Column": "SkipJoinSecret",       "Type": "Boolean",      "Size": "Default" },
+					{ "Column": "CreateDate",           "Type": "CreateDate",   "Size": "Default" },
+					{ "Column": "UpdateDate",           "Type": "UpdateDate",   "Size": "Default" }
+				],
+				"DefaultObject":
+				{
+					"IDBeacon": 0, "Name": "", "BeaconType": "", "Port": 0, "PID": 0,
+					"ContainerID": "", "ContainerName": "", "ImageTag": "", "ImageVersion": "",
+					"Runtime": "process", "BuildSource": "npm",
+					"IDUltravisorInstance": 0,
+					"ConfigPath": "", "ConfigJSON": "{}",
+					"Status": "pending", "StatusDetail": "",
+					"JoinSecretOverride": "", "SkipJoinSecret": false,
+					"CreateDate": null, "UpdateDate": null
+				}
+			}
+		},
+
+		"FactoInstance":
+		{
+			"TableName": "FactoInstance",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDFactoInstance", "DataType": "ID" },
+				{ "Column": "Name",            "DataType": "String", "Size": "200" },
+				{ "Column": "Port",            "DataType": "Numeric", "Size": "int" },
+				{ "Column": "PID",             "DataType": "Numeric", "Size": "int" },
+				{ "Column": "IDDatabase",      "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "Status",          "DataType": "String", "Size": "32" },
+				{ "Column": "StatusDetail",    "DataType": "Text" },
+				{ "Column": "CreateDate",      "DataType": "DateTime" },
+				{ "Column": "UpdateDate",      "DataType": "DateTime" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "FactoInstance",
+				"DefaultIdentifier": "IDFactoInstance",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDFactoInstance", "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "Name",            "Type": "String",       "Size": "200" },
+					{ "Column": "Port",            "Type": "Integer",      "Size": "int" },
+					{ "Column": "PID",             "Type": "Integer",      "Size": "int" },
+					{ "Column": "IDDatabase",      "Type": "ForeignKey",   "Size": "int" },
+					{ "Column": "Status",          "Type": "String",       "Size": "32" },
+					{ "Column": "StatusDetail",    "Type": "Text",         "Size": "Default" },
+					{ "Column": "CreateDate",      "Type": "CreateDate",   "Size": "Default" },
+					{ "Column": "UpdateDate",      "Type": "UpdateDate",   "Size": "Default" }
+				],
+				"DefaultObject":
+				{
+					"IDFactoInstance": 0, "Name": "", "Port": 0, "PID": 0,
+					"IDDatabase": 0,
+					"Status": "pending", "StatusDetail": "",
+					"CreateDate": null, "UpdateDate": null
+				}
+			}
+		},
+
+		"IngestionJob":
+		{
+			"TableName": "IngestionJob",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDIngestionJob",  "DataType": "ID" },
+				{ "Column": "IDFactoInstance", "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "DatasetName",     "DataType": "String", "Size": "200" },
+				{ "Column": "Status",          "DataType": "String", "Size": "32" },
+				{ "Column": "ParsedCount",     "DataType": "Numeric", "Size": "int" },
+				{ "Column": "LoadedCount",     "DataType": "Numeric", "Size": "int" },
+				{ "Column": "VerifiedCount",   "DataType": "Numeric", "Size": "int" },
+				{ "Column": "ErrorMessage",    "DataType": "Text" },
+				{ "Column": "OperationHash",   "DataType": "String", "Size": "128" },
+				{ "Column": "RunHash",         "DataType": "String", "Size": "128" },
+				{ "Column": "StartedAt",       "DataType": "String", "Size": "50" },
+				{ "Column": "CompletedAt",     "DataType": "String", "Size": "50" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "IngestionJob",
+				"DefaultIdentifier": "IDIngestionJob",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDIngestionJob",  "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "IDFactoInstance", "Type": "ForeignKey",   "Size": "int", "Indexed": true },
+					{ "Column": "DatasetName",     "Type": "String",       "Size": "200" },
+					{ "Column": "Status",          "Type": "String",       "Size": "32" },
+					{ "Column": "ParsedCount",     "Type": "Integer",      "Size": "int" },
+					{ "Column": "LoadedCount",     "Type": "Integer",      "Size": "int" },
+					{ "Column": "VerifiedCount",   "Type": "Integer",      "Size": "int" },
+					{ "Column": "ErrorMessage",    "Type": "Text",         "Size": "Default" },
+					{ "Column": "OperationHash",   "Type": "String",       "Size": "128" },
+					{ "Column": "RunHash",         "Type": "String",       "Size": "128" },
+					{ "Column": "StartedAt",       "Type": "String",       "Size": "50" },
+					{ "Column": "CompletedAt",     "Type": "String",       "Size": "50" }
+				],
+				"DefaultObject":
+				{
+					"IDIngestionJob": 0, "IDFactoInstance": 0,
+					"DatasetName": "", "Status": "pending",
+					"ParsedCount": 0, "LoadedCount": 0, "VerifiedCount": 0,
+					"ErrorMessage": "", "OperationHash": "", "RunHash": "",
+					"StartedAt": "", "CompletedAt": ""
+				}
+			}
+		},
+
+		"InfrastructureEvent":
+		{
+			"TableName": "InfrastructureEvent",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDInfrastructureEvent", "DataType": "ID" },
+				{ "Column": "EntityType",            "DataType": "String", "Size": "64" },
+				{ "Column": "EntityID",              "DataType": "Numeric", "Size": "int" },
+				{ "Column": "EntityName",            "DataType": "String", "Size": "200" },
+				{ "Column": "EventType",             "DataType": "String", "Size": "64" },
+				{ "Column": "Severity",              "DataType": "String", "Size": "16" },
+				{ "Column": "Message",               "DataType": "Text" },
+				{ "Column": "Detail",                "DataType": "Text" },
+				{ "Column": "Timestamp",             "DataType": "DateTime" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "InfrastructureEvent",
+				"DefaultIdentifier": "IDInfrastructureEvent",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDInfrastructureEvent", "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "EntityType",            "Type": "String",       "Size": "64", "Indexed": true },
+					{ "Column": "EntityID",              "Type": "Integer",      "Size": "int", "Indexed": true },
+					{ "Column": "EntityName",            "Type": "String",       "Size": "200" },
+					{ "Column": "EventType",             "Type": "String",       "Size": "64" },
+					{ "Column": "Severity",              "Type": "String",       "Size": "16" },
+					{ "Column": "Message",               "Type": "Text",         "Size": "Default" },
+					{ "Column": "Detail",                "Type": "Text",         "Size": "Default" },
+					{ "Column": "Timestamp",             "Type": "CreateDate",   "Size": "Default", "Indexed": true }
+				],
+				"DefaultObject":
+				{
+					"IDInfrastructureEvent": 0,
+					"EntityType": "System", "EntityID": 0, "EntityName": "",
+					"EventType": "info", "Severity": "info",
+					"Message": "", "Detail": "",
+					"Timestamp": null
+				}
+			}
+		}
+	},
+
+	"TablesSequence":
+	[
+		"DBEngine",
+		"Database",
+		"UltravisorInstance",
+		"Beacon",
+		"FactoInstance",
+		"IngestionJob",
+		"InfrastructureEvent"
+	]
+}
