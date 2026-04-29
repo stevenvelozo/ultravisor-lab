@@ -36,7 +36,7 @@
 		"meadow": "^2.0.37",
 		"meadow-connection-sqlite": "^1.0.18",
 		"meadow-endpoints": "^4.0.17",
-		"meadow-integration": "^1.0.36",
+		"meadow-integration": "^1.0.37",
 		"meadow-migrationmanager": "^0.0.13",
 		"orator": "^6.1.0",
 		"orator-conversion": "^1.0.11",
@@ -47,7 +47,7 @@
 		"pict-section-modal": "^0.0.5",
 		"pict-view": "^1.0.68",
 		"retold-databeacon": "^0.0.14",
-		"ultravisor": "^1.0.28",
+		"ultravisor": "^1.0.29",
 		"ultravisor-beacon": "^0.0.13"
 	},
 	"devDependencies": {

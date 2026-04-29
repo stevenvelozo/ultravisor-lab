@@ -631,9 +631,6 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 
 		if (tmpBeacon.Runtime === 'container')
 		{
-			// If we already have a container id, just `docker start` it.
-			// Otherwise (e.g. first boot after a container was removed out
-			// from under us) re-create the container from the type descriptor.
 			let fReady = () =>
 			{
 				this._waitForHttp(tmpBeacon.Port, tmpType.HealthCheck && tmpType.HealthCheck.Path, 0,
@@ -651,6 +648,55 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 					});
 			};
 
+			// Build a fresh container from the type descriptor. Used either
+			// when the row has no ContainerID yet, or when the stored
+			// ContainerID points at a container that's been removed
+			// out-of-band (manual cleanup, lab DB carried across machines,
+			// etc.). Idempotent: meadow's image-existence check skips the
+			// build when the tag is already cached.
+			let fEnsureFresh = () =>
+			{
+				try
+				{
+					let tmpConfig = {};
+					try { tmpConfig = JSON.parse(tmpBeacon.ConfigJSON || '{}'); } catch (pCEx) { /* ignore */ }
+					let tmpRendered = this._renderConfig(tmpType, tmpConfig, pID, tmpBeacon.Name, tmpBeacon.Port, tmpInstance);
+					let tmpCfgPath = tmpBeacon.ConfigPath || libPath.join(this._beaconDir(pID), 'config.json');
+					libFs.mkdirSync(this._beaconDir(pID), { recursive: true });
+					libFs.writeFileSync(tmpCfgPath, JSON.stringify(tmpRendered, null, 2));
+					if (tmpBeacon.ConfigPath !== tmpCfgPath)
+					{
+						this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID, { ConfigPath: tmpCfgPath });
+					}
+				}
+				catch (pRenderErr)
+				{
+					this._markFailed(pID, tmpBeacon.Name, `config render failed: ${pRenderErr.message}`);
+					return fCallback(pRenderErr);
+				}
+
+				let fProgress = this._buildContainerProgressEmitter(
+					{ IDBeacon: pID, Name: tmpBeacon.Name, TypeDisplayName: tmpType.DisplayName });
+
+				this.fable.LabBeaconContainerManager.create(tmpType, tmpBeacon,
+					(pErr, pResult) =>
+					{
+						if (pErr) { this._markFailed(pID, tmpBeacon.Name, pErr.message); return fCallback(pErr); }
+						this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID,
+							{
+								ContainerID:   pResult.ContainerID,
+								ContainerName: pResult.ContainerName,
+								ImageTag:      pResult.ImageTag,
+								ImageVersion:  pResult.ImageVersion,
+								BuildSource:   pResult.BuildSource || tmpBeacon.BuildSource || 'npm',
+								StatusDetail:  'Waiting for HTTP readiness...'
+							});
+						fReady();
+						return fCallback(null, { Status: 'starting' });
+					},
+					fProgress);
+			};
+
 			this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID,
 				{ Status: 'starting', StatusDetail: 'Starting container...' });
 
@@ -661,6 +707,14 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 					{
 						if (pErr)
 						{
+							// "No such container" → fall through to recreate.
+							// Other failures (port conflict, etc.) still bubble.
+							let tmpMsg = (pErr.message || '').toLowerCase();
+							if (tmpMsg.indexOf('no such container') >= 0)
+							{
+								this.log.info(`startBeacon: stored container for beacon ${pID} is gone; recreating from image.`);
+								return fEnsureFresh();
+							}
 							this._markFailed(pID, tmpBeacon.Name, pErr.message);
 							return fCallback(pErr);
 						}
@@ -669,49 +723,7 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 					});
 			}
 
-			// Re-render config.json before (re-)creating the container.
-			// Stanza tweaks (port mappings, mount paths, etc.) only reach
-			// the running process through the rendered file, so any config
-			// older than the current type descriptor gets refreshed here.
-			try
-			{
-				let tmpConfig = {};
-				try { tmpConfig = JSON.parse(tmpBeacon.ConfigJSON || '{}'); } catch (pCEx) { /* ignore */ }
-				let tmpRendered = this._renderConfig(tmpType, tmpConfig, pID, tmpBeacon.Name, tmpBeacon.Port, tmpInstance);
-				let tmpCfgPath = tmpBeacon.ConfigPath || libPath.join(this._beaconDir(pID), 'config.json');
-				libFs.mkdirSync(this._beaconDir(pID), { recursive: true });
-				libFs.writeFileSync(tmpCfgPath, JSON.stringify(tmpRendered, null, 2));
-				if (tmpBeacon.ConfigPath !== tmpCfgPath)
-				{
-					this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID, { ConfigPath: tmpCfgPath });
-				}
-			}
-			catch (pRenderErr)
-			{
-				this._markFailed(pID, tmpBeacon.Name, `config render failed: ${pRenderErr.message}`);
-				return fCallback(pRenderErr);
-			}
-
-			let fProgress = this._buildContainerProgressEmitter(
-				{ IDBeacon: pID, Name: tmpBeacon.Name, TypeDisplayName: tmpType.DisplayName });
-
-			return this.fable.LabBeaconContainerManager.create(tmpType, tmpBeacon,
-				(pErr, pResult) =>
-				{
-					if (pErr) { this._markFailed(pID, tmpBeacon.Name, pErr.message); return fCallback(pErr); }
-					this.fable.LabStateStore.update('Beacon', 'IDBeacon', pID,
-						{
-							ContainerID:   pResult.ContainerID,
-							ContainerName: pResult.ContainerName,
-							ImageTag:      pResult.ImageTag,
-							ImageVersion:  pResult.ImageVersion,
-							BuildSource:   pResult.BuildSource || tmpBeacon.BuildSource || 'npm',
-							StatusDetail:  'Waiting for HTTP readiness...'
-						});
-					fReady();
-					return fCallback(null, { Status: 'starting' });
-				},
-				fProgress);
+			return fEnsureFresh();
 		}
 
 		// Host-process path ( existing behavior; unchanged ).

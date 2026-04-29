@@ -460,32 +460,55 @@ class ServiceUltravisorManager extends libFableServiceProviderBase
 					});
 			};
 
+			let fEnsureFresh = () =>
+			{
+				this._ensureContainer(pID, tmpInstance.Name, tmpInstance.Port,
+					(pErr, pResult) =>
+					{
+						if (pErr) { this._markFailed(pID, tmpInstance.Name, pErr.message); return fCallback(pErr); }
+						this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
+							{
+								ContainerID:   pResult.ContainerID,
+								ContainerName: pResult.ContainerName,
+								ImageTag:      pResult.ImageTag,
+								ImageVersion:  pResult.ImageVersion,
+								StatusDetail:  'Waiting for Ultravisor API...'
+							});
+						fReady();
+						return fCallback(null, { Status: 'starting' });
+					});
+			};
+
 			if (tmpInstance.ContainerID)
 			{
 				return this.fable.LabDockerManager.start(tmpInstance.ContainerID,
 					(pErr) =>
 					{
-						if (pErr) { this._markFailed(pID, tmpInstance.Name, pErr.message); return fCallback(pErr); }
+						if (pErr)
+						{
+							// "No such container" means the container was
+							// removed out-of-band (lab restart with `docker
+							// rm` in between, manual cleanup, etc.). Fall
+							// through to ensureContainer which builds a fresh
+							// image + container — the row's stored
+							// ContainerID gets refreshed in the resulting
+							// state-store update. Any other failure (e.g.
+							// port already in use) still bubbles up.
+							let tmpMsg = (pErr.message || '').toLowerCase();
+							if (tmpMsg.indexOf('no such container') >= 0)
+							{
+								this.log.info(`startInstance: stored container for UV ${pID} is gone; recreating from image.`);
+								return fEnsureFresh();
+							}
+							this._markFailed(pID, tmpInstance.Name, pErr.message);
+							return fCallback(pErr);
+						}
 						fReady();
 						return fCallback(null, { Status: 'starting' });
 					});
 			}
 
-			return this._ensureContainer(pID, tmpInstance.Name, tmpInstance.Port,
-				(pErr, pResult) =>
-				{
-					if (pErr) { this._markFailed(pID, tmpInstance.Name, pErr.message); return fCallback(pErr); }
-					this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
-						{
-							ContainerID:   pResult.ContainerID,
-							ContainerName: pResult.ContainerName,
-							ImageTag:      pResult.ImageTag,
-							ImageVersion:  pResult.ImageVersion,
-							StatusDetail:  'Waiting for Ultravisor API...'
-						});
-					fReady();
-					return fCallback(null, { Status: 'starting' });
-				});
+			return fEnsureFresh();
 		}
 
 		// Host-process fallback kept for pre-migration rows.  Should never

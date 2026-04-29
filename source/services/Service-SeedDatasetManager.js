@@ -532,7 +532,7 @@ class ServiceSeedDatasetManager extends libFableServiceProviderBase
 				// routes aren't registered, and BulkInsertViaBeacon's POSTs
 				// get 404s (InsertedCount stays at 0).
 				this._ensureBeaconConnection(pBeacon, pEngine, pDatabase,
-					(pConnErr) =>
+					(pConnErr, pConnID) =>
 					{
 						if (pConnErr)
 						{
@@ -546,7 +546,16 @@ class ServiceSeedDatasetManager extends libFableServiceProviderBase
 									Message: `Beacon connection wiring failed: ${pConnErr.message}`
 								});
 						}
-						this._introspectAndEnable(pBeacon, tmpEntities, fCallback);
+						// Forward the resolved connection ID into
+						// _introspectAndEnable so it doesn't have to guess
+						// which connection on the databeacon owns our tables.
+						// (Older code grabbed the first connection in the
+						// list, which silently targeted whatever was created
+						// first — usually the databeacon's internal SQLite
+						// or a previous seed run — so endpoints for the
+						// real seed target never registered, and
+						// BulkInsertViaBeacon's POSTs 404'd into the void.)
+						this._introspectAndEnable(pBeacon, pConnID || 0, tmpEntities, pJobID, fCallback);
 					});
 			});
 	}
@@ -685,40 +694,79 @@ class ServiceSeedDatasetManager extends libFableServiceProviderBase
 		}
 	}
 
-	_introspectAndEnable(pBeacon, pEntities, fCallback)
+	_introspectAndEnable(pBeacon, pConnID, pEntities, pJobID, fCallback)
 	{
-		// List existing connections, pick ours (by name match), then enable
-		// endpoints for the entities we care about.
-		this._beaconGet(pBeacon.Port, '/beacon/connections', (pListErr, pBody) =>
-			{
-				if (pListErr) { return fCallback(null); }  // non-fatal; operation may still work
-
-				let tmpConnID = 0;
-				try
+		let tmpStore = this.fable.LabStateStore;
+		// pConnID was resolved by _ensureBeaconConnection — that's the only
+		// connection we want to introspect + register endpoints for. If it's
+		// 0 we have nothing to act on; bail early instead of grabbing a
+		// neighbouring connection that doesn't own our seed tables.
+		if (!pConnID)
+		{
+			tmpStore.recordEvent(
 				{
-					let tmpParsed = JSON.parse(pBody);
-					let tmpConns = tmpParsed.Connections || [];
-					if (tmpConns.length > 0) { tmpConnID = tmpConns[0].IDBeaconConnection; }
-				}
-				catch (pEx) { /* ignore */ }
+					EntityType: 'IngestionJob', EntityID: pJobID,
+					EventType: 'seed-introspect-skipped', Severity: 'warning',
+					Message: 'Beacon connection ID not resolved; skipping introspect+enable. BulkInsertViaBeacon will likely return 0 rows.'
+				});
+			return fCallback(null);
+		}
 
-				if (!tmpConnID) { return fCallback(null); }
-
-				// Re-introspect so the new tables are visible to the beacon.
-				this._beaconPost(pBeacon.Port, `/beacon/connection/${tmpConnID}/introspect`, '{}', () =>
-					{
-						let tmpIdx = 0;
-						let tmpEnableNext = () =>
+		// Re-introspect so the new tables are visible to the beacon.
+		this._beaconPost(pBeacon.Port, `/beacon/connection/${pConnID}/introspect`, '{}', (pIntroErr, pIntroBody) =>
+			{
+				if (pIntroErr)
+				{
+					tmpStore.recordEvent(
 						{
-							if (tmpIdx >= pEntities.length) { return fCallback(null); }
-							let tmpEntity = pEntities[tmpIdx++];
-							this._beaconPost(pBeacon.Port,
-								`/beacon/endpoint/${tmpConnID}/${tmpEntity.Name}/enable`,
-								'{}',
-								() => setImmediate(tmpEnableNext));
-						};
-						tmpEnableNext();
-					});
+							EntityType: 'IngestionJob', EntityID: pJobID,
+							EventType: 'seed-introspect-failed', Severity: 'warning',
+							Message: `Introspect failed: ${pIntroErr.message}`
+						});
+					// Don't bail; some endpoints may still wire up via
+					// previously-cached IntrospectedTable rows.
+				}
+				let tmpIdx = 0;
+				let tmpFailures = [];
+				let tmpEnableNext = () =>
+				{
+					if (tmpIdx >= pEntities.length)
+					{
+						if (tmpFailures.length > 0)
+						{
+							tmpStore.recordEvent(
+								{
+									EntityType: 'IngestionJob', EntityID: pJobID,
+									EventType: 'seed-endpoint-enable-failed', Severity: 'warning',
+									Message: `Endpoint enable failed for: ${tmpFailures.join(', ')}`
+								});
+						}
+						return fCallback(null);
+					}
+					let tmpEntity = pEntities[tmpIdx++];
+					this._beaconPost(pBeacon.Port,
+						`/beacon/endpoint/${pConnID}/${tmpEntity.Name}/enable`,
+						'{}',
+						(pErr, pBody) =>
+						{
+							// retold-databeacon returns {Success: true} or
+							// {Error: "..."} — surface the failure case so the
+							// silent-404 class of bug is visible in events.
+							let tmpFailed = !!pErr;
+							if (!tmpFailed && typeof pBody === 'string')
+							{
+								try
+								{
+									let tmpParsed = JSON.parse(pBody);
+									if (tmpParsed && tmpParsed.Error) { tmpFailed = true; }
+								}
+								catch (pEx) { /* ignore — non-JSON success bodies are fine */ }
+							}
+							if (tmpFailed) { tmpFailures.push(tmpEntity.Name); }
+							setImmediate(tmpEnableNext);
+						});
+				};
+				tmpEnableNext();
 			});
 	}
 
