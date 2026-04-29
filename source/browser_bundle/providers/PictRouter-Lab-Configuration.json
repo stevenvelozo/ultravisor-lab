@@ -11,6 +11,7 @@
 		{ "path": "/view/ultravisor",     "template": "{~LV:Pict.PictApplication.setActiveView(`Ultravisor`)~}" },
 		{ "path": "/view/beacons",        "template": "{~LV:Pict.PictApplication.setActiveView(`Beacons`)~}" },
 		{ "path": "/view/seeddatasets",   "template": "{~LV:Pict.PictApplication.setActiveView(`SeedDatasets`)~}" },
+		{ "path": "/view/queuelab",       "template": "{~LV:Pict.PictApplication.setActiveView(`QueueLab`)~}" },
 		{ "path": "/view/events",         "template": "{~LV:Pict.PictApplication.setActiveView(`Events`)~}" },
 
 		{ "path": "/system/reconcile",    "template": "{~LV:Pict.PictApplication.triggerReconcile()~}" },
@@ -51,6 +52,9 @@
 		{ "path": "/beacons/:id/logs/refresh","template": "{~LV:Pict.PictApplication.refreshBeaconLogs(Record.data.id)~}" },
 
 		{ "path": "/seeds/:hash/run",           "template": "{~LV:Pict.PictApplication.runSeedDataset(Record.data.hash)~}" },
-		{ "path": "/seeds/:hash/seed-to-engine","template": "{~LV:Pict.PictApplication.seedDatasetToEngine(Record.data.hash)~}" }
+		{ "path": "/seeds/:hash/seed-to-engine","template": "{~LV:Pict.PictApplication.seedDatasetToEngine(Record.data.hash)~}" },
+
+		{ "path": "/queuelab/:hash/run",        "template": "{~LV:Pict.PictApplication.runQueueScenario(Record.data.hash)~}" },
+		{ "path": "/queuelab/runs/:id/cancel",  "template": "{~LV:Pict.PictApplication.cancelQueueScenarioRun(Record.data.id)~}" }
 	]
 }

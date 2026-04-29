@@ -220,6 +220,53 @@ class LabApiProvider extends libFableServiceProviderBase
 	}
 
 	listIngestionJobs(fCallback) { return _request('GET', '/api/lab/ingestion-jobs', null, fCallback); }
+
+	// ── Queue scenarios (harness) ───────────────────────────────────────────
+
+	listQueueScenarios(fCallback)
+	{
+		return _request('GET', '/api/lab/queue-scenarios', null, fCallback);
+	}
+
+	getQueueScenario(pHash, fCallback)
+	{
+		return _request('GET', '/api/lab/queue-scenarios/' + encodeURIComponent(pHash), null, fCallback);
+	}
+
+	runQueueScenario(pHash, pBody, fCallback)
+	{
+		return _request('POST', '/api/lab/queue-scenarios/' + encodeURIComponent(pHash) + '/run', pBody, fCallback);
+	}
+
+	listQueueScenarioRuns(fCallback)
+	{
+		return _request('GET', '/api/lab/queue-scenario-runs', null, fCallback);
+	}
+
+	getQueueScenarioRun(pID, fCallback)
+	{
+		return _request('GET', '/api/lab/queue-scenario-runs/' + pID, null, fCallback);
+	}
+
+	getQueueScenarioRunEvents(pID, pPaging, fCallback)
+	{
+		let tmpPath = '/api/lab/queue-scenario-runs/' + pID + '/events';
+		let tmpQS = [];
+		if (pPaging && Number.isFinite(pPaging.offset)) { tmpQS.push('offset=' + pPaging.offset); }
+		if (pPaging && Number.isFinite(pPaging.limit))  { tmpQS.push('limit=' + pPaging.limit); }
+		if (tmpQS.length) { tmpPath += '?' + tmpQS.join('&'); }
+		return _request('GET', tmpPath, null, fCallback);
+	}
+
+	cancelQueueScenarioRun(pID, fCallback)
+	{
+		return _request('POST', '/api/lab/queue-scenario-runs/' + pID + '/cancel', {}, fCallback);
+	}
+
+	getQueueSnapshot(pUvID, fCallback)
+	{
+		return _request('GET', '/api/lab/ultravisor-instances/' + pUvID + '/queue-snapshot', null, fCallback);
+	}
 }
 
 module.exports = LabApiProvider;

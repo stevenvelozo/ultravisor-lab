@@ -34,25 +34,25 @@
 		"fable": "^3.1.71",
 		"fable-serviceproviderbase": "^3.0.19",
 		"meadow": "^2.0.37",
-		"meadow-connection-sqlite": "^1.0.18",
+		"meadow-connection-sqlite": "^1.0.19",
 		"meadow-endpoints": "^4.0.17",
-		"meadow-integration": "^1.0.37",
-		"meadow-migrationmanager": "^0.0.13",
-		"orator": "^6.1.0",
-		"orator-conversion": "^1.0.11",
+		"meadow-integration": "^1.0.38",
+		"meadow-migrationmanager": "^0.0.14",
+		"orator": "^6.1.1",
+		"orator-conversion": "^1.0.12",
 		"orator-serviceserver-restify": "^2.0.10",
 		"pict": "^1.0.365",
 		"pict-application": "^1.0.33",
 		"pict-router": "^1.0.9",
 		"pict-section-modal": "^0.0.5",
 		"pict-view": "^1.0.68",
-		"retold-databeacon": "^0.0.14",
+		"retold-databeacon": "^0.0.15",
 		"ultravisor": "^1.0.29",
 		"ultravisor-beacon": "^0.0.13"
 	},
 	"devDependencies": {
 		"gulp": "^4.0.2",
-		"quackage": "^1.1.2"
+		"quackage": "^1.1.3"
 	},
 	"license": "MIT",
 	"author": "Steven Velozo <steven@velozo.com>"

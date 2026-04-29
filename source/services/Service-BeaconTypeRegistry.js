@@ -34,11 +34,18 @@
  *     }
  *   }
  *
- * There are no lab-local overrides: every beacon type (standalone-service
- * or capability-provider) is a published npm package whose own stanza
- * drives discovery, Dockerfile selection, and image tagging.  Add a new
- * beacon type by (1) publishing its module with a retoldBeacon stanza and
- * (2) listing its name in SCANNED_MODULES.
+ * The general rule is: every beacon type (standalone-service or
+ * capability-provider) is a published npm package whose own stanza drives
+ * discovery, Dockerfile selection, and image tagging.  Add a new beacon
+ * type by (1) publishing its module with a retoldBeacon stanza and (2)
+ * listing its name in SCANNED_MODULES.
+ *
+ * Narrow carve-out: the queue-testing harness's synthetic worker beacon
+ * lives inside this lab repo (no separate npm package) because it has no
+ * use outside the harness.  Its descriptor is hand-built in
+ * LAB_LOCAL_BEACON_TYPES below and merged into _scan()'s output.  This
+ * is a deliberate exception, not a precedent — anything that ships
+ * outside the harness should still go through the package-stanza path.
  */
 'use strict';
 
@@ -48,10 +55,11 @@ const libFableServiceProviderBase = require('fable-serviceproviderbase');
 
 // Modules scanned for a retoldBeacon stanza.  Absence is fine; the module
 // just won't contribute a beacon type.  Order here decides UI picker order.
-// Every containerized beacon type -- standalone-service or capability-
-// provider -- lives in its own published npm package with a retoldBeacon
-// stanza.  No lab-local shims: the lab finds providers the same way it
-// finds bins, via the package's own stanza.
+// Most containerized beacon types -- standalone-service or capability-
+// provider -- live in their own published npm package with a retoldBeacon
+// stanza.  The lab finds providers the same way it finds bins, via the
+// package's own stanza.  See LAB_LOCAL_BEACON_TYPES for the harness-only
+// exception.
 const SCANNED_MODULES =
 [
 	'retold-databeacon',
@@ -63,6 +71,72 @@ const SCANNED_MODULES =
 	'ultravisor-auth-beacon',
 	'ultravisor-queue-beacon',
 	'ultravisor-manifest-beacon'
+];
+
+// Lab-bundled beacon types that don't live in their own npm package.
+// Reserved for harness-only beacons that have no use outside this lab.
+// Each entry is a fully-baked descriptor in the same shape that
+// _loadFromPackage produces, so _scan() can merge it without special-casing
+// downstream consumers.  Source: 'lab-local' lets consumers distinguish
+// when they need to.  For now the only entry is the queue-testing
+// synthetic worker beacon under source/synthetic-beacon/.
+const LAB_LOCAL_PACKAGE_ROOT = libPath.resolve(__dirname, '..', '..');
+
+const LAB_LOCAL_BEACON_TYPES =
+[
+	{
+		BeaconType:         'lab-synthetic-beacon',
+		DisplayName:        'Lab Synthetic Beacon (harness)',
+		Description:        'Configurable sleep-N-ms beacon for queue-harness scenarios.  Lives inside ultravisor-lab; not for production deployment.',
+		Category:           'test-harness',
+		Mode:               'standalone-service',
+		PackageRoot:        LAB_LOCAL_PACKAGE_ROOT,
+		PackageName:        'ultravisor-lab',
+		PackageVersion:     'lab-local',
+		DefaultPort:        0,
+		RequiresUltravisor: true,
+		HealthCheck:        null,
+		ConfigForm:
+		{
+			Fields:
+			[
+				{ Name: 'Capability',        Hash: 'Capability',        DataType: 'String',  Default: 'SyntheticDataIntegration', Description: 'Capability name advertised by this beacon.' },
+				{ Name: 'Actions',           Hash: 'Actions',           DataType: 'String',  Default: 'Process',                  Description: 'Comma-separated list of action names.' },
+				{ Name: 'MaxConcurrent',     Hash: 'MaxConcurrent',     DataType: 'Number',  Default: 1,                          Description: 'Per-beacon concurrency limit.' },
+				{ Name: 'DefaultDurationMs', Hash: 'DefaultDurationMs', DataType: 'Number',  Default: 2000,                       Description: 'Default sleep duration per work item, in ms.' }
+			]
+		},
+		ConfigTemplate:  null,
+		BinPath:         libPath.resolve(__dirname, '..', 'synthetic-beacon', 'bin', 'synthetic-beacon-runner.js'),
+		ArgTemplate:
+		[
+			'--ultravisor',          { fromLabPath: 'UltravisorURL' },
+			'--name',                { fromLabPath: 'BeaconName' },
+			'--join-secret',         { fromLabPath: 'JoinSecret' },
+			'--capability',          { fromLabPath: 'Capability' },
+			'--actions',             { fromLabPath: 'Actions' },
+			'--max-concurrent',      { fromLabPath: 'MaxConcurrent' },
+			'--default-duration-ms', { fromLabPath: 'DefaultDurationMs' }
+		],
+		Docker:
+		{
+			Image:            'lab-synthetic-beacon',
+			Version:          'lab-local',
+			Dockerfile:       'docker/synthetic-beacon/Dockerfile',
+			DataMountPath:    '/app/data',
+			ConfigMountPath:  '/app/data/config.json',
+			ContentMountPath: '/app/content',
+			ExposedPort:      0,
+			HostPackage:      'retold-beacon-host',
+			HostVersion:      '',
+			ExtraMounts:      [],
+			ConfigMounts:     []
+		},
+		Source:           'lab-local',
+		Deprecated:       false,
+		DeprecationNote:  '',
+		IsLabLocal:       true
+	}
 ];
 
 // Beacon types that are marked deprecated in the lab UI. They still
@@ -127,6 +201,16 @@ class ServiceBeaconTypeRegistry extends libFableServiceProviderBase
 			let tmpName = SCANNED_MODULES[j];
 			let tmpEntry = this._loadFromPackage(tmpName);
 			if (tmpEntry) { tmpMap.set(tmpEntry.BeaconType, tmpEntry); }
+		}
+
+		// Merge lab-local descriptors (harness-only carve-out).  Package
+		// scans win on collision so a future published equivalent can
+		// supersede the lab-local entry without code changes.
+		for (let k = 0; k < LAB_LOCAL_BEACON_TYPES.length; k++)
+		{
+			let tmpLocal = LAB_LOCAL_BEACON_TYPES[k];
+			if (tmpMap.has(tmpLocal.BeaconType)) { continue; }
+			tmpMap.set(tmpLocal.BeaconType, tmpLocal);
 		}
 
 		this.fable.log.info(`BeaconTypeRegistry: ${tmpMap.size} beacon type(s) registered`);

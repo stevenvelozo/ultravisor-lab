@@ -1,0 +1,52 @@
+{
+	"Hash": "qs-mixed-three-capability",
+	"Name": "Mixed three-capability drain",
+	"Description": "Three synthetic capabilities (data integration, video transcode, file transfer) each backed by a dedicated beacon.  Workload is interleaved so all three capabilities have items pending across the same wall-clock window.  All three should run in parallel; if a capability never observes concurrency or BlockingWindows fire, the scheduler is over-serializing across capabilities.",
+	"Targets": {},
+	"Beacons":
+	[
+		{
+			"Name": "syn-di-mtc",
+			"Capability": "DataIntegration",
+			"Actions": ["Process"],
+			"MaxConcurrent": 1,
+			"DefaultDurationMs": 2000,
+			"RunMode": "child-process"
+		},
+		{
+			"Name": "syn-vid-mtc",
+			"Capability": "VideoTranscode",
+			"Actions": ["Encode"],
+			"MaxConcurrent": 1,
+			"DefaultDurationMs": 2000,
+			"RunMode": "child-process"
+		},
+		{
+			"Name": "syn-file-mtc",
+			"Capability": "FileTransfer",
+			"Actions": ["Transfer"],
+			"MaxConcurrent": 1,
+			"DefaultDurationMs": 2000,
+			"RunMode": "child-process"
+		}
+	],
+	"Workload":
+	[
+		{ "Capability": "DataIntegration", "Action": "Process",  "Count": 8, "Settings": { "DurationMs": 2000 } },
+		{ "Capability": "VideoTranscode",  "Action": "Encode",   "Count": 8, "Settings": { "DurationMs": 2000 } },
+		{ "Capability": "FileTransfer",    "Action": "Transfer", "Count": 8, "Settings": { "DurationMs": 2000 } }
+	],
+	"Cadence": { "Strategy": "interleave", "EnqueueIntervalMs": 50 },
+	"Assertions":
+	{
+		"MaxDrainSeconds": 30,
+		"MaxFailedItems": 0,
+		"MinObservedConcurrencyByCapability":
+		{
+			"DataIntegration": 1,
+			"VideoTranscode":  1,
+			"FileTransfer":    1
+		},
+		"NoCrossCapabilityHeadOfLineBlocking": true
+	}
+}

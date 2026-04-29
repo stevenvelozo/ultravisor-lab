@@ -1,0 +1,28 @@
+{
+	"Hash": "qs-single-capability-burst",
+	"Name": "Single capability burst",
+	"Description": "Control case.  One beacon advertising one capability, burst-enqueue 10 work items, measure drain.  No mixed-capability blocking is possible by construction; this scenario establishes the baseline drain time and validates the harness wire path before more interesting scenarios run.",
+	"Targets": {},
+	"Beacons":
+	[
+		{
+			"Name": "syn-di-control",
+			"Capability": "DataIntegration",
+			"Actions": ["Process"],
+			"MaxConcurrent": 1,
+			"DefaultDurationMs": 1500,
+			"RunMode": "child-process"
+		}
+	],
+	"Workload":
+	[
+		{ "Capability": "DataIntegration", "Action": "Process", "Count": 10, "Settings": { "DurationMs": 1500 } }
+	],
+	"Cadence": { "Strategy": "burst" },
+	"Assertions":
+	{
+		"MaxDrainSeconds": 25,
+		"MaxFailedItems": 0,
+		"MinObservedConcurrencyByCapability": { "DataIntegration": 1 }
+	}
+}

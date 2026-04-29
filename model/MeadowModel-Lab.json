@@ -357,6 +357,108 @@
 					"Timestamp": null
 				}
 			}
+		},
+
+		"QueueScenarioRun":
+		{
+			"TableName": "QueueScenarioRun",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDQueueScenarioRun",   "DataType": "ID" },
+				{ "Column": "ScenarioHash",         "DataType": "String", "Size": "200" },
+				{ "Column": "ScenarioName",         "DataType": "String", "Size": "200" },
+				{ "Column": "IDUltravisorInstance", "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "Status",               "DataType": "String", "Size": "32" },
+				{ "Column": "StartedAt",            "DataType": "String", "Size": "50" },
+				{ "Column": "CompletedAt",          "DataType": "String", "Size": "50" },
+				{ "Column": "DrainMs",              "DataType": "Numeric", "Size": "int" },
+				{ "Column": "TotalEnqueued",        "DataType": "Numeric", "Size": "int" },
+				{ "Column": "TotalCompleted",       "DataType": "Numeric", "Size": "int" },
+				{ "Column": "TotalFailed",          "DataType": "Numeric", "Size": "int" },
+				{ "Column": "VerdictsJSON",         "DataType": "Text" },
+				{ "Column": "TimingJSON",           "DataType": "Text" },
+				{ "Column": "ErrorMessage",         "DataType": "Text" },
+				{ "Column": "CreateDate",           "DataType": "DateTime" },
+				{ "Column": "UpdateDate",           "DataType": "DateTime" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "QueueScenarioRun",
+				"DefaultIdentifier": "IDQueueScenarioRun",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDQueueScenarioRun",   "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "ScenarioHash",         "Type": "String",       "Size": "200", "Indexed": true },
+					{ "Column": "ScenarioName",         "Type": "String",       "Size": "200" },
+					{ "Column": "IDUltravisorInstance", "Type": "ForeignKey",   "Size": "int", "Indexed": true },
+					{ "Column": "Status",               "Type": "String",       "Size": "32", "Indexed": true },
+					{ "Column": "StartedAt",            "Type": "String",       "Size": "50" },
+					{ "Column": "CompletedAt",          "Type": "String",       "Size": "50" },
+					{ "Column": "DrainMs",              "Type": "Integer",      "Size": "int" },
+					{ "Column": "TotalEnqueued",        "Type": "Integer",      "Size": "int" },
+					{ "Column": "TotalCompleted",       "Type": "Integer",      "Size": "int" },
+					{ "Column": "TotalFailed",          "Type": "Integer",      "Size": "int" },
+					{ "Column": "VerdictsJSON",         "Type": "Text",         "Size": "Default" },
+					{ "Column": "TimingJSON",           "Type": "Text",         "Size": "Default" },
+					{ "Column": "ErrorMessage",         "Type": "Text",         "Size": "Default" },
+					{ "Column": "CreateDate",           "Type": "CreateDate",   "Size": "Default" },
+					{ "Column": "UpdateDate",           "Type": "UpdateDate",   "Size": "Default" }
+				],
+				"DefaultObject":
+				{
+					"IDQueueScenarioRun": 0, "ScenarioHash": "", "ScenarioName": "",
+					"IDUltravisorInstance": 0, "Status": "running",
+					"StartedAt": "", "CompletedAt": "",
+					"DrainMs": 0, "TotalEnqueued": 0, "TotalCompleted": 0, "TotalFailed": 0,
+					"VerdictsJSON": "", "TimingJSON": "", "ErrorMessage": "",
+					"CreateDate": null, "UpdateDate": null
+				}
+			}
+		},
+
+		"QueueScenarioEvent":
+		{
+			"TableName": "QueueScenarioEvent",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDQueueScenarioEvent", "DataType": "ID" },
+				{ "Column": "IDQueueScenarioRun",   "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "Topic",                "DataType": "String", "Size": "64" },
+				{ "Column": "EventGUID",            "DataType": "String", "Size": "64" },
+				{ "Column": "WorkItemHash",         "DataType": "String", "Size": "64" },
+				{ "Column": "Capability",           "DataType": "String", "Size": "64" },
+				{ "Column": "BeaconID",             "DataType": "String", "Size": "64" },
+				{ "Column": "EmittedAt",            "DataType": "String", "Size": "50" },
+				{ "Column": "PayloadJSON",          "DataType": "Text" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "QueueScenarioEvent",
+				"DefaultIdentifier": "IDQueueScenarioEvent",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDQueueScenarioEvent", "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "IDQueueScenarioRun",   "Type": "ForeignKey",   "Size": "int", "Indexed": true },
+					{ "Column": "Topic",                "Type": "String",       "Size": "64", "Indexed": true },
+					{ "Column": "EventGUID",            "Type": "String",       "Size": "64" },
+					{ "Column": "WorkItemHash",         "Type": "String",       "Size": "64", "Indexed": true },
+					{ "Column": "Capability",           "Type": "String",       "Size": "64" },
+					{ "Column": "BeaconID",             "Type": "String",       "Size": "64" },
+					{ "Column": "EmittedAt",            "Type": "String",       "Size": "50" },
+					{ "Column": "PayloadJSON",          "Type": "Text",         "Size": "Default" }
+				],
+				"DefaultObject":
+				{
+					"IDQueueScenarioEvent": 0, "IDQueueScenarioRun": 0,
+					"Topic": "", "EventGUID": "", "WorkItemHash": "",
+					"Capability": "", "BeaconID": "",
+					"EmittedAt": "", "PayloadJSON": ""
+				}
+			}
 		}
 	},
 
@@ -368,6 +470,8 @@
 		"Beacon",
 		"FactoInstance",
 		"IngestionJob",
-		"InfrastructureEvent"
+		"InfrastructureEvent",
+		"QueueScenarioRun",
+		"QueueScenarioEvent"
 	]
 }

@@ -275,7 +275,7 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 		// process to stabilize and mark it ready. A more rigorous check
 		// would query ultravisor's beacon list for our Name; that's
 		// follow-up work.
-		let tmpNeedsHTTP = pPort && pPort > 0;
+		let tmpNeedsHTTP = tmpPort && tmpPort > 0;
 		if (!tmpNeedsHTTP)
 		{
 			tmpStore.update('Beacon', 'IDBeacon', tmpID,
@@ -464,6 +464,44 @@ class ServiceBeaconManager extends libFableServiceProviderBase
 				UltravisorURL: pInstance ? `http://127.0.0.1:${pInstance.Port}` : '',
 				JoinSecret: tmpJoinSecret
 			};
+
+			// Pass-through for argTemplate.fromLabPath: merge any per-beacon
+			// ConfigJSON keys (operator-set fields from the configForm) into
+			// tmpCtx so type-specific argTemplates can reference them
+			// without lab core needing to know about each key.  Reserved
+			// keys above always win; arrays flatten to CSV so string-shaped
+			// flags work without per-bin parsing.  Parse failures are
+			// non-fatal -- the spawn proceeds with defaults.
+			let tmpReserved =
+				{ Port: 1, BeaconName: 1, ConfigPath: 1, UltravisorURL: 1, JoinSecret: 1 };
+			if (pBeaconRow && typeof pBeaconRow.ConfigJSON === 'string' && pBeaconRow.ConfigJSON.length > 0)
+			{
+				try
+				{
+					let tmpConfig = JSON.parse(pBeaconRow.ConfigJSON);
+					if (tmpConfig && typeof tmpConfig === 'object')
+					{
+						let tmpKeys = Object.keys(tmpConfig);
+						for (let i = 0; i < tmpKeys.length; i++)
+						{
+							let tmpKey = tmpKeys[i];
+							if (tmpReserved[tmpKey]) { continue; }
+							let tmpValue = tmpConfig[tmpKey];
+							if (tmpValue === null || tmpValue === undefined) { continue; }
+							if (Array.isArray(tmpValue)) { tmpValue = tmpValue.join(','); }
+							tmpCtx[tmpKey] = tmpValue;
+						}
+					}
+				}
+				catch (pErr)
+				{
+					if (this.fable && this.fable.log)
+					{
+						this.fable.log.warn(`_buildSpawnSpec: could not parse ConfigJSON for beacon ${pName}: ${pErr.message}`);
+					}
+				}
+			}
+
 			return {
 				Command: process.execPath,
 				Args: [pType.BinPath].concat(this._expandArgTemplate(tmpTemplate, tmpCtx))

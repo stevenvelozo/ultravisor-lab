@@ -32,16 +32,18 @@ const libServiceUltravisorManager  = require('../services/Service-UltravisorMana
 const libServiceBeaconTypeRegistry = require('../services/Service-BeaconTypeRegistry.js');
 const libServiceBeaconManager      = require('../services/Service-BeaconManager.js');
 const libServiceBeaconContainerManager = require('../services/Service-BeaconContainerManager.js');
-const libServiceSeedDatasetManager = require('../services/Service-SeedDatasetManager.js');
-const libServiceLabLifecycle       = require('../services/Service-LabLifecycle.js');
+const libServiceSeedDatasetManager   = require('../services/Service-SeedDatasetManager.js');
+const libServiceQueueScenarioManager = require('../services/Service-QueueScenarioManager.js');
+const libServiceLabLifecycle         = require('../services/Service-LabLifecycle.js');
 
-const libRoutesSystem       = require('./routes/Lab-Api-System.js');
-const libRoutesEntities     = require('./routes/Lab-Api-Entities.js');
-const libRoutesEvents       = require('./routes/Lab-Api-Events.js');
-const libRoutesDBEngines    = require('./routes/Lab-Api-DBEngines.js');
-const libRoutesUltravisor   = require('./routes/Lab-Api-Ultravisor.js');
-const libRoutesBeacons      = require('./routes/Lab-Api-Beacons.js');
-const libRoutesSeedDatasets = require('./routes/Lab-Api-SeedDatasets.js');
+const libRoutesSystem          = require('./routes/Lab-Api-System.js');
+const libRoutesEntities        = require('./routes/Lab-Api-Entities.js');
+const libRoutesEvents          = require('./routes/Lab-Api-Events.js');
+const libRoutesDBEngines       = require('./routes/Lab-Api-DBEngines.js');
+const libRoutesUltravisor      = require('./routes/Lab-Api-Ultravisor.js');
+const libRoutesBeacons         = require('./routes/Lab-Api-Beacons.js');
+const libRoutesSeedDatasets    = require('./routes/Lab-Api-SeedDatasets.js');
+const libRoutesQueueScenarios  = require('./routes/Lab-Api-QueueScenarios.js');
 
 function setupLabServer(pOptions, fCallback)
 {
@@ -93,8 +95,9 @@ function setupLabServer(pOptions, fCallback)
 	tmpFable.addAndInstantiateServiceType('LabBeaconTypeRegistry', libServiceBeaconTypeRegistry);
 	tmpFable.addAndInstantiateServiceType('LabBeaconContainerManager', libServiceBeaconContainerManager);
 	tmpFable.addAndInstantiateServiceType('LabBeaconManager',      libServiceBeaconManager);
-	tmpFable.addAndInstantiateServiceType('LabSeedDatasetManager', libServiceSeedDatasetManager);
-	tmpFable.addAndInstantiateServiceType('LabLifecycle',          libServiceLabLifecycle);
+	tmpFable.addAndInstantiateServiceType('LabSeedDatasetManager',   libServiceSeedDatasetManager);
+	tmpFable.addAndInstantiateServiceType('LabQueueScenarioManager', libServiceQueueScenarioManager);
+	tmpFable.addAndInstantiateServiceType('LabLifecycle',            libServiceLabLifecycle);
 
 	tmpFable.LabStateStore.initialize(
 		(pStateErr) =>
@@ -133,9 +136,10 @@ function setupLabServer(pOptions, fCallback)
 						BeaconTypeRegistry: tmpFable.LabBeaconTypeRegistry,
 						BeaconManager:      tmpFable.LabBeaconManager,
 						BeaconContainerManager: tmpFable.LabBeaconContainerManager,
-						SeedDatasetManager: tmpFable.LabSeedDatasetManager,
-						Lifecycle:          tmpFable.LabLifecycle,
-						Package:            tmpPackage
+						SeedDatasetManager:   tmpFable.LabSeedDatasetManager,
+						QueueScenarioManager: tmpFable.LabQueueScenarioManager,
+						Lifecycle:            tmpFable.LabLifecycle,
+						Package:              tmpPackage
 					};
 
 					// ─────────────────────────────────────────────
@@ -162,6 +166,7 @@ function setupLabServer(pOptions, fCallback)
 							libRoutesUltravisor(tmpCore);
 							libRoutesBeacons(tmpCore);
 							libRoutesSeedDatasets(tmpCore);
+							libRoutesQueueScenarios(tmpCore);
 
 							// Static bundle.  During dev we serve the `web/` source tree
 							// directly.  The browser bundle only exists after `npm run

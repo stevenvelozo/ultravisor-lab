@@ -31,6 +31,7 @@ const libDBEnginesView      = require('./views/PictView-Lab-DBEngines.js');
 const libUltravisorView     = require('./views/PictView-Lab-Ultravisor.js');
 const libBeaconsView        = require('./views/PictView-Lab-Beacons.js');
 const libSeedDatasetsView   = require('./views/PictView-Lab-SeedDatasets.js');
+const libQueueLabView       = require('./views/PictView-Lab-QueueLab.js');
 
 const POLL_INTERVAL_MS = 10000;
 
@@ -51,6 +52,7 @@ class LabBrowserApplication extends libPictApplication
 		this.pict.addView('Lab-Ultravisor',   libUltravisorView.default_configuration,   libUltravisorView);
 		this.pict.addView('Lab-Beacons',      libBeaconsView.default_configuration,      libBeaconsView);
 		this.pict.addView('Lab-SeedDatasets', libSeedDatasetsView.default_configuration, libSeedDatasetsView);
+		this.pict.addView('Lab-QueueLab',     libQueueLabView.default_configuration,     libQueueLabView);
 		this.pict.addView('Lab-Events',       libEventsView.default_configuration,       libEventsView);
 
 		// Modal + toast toolkit: replaces window.alert/confirm app-wide.
@@ -100,6 +102,13 @@ class LabBrowserApplication extends libPictApplication
 				Datasets:   [],
 				Jobs:       [],
 				Targets:    { IDUltravisorInstance: 0, IDBeacon: 0, IDDBEngine: 0 }
+			},
+			QueueLab:
+			{
+				Scenarios: [],
+				Runs:      [],
+				Snapshot:  null,
+				Targets:   { IDUltravisorInstance: 0 }
 			}
 		};
 		return super.onBeforeInitializeAsync(fCallback);
@@ -113,14 +122,18 @@ class LabBrowserApplication extends libPictApplication
 				this._bootstrapSeedCatalog(
 					() =>
 					{
-						this._bootstrapBeaconTypes(
+						this._bootstrapQueueScenarios(
 							() =>
 							{
-								this.refreshAll(
+								this._bootstrapBeaconTypes(
 									() =>
 									{
-										this._pollTimer = setInterval(() => this.refreshAll(() => {}), POLL_INTERVAL_MS);
-										return super.onAfterInitializeAsync(fCallback);
+										this.refreshAll(
+											() =>
+											{
+												this._pollTimer = setInterval(() => this.refreshAll(() => {}), POLL_INTERVAL_MS);
+												return super.onAfterInitializeAsync(fCallback);
+											});
 									});
 							});
 					});
@@ -215,6 +228,7 @@ class LabBrowserApplication extends libPictApplication
 		else if (tmpName === 'Ultravisor')   { this.pict.views['Lab-Ultravisor'].render(); }
 		else if (tmpName === 'Beacons')      { this.pict.views['Lab-Beacons'].render(); }
 		else if (tmpName === 'SeedDatasets') { this.pict.views['Lab-SeedDatasets'].render(); }
+		else if (tmpName === 'QueueLab')     { this.pict.views['Lab-QueueLab'].render(); }
 		else if (tmpName === 'Events')       { this.pict.views['Lab-Events'].render(); }
 	}
 
@@ -246,12 +260,18 @@ class LabBrowserApplication extends libPictApplication
 			this.pict.views['Lab-SeedDatasets'].render('Lab-SeedDatasets-List');
 			this.pict.views['Lab-SeedDatasets'].render('Lab-SeedDatasets-Jobs');
 		}
+		else if (tmpName === 'QueueLab')
+		{
+			this.pict.views['Lab-QueueLab'].render('Lab-QueueLab-Board');
+			this.pict.views['Lab-QueueLab'].render('Lab-QueueLab-Scenarios');
+			this.pict.views['Lab-QueueLab'].render('Lab-QueueLab-Runs');
+		}
 	}
 
 	refreshAll(fCallback)
 	{
 		let tmpApi = this.pict.providers.LabApi;
-		let tmpPending = 6;  // status, events, engines, ultravisors, beacons, jobs
+		let tmpPending = 8;  // status, events, engines, ultravisors, beacons, jobs, queue runs, queue snapshot
 		let tmpDone = () =>
 		{
 			tmpPending--;
@@ -332,6 +352,36 @@ class LabBrowserApplication extends libPictApplication
 				}
 				tmpDone();
 			});
+
+		tmpApi.listQueueScenarioRuns((pErr, pPayload) =>
+			{
+				if (!pErr && pPayload && Array.isArray(pPayload.Runs))
+				{
+					this.pict.AppData.Lab.QueueLab.Runs = pPayload.Runs;
+				}
+				tmpDone();
+			});
+
+		// Queue snapshot only when (a) the QueueLab tab is active and
+		// (b) the user has picked a target UV.  Skipping otherwise keeps
+		// the background poll cheap and avoids 404s from non-running UVs.
+		let tmpUvID = parseInt(
+			(this.pict.AppData.Lab.QueueLab && this.pict.AppData.Lab.QueueLab.Targets && this.pict.AppData.Lab.QueueLab.Targets.IDUltravisorInstance) || 0, 10);
+		let tmpActiveQueue = this.pict.AppData.Lab.ActiveView === 'QueueLab';
+		if (tmpActiveQueue && tmpUvID > 0)
+		{
+			tmpApi.getQueueSnapshot(tmpUvID, (pErr, pPayload) =>
+				{
+					if (!pErr && pPayload) { this.pict.AppData.Lab.QueueLab.Snapshot = pPayload; }
+					tmpDone();
+				});
+		}
+		else
+		{
+			// Clear stale snapshot if user moved off the tab or unset target.
+			if (!tmpActiveQueue || tmpUvID === 0) { this.pict.AppData.Lab.QueueLab.Snapshot = null; }
+			tmpDone();
+		}
 	}
 
 	_refreshEngineDatabases(pEngines, fCallback)
@@ -516,6 +566,19 @@ class LabBrowserApplication extends libPictApplication
 				if (!pErr && pPayload && Array.isArray(pPayload.Datasets))
 				{
 					this.pict.AppData.Lab.SeedDatasets.Datasets = pPayload.Datasets;
+				}
+				return fCallback();
+			});
+	}
+
+	_bootstrapQueueScenarios(fCallback)
+	{
+		this.pict.providers.LabApi.listQueueScenarios(
+			(pErr, pPayload) =>
+			{
+				if (!pErr && pPayload && Array.isArray(pPayload.Scenarios))
+				{
+					this.pict.AppData.Lab.QueueLab.Scenarios = pPayload.Scenarios;
 				}
 				return fCallback();
 			});
@@ -1716,6 +1779,45 @@ class LabBrowserApplication extends libPictApplication
 			{
 				if (pErr) { this._toastError('Quick-seed failed: ' + pErr.message); return; }
 				this._toastSuccess(`Seed '${pDatasetHash}' running...`);
+				this.refreshAll(() => {});
+			});
+	}
+
+	// ── Queue Lab handlers ──────────────────────────────────────────────────
+
+	_readQueueLabTargetFromDOM()
+	{
+		let tmpVal = this._domValue('#Lab-QueueLab-Targets-Ultravisor');
+		let tmpID = parseInt(tmpVal, 10);
+		return Number.isFinite(tmpID) ? tmpID : 0;
+	}
+
+	runQueueScenario(pHash)
+	{
+		let tmpUvID = this._readQueueLabTargetFromDOM();
+		this.pict.AppData.Lab.QueueLab.Targets.IDUltravisorInstance = tmpUvID;
+		if (!tmpUvID)
+		{
+			this._toastWarning('Pick a target Ultravisor first.');
+			return;
+		}
+		this._toast(`Starting scenario '${pHash}'...`, 'info', { duration: 2500 });
+		this.pict.providers.LabApi.runQueueScenario(pHash, { IDUltravisorInstance: tmpUvID },
+			(pErr, pResult) =>
+			{
+				if (pErr) { this._toastError('Run failed: ' + pErr.message); return; }
+				this._toastSuccess(`Scenario '${pHash}' running (run #${pResult.IDQueueScenarioRun}).`);
+				this.refreshAll(() => {});
+			});
+	}
+
+	cancelQueueScenarioRun(pID)
+	{
+		this.pict.providers.LabApi.cancelQueueScenarioRun(pID, (pErr, pResult) =>
+			{
+				if (pErr) { this._toastError('Cancel failed: ' + pErr.message); return; }
+				let tmpUncan = (pResult && pResult.Uncancelable) ? pResult.Uncancelable.length : 0;
+				this._toast(`Cancel issued (uncancelable=${tmpUncan}).`, 'info');
 				this.refreshAll(() => {});
 			});
 	}
