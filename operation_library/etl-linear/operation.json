@@ -1,0 +1,215 @@
+{
+  "Hash": "etl-linear",
+  "Name": "ETL Linear",
+  "Description": "4-stage linear pipeline: Parser \u2192 Transformer \u2192 Validator \u2192 Loader.  Demonstrates baseline single-op orchestration through the shared synthetic-beacon fleet.",
+  "Tags": [
+    "lab",
+    "operation-exercise"
+  ],
+  "Version": "1.0.0",
+  "Graph": {
+    "Nodes": [
+      {
+        "Hash": "start",
+        "Type": "start",
+        "X": 50,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "Start",
+        "Ports": [
+          {
+            "Hash": "start-out",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Out"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "parse",
+        "Type": "beacon-parser-parse",
+        "X": 250,
+        "Y": 200,
+        "Width": 200,
+        "Height": 110,
+        "Title": "Parse",
+        "Ports": [
+          {
+            "Hash": "parse-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "parse-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "parse-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          }
+        ],
+        "Data": {
+          "DurationMs": 1500
+        }
+      },
+      {
+        "Hash": "xform",
+        "Type": "beacon-transformer-transform",
+        "X": 500,
+        "Y": 200,
+        "Width": 200,
+        "Height": 110,
+        "Title": "Transform",
+        "Ports": [
+          {
+            "Hash": "xform-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "xform-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "xform-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          }
+        ],
+        "Data": {
+          "DurationMs": 1500
+        }
+      },
+      {
+        "Hash": "validate",
+        "Type": "beacon-validator-validate",
+        "X": 750,
+        "Y": 200,
+        "Width": 200,
+        "Height": 110,
+        "Title": "Validate",
+        "Ports": [
+          {
+            "Hash": "validate-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "validate-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "validate-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          }
+        ],
+        "Data": {
+          "DurationMs": 1500
+        }
+      },
+      {
+        "Hash": "load",
+        "Type": "beacon-loader-load",
+        "X": 1000,
+        "Y": 200,
+        "Width": 200,
+        "Height": 110,
+        "Title": "Load",
+        "Ports": [
+          {
+            "Hash": "load-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "load-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "load-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          }
+        ],
+        "Data": {
+          "DurationMs": 1500
+        }
+      },
+      {
+        "Hash": "end",
+        "Type": "end",
+        "X": 1250,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "End",
+        "Ports": [
+          {
+            "Hash": "end-in",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "In"
+          }
+        ],
+        "Data": {}
+      }
+    ],
+    "Connections": [
+      {
+        "SourceNodeHash": "start",
+        "SourcePortHash": "start-out",
+        "TargetNodeHash": "parse",
+        "TargetPortHash": "parse-Trigger"
+      },
+      {
+        "SourceNodeHash": "parse",
+        "SourcePortHash": "parse-Complete",
+        "TargetNodeHash": "xform",
+        "TargetPortHash": "xform-Trigger"
+      },
+      {
+        "SourceNodeHash": "xform",
+        "SourcePortHash": "xform-Complete",
+        "TargetNodeHash": "validate",
+        "TargetPortHash": "validate-Trigger"
+      },
+      {
+        "SourceNodeHash": "validate",
+        "SourcePortHash": "validate-Complete",
+        "TargetNodeHash": "load",
+        "TargetPortHash": "load-Trigger"
+      },
+      {
+        "SourceNodeHash": "load",
+        "SourcePortHash": "load-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      }
+    ]
+  },
+  "ViewState": {
+    "X": 0,
+    "Y": 0,
+    "Scale": 1
+  }
+}

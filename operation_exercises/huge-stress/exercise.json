@@ -1,0 +1,24 @@
+{
+	"Hash": "oe-huge-stress",
+	"Name": "Huge Stress (⚠ 5-10 min)",
+	"Description": "WARNING: this exercise takes 5-10 minutes to drain.  It kicks 1040 operations of mixed shapes and durations across the 7 active fleet beacons (Parser, Transformer, Validator, Loader, DataIntegration, VideoTranscode, FileTransfer), deliberately producing cross-operation resource contention on every single-slot capability.  Designed to populate the queue heavily so the Ultravisor and Lab UIs have a real workload to render — Upcoming, In-Process, Stalled, and Recently-Terminal buckets all see meaningful traffic.  Useful for queue management tooling work (priority changes, reorder, cancel) and Phase 3 Observer snapshot diagnostics.\n\nMix (1040 ops):\n  200 mixed-pipeline       (DI → Vid → File at 1.5s/stage; ~4.5s each)\n  400 mixed-pipeline-fast  (DI → Vid → File at 400ms/stage; ~1.2s each)\n  200 validation-only-fast (Parser → Validator at 400ms/stage; ~0.8s each)\n   80 etl-linear           (P → T → V → L at 1.5s/stage; ~6s each)\n   60 etl-strict           (Parser-strict → T → Validator-strict → L at 1.5s; ~6s each)\n   60 bulk-load-fanout     (P → 3×T → V → L at 1.5s/stage; ~9s each)\n   40 validation-only      (Parser → Validator at 1.5s; ~3s each)\n\nKicks are paced over ~150s so peak HTTP-connection rate stays ≤ 12/s — important on local Mac/Colima setups where the SSH-based port-forward gets overwhelmed past ~25/s.  Critical bottleneck: shared DI/Vid/File capacity at 200×1.5 + 400×0.4 = 460s ≈ 7.7 min wall.",
+	"Targets": {},
+	"Operations": [ "etl-linear", "etl-strict", "validation-only", "validation-only-fast", "bulk-load-fanout", "mixed-pipeline", "mixed-pipeline-fast" ],
+	"Kicks":
+	[
+		{ "OperationHash": "etl-linear",            "Count":  80,  "EnqueueAtMs":     0,  "EnqueueIntervalMs":  500 },
+		{ "OperationHash": "etl-strict",            "Count":  60,  "EnqueueAtMs":  4000,  "EnqueueIntervalMs":  600 },
+		{ "OperationHash": "validation-only",       "Count":  40,  "EnqueueAtMs":  8000,  "EnqueueIntervalMs":  500 },
+		{ "OperationHash": "bulk-load-fanout",      "Count":  60,  "EnqueueAtMs": 12000,  "EnqueueIntervalMs":  900 },
+		{ "OperationHash": "mixed-pipeline",        "Count": 200,  "EnqueueAtMs":   500,  "EnqueueIntervalMs":  500 },
+		{ "OperationHash": "mixed-pipeline-fast",   "Count": 400,  "EnqueueAtMs":  1500,  "EnqueueIntervalMs":  300 },
+		{ "OperationHash": "validation-only-fast",  "Count": 200,  "EnqueueAtMs":  6000,  "EnqueueIntervalMs":  400 }
+	],
+	"Assertions":
+	{
+		"AllOperationsCompleted": true,
+		"MaxOperationDurationSeconds": 720,
+		"MaxFailedOperations": 0,
+		"MinSuccessfulOperations": 1040
+	}
+}

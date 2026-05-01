@@ -1,0 +1,17 @@
+{
+	"Hash": "oe-single-etl",
+	"Name": "Single ETL",
+	"Description": "Baseline: one etl-linear operation kicked through the shared fleet.  Exercises the wire path end-to-end before more interesting graphs run.",
+	"Targets": {},
+	"Operations": [ "etl-linear" ],
+	"Kicks":
+	[
+		{ "OperationHash": "etl-linear", "Count": 1, "EnqueueAtMs": 0 }
+	],
+	"Assertions":
+	{
+		"AllOperationsCompleted": true,
+		"MaxOperationDurationSeconds": 30,
+		"MaxFailedOperations": 0
+	}
+}

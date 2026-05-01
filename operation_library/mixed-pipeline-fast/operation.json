@@ -1,0 +1,177 @@
+{
+  "Hash": "mixed-pipeline-fast",
+  "Name": "Mixed Pipeline Fast",
+  "Description": "Cross-capability sequential pipeline using the harness-classic three caps: DataIntegration \u2192 VideoTranscode \u2192 FileTransfer.",
+  "Tags": [
+    "lab",
+    "operation-exercise"
+  ],
+  "Version": "1.0.0",
+  "Graph": {
+    "Nodes": [
+      {
+        "Hash": "start",
+        "Type": "start",
+        "X": 50,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "Start",
+        "Ports": [
+          {
+            "Hash": "start-out",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Out"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "di",
+        "Type": "beacon-dataintegration-process",
+        "X": 250,
+        "Y": 200,
+        "Width": 200,
+        "Height": 110,
+        "Title": "Data Integration",
+        "Ports": [
+          {
+            "Hash": "di-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "di-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "di-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          }
+        ],
+        "Data": {
+          "DurationMs": 400
+        }
+      },
+      {
+        "Hash": "vid",
+        "Type": "beacon-videotranscode-encode",
+        "X": 500,
+        "Y": 200,
+        "Width": 200,
+        "Height": 110,
+        "Title": "Video Encode",
+        "Ports": [
+          {
+            "Hash": "vid-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "vid-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "vid-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          }
+        ],
+        "Data": {
+          "DurationMs": 400
+        }
+      },
+      {
+        "Hash": "file",
+        "Type": "beacon-filetransfer-transfer",
+        "X": 750,
+        "Y": 200,
+        "Width": 200,
+        "Height": 110,
+        "Title": "File Transfer",
+        "Ports": [
+          {
+            "Hash": "file-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "file-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "file-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          }
+        ],
+        "Data": {
+          "DurationMs": 400
+        }
+      },
+      {
+        "Hash": "end",
+        "Type": "end",
+        "X": 1000,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "End",
+        "Ports": [
+          {
+            "Hash": "end-in",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "In"
+          }
+        ],
+        "Data": {}
+      }
+    ],
+    "Connections": [
+      {
+        "SourceNodeHash": "start",
+        "SourcePortHash": "start-out",
+        "TargetNodeHash": "di",
+        "TargetPortHash": "di-Trigger"
+      },
+      {
+        "SourceNodeHash": "di",
+        "SourcePortHash": "di-Complete",
+        "TargetNodeHash": "vid",
+        "TargetPortHash": "vid-Trigger"
+      },
+      {
+        "SourceNodeHash": "vid",
+        "SourcePortHash": "vid-Complete",
+        "TargetNodeHash": "file",
+        "TargetPortHash": "file-Trigger"
+      },
+      {
+        "SourceNodeHash": "file",
+        "SourcePortHash": "file-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      }
+    ]
+  },
+  "ViewState": {
+    "X": 0,
+    "Y": 0,
+    "Scale": 1
+  }
+}

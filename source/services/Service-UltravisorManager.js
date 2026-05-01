@@ -204,10 +204,21 @@ class ServiceUltravisorManager extends libFableServiceProviderBase
 							this._markFailed(tmpID, tmpName, 'Ultravisor API did not come up');
 							return;
 						}
+						// Flip Status to 'running' BEFORE loading the
+						// operation library.  registerOperation gates on
+						// Status === 'running' (see line 633), so doing
+						// the library load first triggers a "not running"
+						// warning for every seed-*.json file -- UV's HTTP
+						// is already responsive (we just verified via
+						// _waitForHttp), the lab's DB flag is just stale.
+						// The library load is informational; if a single
+						// operation fails to register it warns and
+						// continues, so promoting status first doesn't
+						// risk false positives.
+						tmpStore.update('UltravisorInstance', 'IDUltravisorInstance', tmpID,
+							{ Status: 'running', StatusDetail: '' });
 						this._loadOperationsFromLibrary(tmpID, () =>
 							{
-								tmpStore.update('UltravisorInstance', 'IDUltravisorInstance', tmpID,
-									{ Status: 'running', StatusDetail: '' });
 								tmpStore.recordEvent(
 									{
 										EntityType: 'UltravisorInstance', EntityID: tmpID, EntityName: tmpName,
@@ -452,11 +463,13 @@ class ServiceUltravisorManager extends libFableServiceProviderBase
 				this._waitForHttp(tmpInstance.Port, 0, (pR) =>
 					{
 						if (!pR) { this._markFailed(pID, tmpInstance.Name, 'Ultravisor API did not come up'); return; }
-						this._loadOperationsFromLibrary(pID, () =>
-							{
-								this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
-									{ Status: 'running', StatusDetail: '' });
-							});
+						// Flip Status to 'running' before loading the
+						// operation library so registerOperation's
+						// status gate doesn't fail every seed-*.json
+						// file.  Same race as createInstance above.
+						this.fable.LabStateStore.update('UltravisorInstance', 'IDUltravisorInstance', pID,
+							{ Status: 'running', StatusDetail: '' });
+						this._loadOperationsFromLibrary(pID, () => { /* informational; warnings already log per-file */ });
 					});
 			};
 

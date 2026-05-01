@@ -359,13 +359,13 @@
 			}
 		},
 
-		"QueueScenarioRun":
+		"BeaconExerciseRun":
 		{
-			"TableName": "QueueScenarioRun",
+			"TableName": "BeaconExerciseRun",
 			"Domain": "Default",
 			"Columns":
 			[
-				{ "Column": "IDQueueScenarioRun",   "DataType": "ID" },
+				{ "Column": "IDBeaconExerciseRun",   "DataType": "ID" },
 				{ "Column": "ScenarioHash",         "DataType": "String", "Size": "200" },
 				{ "Column": "ScenarioName",         "DataType": "String", "Size": "200" },
 				{ "Column": "IDUltravisorInstance", "DataType": "ForeignKey", "Size": "int" },
@@ -384,12 +384,12 @@
 			],
 			"MeadowSchema":
 			{
-				"Scope": "QueueScenarioRun",
-				"DefaultIdentifier": "IDQueueScenarioRun",
+				"Scope": "BeaconExerciseRun",
+				"DefaultIdentifier": "IDBeaconExerciseRun",
 				"Domain": "Default",
 				"Schema":
 				[
-					{ "Column": "IDQueueScenarioRun",   "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "IDBeaconExerciseRun",   "Type": "AutoIdentity", "Size": "Default" },
 					{ "Column": "ScenarioHash",         "Type": "String",       "Size": "200", "Indexed": true },
 					{ "Column": "ScenarioName",         "Type": "String",       "Size": "200" },
 					{ "Column": "IDUltravisorInstance", "Type": "ForeignKey",   "Size": "int", "Indexed": true },
@@ -408,7 +408,7 @@
 				],
 				"DefaultObject":
 				{
-					"IDQueueScenarioRun": 0, "ScenarioHash": "", "ScenarioName": "",
+					"IDBeaconExerciseRun": 0, "ScenarioHash": "", "ScenarioName": "",
 					"IDUltravisorInstance": 0, "Status": "running",
 					"StartedAt": "", "CompletedAt": "",
 					"DrainMs": 0, "TotalEnqueued": 0, "TotalCompleted": 0, "TotalFailed": 0,
@@ -418,14 +418,14 @@
 			}
 		},
 
-		"QueueScenarioEvent":
+		"BeaconExerciseEvent":
 		{
-			"TableName": "QueueScenarioEvent",
+			"TableName": "BeaconExerciseEvent",
 			"Domain": "Default",
 			"Columns":
 			[
-				{ "Column": "IDQueueScenarioEvent", "DataType": "ID" },
-				{ "Column": "IDQueueScenarioRun",   "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "IDBeaconExerciseEvent", "DataType": "ID" },
+				{ "Column": "IDBeaconExerciseRun",   "DataType": "ForeignKey", "Size": "int" },
 				{ "Column": "Topic",                "DataType": "String", "Size": "64" },
 				{ "Column": "EventGUID",            "DataType": "String", "Size": "64" },
 				{ "Column": "WorkItemHash",         "DataType": "String", "Size": "64" },
@@ -436,13 +436,13 @@
 			],
 			"MeadowSchema":
 			{
-				"Scope": "QueueScenarioEvent",
-				"DefaultIdentifier": "IDQueueScenarioEvent",
+				"Scope": "BeaconExerciseEvent",
+				"DefaultIdentifier": "IDBeaconExerciseEvent",
 				"Domain": "Default",
 				"Schema":
 				[
-					{ "Column": "IDQueueScenarioEvent", "Type": "AutoIdentity", "Size": "Default" },
-					{ "Column": "IDQueueScenarioRun",   "Type": "ForeignKey",   "Size": "int", "Indexed": true },
+					{ "Column": "IDBeaconExerciseEvent", "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "IDBeaconExerciseRun",   "Type": "ForeignKey",   "Size": "int", "Indexed": true },
 					{ "Column": "Topic",                "Type": "String",       "Size": "64", "Indexed": true },
 					{ "Column": "EventGUID",            "Type": "String",       "Size": "64" },
 					{ "Column": "WorkItemHash",         "Type": "String",       "Size": "64", "Indexed": true },
@@ -453,9 +453,106 @@
 				],
 				"DefaultObject":
 				{
-					"IDQueueScenarioEvent": 0, "IDQueueScenarioRun": 0,
+					"IDBeaconExerciseEvent": 0, "IDBeaconExerciseRun": 0,
 					"Topic": "", "EventGUID": "", "WorkItemHash": "",
 					"Capability": "", "BeaconID": "",
+					"EmittedAt": "", "PayloadJSON": ""
+				}
+			}
+		},
+
+		"OperationExerciseRun":
+		{
+			"TableName": "OperationExerciseRun",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDOperationExerciseRun", "DataType": "ID" },
+				{ "Column": "ExerciseHash",           "DataType": "String", "Size": "200" },
+				{ "Column": "ExerciseName",           "DataType": "String", "Size": "200" },
+				{ "Column": "IDUltravisorInstance",   "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "Status",                 "DataType": "String", "Size": "32" },
+				{ "Column": "StartedAt",              "DataType": "String", "Size": "50" },
+				{ "Column": "CompletedAt",            "DataType": "String", "Size": "50" },
+				{ "Column": "DurationMs",             "DataType": "Numeric", "Size": "int" },
+				{ "Column": "TotalKicked",            "DataType": "Numeric", "Size": "int" },
+				{ "Column": "TotalCompleted",         "DataType": "Numeric", "Size": "int" },
+				{ "Column": "TotalFailed",            "DataType": "Numeric", "Size": "int" },
+				{ "Column": "VerdictsJSON",           "DataType": "Text" },
+				{ "Column": "TimingJSON",             "DataType": "Text" },
+				{ "Column": "ErrorMessage",           "DataType": "Text" },
+				{ "Column": "CreateDate",             "DataType": "DateTime" },
+				{ "Column": "UpdateDate",             "DataType": "DateTime" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "OperationExerciseRun",
+				"DefaultIdentifier": "IDOperationExerciseRun",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDOperationExerciseRun", "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "ExerciseHash",           "Type": "String",       "Size": "200", "Indexed": true },
+					{ "Column": "ExerciseName",           "Type": "String",       "Size": "200" },
+					{ "Column": "IDUltravisorInstance",   "Type": "ForeignKey",   "Size": "int", "Indexed": true },
+					{ "Column": "Status",                 "Type": "String",       "Size": "32", "Indexed": true },
+					{ "Column": "StartedAt",              "Type": "String",       "Size": "50" },
+					{ "Column": "CompletedAt",            "Type": "String",       "Size": "50" },
+					{ "Column": "DurationMs",             "Type": "Integer",      "Size": "int" },
+					{ "Column": "TotalKicked",            "Type": "Integer",      "Size": "int" },
+					{ "Column": "TotalCompleted",         "Type": "Integer",      "Size": "int" },
+					{ "Column": "TotalFailed",            "Type": "Integer",      "Size": "int" },
+					{ "Column": "VerdictsJSON",           "Type": "Text",         "Size": "Default" },
+					{ "Column": "TimingJSON",             "Type": "Text",         "Size": "Default" },
+					{ "Column": "ErrorMessage",           "Type": "Text",         "Size": "Default" },
+					{ "Column": "CreateDate",             "Type": "CreateDate",   "Size": "Default" },
+					{ "Column": "UpdateDate",             "Type": "UpdateDate",   "Size": "Default" }
+				],
+				"DefaultObject":
+				{
+					"IDOperationExerciseRun": 0, "ExerciseHash": "", "ExerciseName": "",
+					"IDUltravisorInstance": 0, "Status": "running",
+					"StartedAt": "", "CompletedAt": "",
+					"DurationMs": 0, "TotalKicked": 0, "TotalCompleted": 0, "TotalFailed": 0,
+					"VerdictsJSON": "", "TimingJSON": "", "ErrorMessage": "",
+					"CreateDate": null, "UpdateDate": null
+				}
+			}
+		},
+
+		"OperationExerciseEvent":
+		{
+			"TableName": "OperationExerciseEvent",
+			"Domain": "Default",
+			"Columns":
+			[
+				{ "Column": "IDOperationExerciseEvent", "DataType": "ID" },
+				{ "Column": "IDOperationExerciseRun",   "DataType": "ForeignKey", "Size": "int" },
+				{ "Column": "RunHash",                  "DataType": "String", "Size": "64" },
+				{ "Column": "OperationHash",            "DataType": "String", "Size": "200" },
+				{ "Column": "EventType",                "DataType": "String", "Size": "64" },
+				{ "Column": "EmittedAt",                "DataType": "String", "Size": "50" },
+				{ "Column": "PayloadJSON",              "DataType": "Text" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "OperationExerciseEvent",
+				"DefaultIdentifier": "IDOperationExerciseEvent",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDOperationExerciseEvent", "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "IDOperationExerciseRun",   "Type": "ForeignKey",   "Size": "int", "Indexed": true },
+					{ "Column": "RunHash",                  "Type": "String",       "Size": "64", "Indexed": true },
+					{ "Column": "OperationHash",            "Type": "String",       "Size": "200" },
+					{ "Column": "EventType",                "Type": "String",       "Size": "64", "Indexed": true },
+					{ "Column": "EmittedAt",                "Type": "String",       "Size": "50" },
+					{ "Column": "PayloadJSON",              "Type": "Text",         "Size": "Default" }
+				],
+				"DefaultObject":
+				{
+					"IDOperationExerciseEvent": 0, "IDOperationExerciseRun": 0,
+					"RunHash": "", "OperationHash": "", "EventType": "",
 					"EmittedAt": "", "PayloadJSON": ""
 				}
 			}
@@ -471,7 +568,9 @@
 		"FactoInstance",
 		"IngestionJob",
 		"InfrastructureEvent",
-		"QueueScenarioRun",
-		"QueueScenarioEvent"
+		"BeaconExerciseRun",
+		"BeaconExerciseEvent",
+		"OperationExerciseRun",
+		"OperationExerciseEvent"
 	]
 }

@@ -1,0 +1,139 @@
+{
+  "Hash": "validation-only",
+  "Name": "Validation Only",
+  "Description": "Short two-stage pipeline: Parser \u2192 Validator.  Demonstrates partial fleet utilization (no Transformer or Loader nodes are touched).",
+  "Tags": [
+    "lab",
+    "operation-exercise"
+  ],
+  "Version": "1.0.0",
+  "Graph": {
+    "Nodes": [
+      {
+        "Hash": "start",
+        "Type": "start",
+        "X": 50,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "Start",
+        "Ports": [
+          {
+            "Hash": "start-out",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Out"
+          }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "parse",
+        "Type": "beacon-parser-parse",
+        "X": 250,
+        "Y": 200,
+        "Width": 200,
+        "Height": 110,
+        "Title": "Parse",
+        "Ports": [
+          {
+            "Hash": "parse-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "parse-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "parse-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          }
+        ],
+        "Data": {
+          "DurationMs": 1500
+        }
+      },
+      {
+        "Hash": "validate",
+        "Type": "beacon-validator-validate",
+        "X": 500,
+        "Y": 200,
+        "Width": 200,
+        "Height": 110,
+        "Title": "Validate",
+        "Ports": [
+          {
+            "Hash": "validate-Trigger",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "Trigger"
+          },
+          {
+            "Hash": "validate-Complete",
+            "Direction": "output",
+            "Side": "right-bottom",
+            "Label": "Complete"
+          },
+          {
+            "Hash": "validate-Error",
+            "Direction": "output",
+            "Side": "bottom",
+            "Label": "Error"
+          }
+        ],
+        "Data": {
+          "DurationMs": 1500
+        }
+      },
+      {
+        "Hash": "end",
+        "Type": "end",
+        "X": 750,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "End",
+        "Ports": [
+          {
+            "Hash": "end-in",
+            "Direction": "input",
+            "Side": "left-bottom",
+            "Label": "In"
+          }
+        ],
+        "Data": {}
+      }
+    ],
+    "Connections": [
+      {
+        "SourceNodeHash": "start",
+        "SourcePortHash": "start-out",
+        "TargetNodeHash": "parse",
+        "TargetPortHash": "parse-Trigger"
+      },
+      {
+        "SourceNodeHash": "parse",
+        "SourcePortHash": "parse-Complete",
+        "TargetNodeHash": "validate",
+        "TargetPortHash": "validate-Trigger"
+      },
+      {
+        "SourceNodeHash": "validate",
+        "SourcePortHash": "validate-Complete",
+        "TargetNodeHash": "end",
+        "TargetPortHash": "end-in"
+      }
+    ]
+  },
+  "ViewState": {
+    "X": 0,
+    "Y": 0,
+    "Scale": 1
+  }
+}

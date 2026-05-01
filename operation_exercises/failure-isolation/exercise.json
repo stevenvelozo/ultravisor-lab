@@ -1,0 +1,19 @@
+{
+	"Hash": "oe-failure-isolation",
+	"Name": "Failure Isolation",
+	"Description": "3 etl-linear ops where the first kick has ParseFailRate=1.0 forcing the parse node to fail.  Verifies the failed op does not cascade-kill the other two.",
+	"Targets": {},
+	"Operations": [ "etl-linear" ],
+	"Kicks":
+	[
+		{ "OperationHash": "etl-linear", "Count": 1, "EnqueueAtMs": 0,   "Override": { "ParseFailRate": 1.0 } },
+		{ "OperationHash": "etl-linear", "Count": 2, "EnqueueAtMs": 100 }
+	],
+	"Assertions":
+	{
+		"MaxOperationDurationSeconds": 60,
+		"MaxFailedOperations": 1,
+		"MinSuccessfulOperations": 2,
+		"FailureIsolation": true
+	}
+}

@@ -31,7 +31,8 @@ const libDBEnginesView      = require('./views/PictView-Lab-DBEngines.js');
 const libUltravisorView     = require('./views/PictView-Lab-Ultravisor.js');
 const libBeaconsView        = require('./views/PictView-Lab-Beacons.js');
 const libSeedDatasetsView   = require('./views/PictView-Lab-SeedDatasets.js');
-const libQueueLabView       = require('./views/PictView-Lab-QueueLab.js');
+const libBeaconExercisesView       = require('./views/PictView-Lab-BeaconExercises.js');
+const libOperationExercisesView    = require('./views/PictView-Lab-OperationExercises.js');
 
 const POLL_INTERVAL_MS = 10000;
 
@@ -52,7 +53,8 @@ class LabBrowserApplication extends libPictApplication
 		this.pict.addView('Lab-Ultravisor',   libUltravisorView.default_configuration,   libUltravisorView);
 		this.pict.addView('Lab-Beacons',      libBeaconsView.default_configuration,      libBeaconsView);
 		this.pict.addView('Lab-SeedDatasets', libSeedDatasetsView.default_configuration, libSeedDatasetsView);
-		this.pict.addView('Lab-QueueLab',     libQueueLabView.default_configuration,     libQueueLabView);
+		this.pict.addView('Lab-BeaconExercises',     libBeaconExercisesView.default_configuration,     libBeaconExercisesView);
+		this.pict.addView('Lab-OperationExercises',  libOperationExercisesView.default_configuration,  libOperationExercisesView);
 		this.pict.addView('Lab-Events',       libEventsView.default_configuration,       libEventsView);
 
 		// Modal + toast toolkit: replaces window.alert/confirm app-wide.
@@ -103,11 +105,17 @@ class LabBrowserApplication extends libPictApplication
 				Jobs:       [],
 				Targets:    { IDUltravisorInstance: 0, IDBeacon: 0, IDDBEngine: 0 }
 			},
-			QueueLab:
+			BeaconExercises:
 			{
 				Scenarios: [],
 				Runs:      [],
 				Snapshot:  null,
+				Targets:   { IDUltravisorInstance: 0 }
+			},
+			OperationExercises:
+			{
+				Exercises: [],
+				Runs:      [],
 				Targets:   { IDUltravisorInstance: 0 }
 			}
 		};
@@ -122,17 +130,21 @@ class LabBrowserApplication extends libPictApplication
 				this._bootstrapSeedCatalog(
 					() =>
 					{
-						this._bootstrapQueueScenarios(
+						this._bootstrapBeaconExercises(
 							() =>
 							{
-								this._bootstrapBeaconTypes(
+								this._bootstrapOperationExercises(
 									() =>
 									{
-										this.refreshAll(
+										this._bootstrapBeaconTypes(
 											() =>
 											{
-												this._pollTimer = setInterval(() => this.refreshAll(() => {}), POLL_INTERVAL_MS);
-												return super.onAfterInitializeAsync(fCallback);
+												this.refreshAll(
+													() =>
+													{
+														this._pollTimer = setInterval(() => this.refreshAll(() => {}), POLL_INTERVAL_MS);
+														return super.onAfterInitializeAsync(fCallback);
+													});
 											});
 									});
 							});
@@ -228,7 +240,8 @@ class LabBrowserApplication extends libPictApplication
 		else if (tmpName === 'Ultravisor')   { this.pict.views['Lab-Ultravisor'].render(); }
 		else if (tmpName === 'Beacons')      { this.pict.views['Lab-Beacons'].render(); }
 		else if (tmpName === 'SeedDatasets') { this.pict.views['Lab-SeedDatasets'].render(); }
-		else if (tmpName === 'QueueLab')     { this.pict.views['Lab-QueueLab'].render(); }
+		else if (tmpName === 'BeaconExercises')     { this.pict.views['Lab-BeaconExercises'].render(); }
+		else if (tmpName === 'OperationExercises')  { this.pict.views['Lab-OperationExercises'].render(); }
 		else if (tmpName === 'Events')       { this.pict.views['Lab-Events'].render(); }
 	}
 
@@ -260,18 +273,24 @@ class LabBrowserApplication extends libPictApplication
 			this.pict.views['Lab-SeedDatasets'].render('Lab-SeedDatasets-List');
 			this.pict.views['Lab-SeedDatasets'].render('Lab-SeedDatasets-Jobs');
 		}
-		else if (tmpName === 'QueueLab')
+		else if (tmpName === 'BeaconExercises')
 		{
-			this.pict.views['Lab-QueueLab'].render('Lab-QueueLab-Board');
-			this.pict.views['Lab-QueueLab'].render('Lab-QueueLab-Scenarios');
-			this.pict.views['Lab-QueueLab'].render('Lab-QueueLab-Runs');
+			this.pict.views['Lab-BeaconExercises'].render('Lab-BeaconExercises-Board');
+			this.pict.views['Lab-BeaconExercises'].render('Lab-BeaconExercises-Scenarios');
+			this.pict.views['Lab-BeaconExercises'].render('Lab-BeaconExercises-Runs');
+		}
+		else if (tmpName === 'OperationExercises')
+		{
+			this.pict.views['Lab-OperationExercises'].render('Lab-OperationExercises-Active');
+			this.pict.views['Lab-OperationExercises'].render('Lab-OperationExercises-Cards');
+			this.pict.views['Lab-OperationExercises'].render('Lab-OperationExercises-Runs');
 		}
 	}
 
 	refreshAll(fCallback)
 	{
 		let tmpApi = this.pict.providers.LabApi;
-		let tmpPending = 8;  // status, events, engines, ultravisors, beacons, jobs, queue runs, queue snapshot
+		let tmpPending = 9;  // status, events, engines, ultravisors, beacons, jobs, queue runs, queue snapshot, op-exercise runs
 		let tmpDone = () =>
 		{
 			tmpPending--;
@@ -282,6 +301,8 @@ class LabBrowserApplication extends libPictApplication
 				this._refreshAllUvPersistence(() =>
 				{
 					this._applySeedTargetDefaults();
+					this._applyBeaconExerciseTargetDefaults();
+					this._applyOperationExerciseTargetDefaults();
 					this._refreshActiveList();
 					this.pict.views['Lab-Navigation'].render();
 					this._pumpPersistencePollers();
@@ -353,33 +374,42 @@ class LabBrowserApplication extends libPictApplication
 				tmpDone();
 			});
 
-		tmpApi.listQueueScenarioRuns((pErr, pPayload) =>
+		tmpApi.listBeaconExerciseRuns((pErr, pPayload) =>
 			{
 				if (!pErr && pPayload && Array.isArray(pPayload.Runs))
 				{
-					this.pict.AppData.Lab.QueueLab.Runs = pPayload.Runs;
+					this.pict.AppData.Lab.BeaconExercises.Runs = pPayload.Runs;
 				}
 				tmpDone();
 			});
 
-		// Queue snapshot only when (a) the QueueLab tab is active and
+		tmpApi.listOperationExerciseRuns((pErr, pPayload) =>
+			{
+				if (!pErr && pPayload && Array.isArray(pPayload.Runs))
+				{
+					this.pict.AppData.Lab.OperationExercises.Runs = pPayload.Runs;
+				}
+				tmpDone();
+			});
+
+		// Queue snapshot only when (a) the BeaconExercises tab is active and
 		// (b) the user has picked a target UV.  Skipping otherwise keeps
 		// the background poll cheap and avoids 404s from non-running UVs.
 		let tmpUvID = parseInt(
-			(this.pict.AppData.Lab.QueueLab && this.pict.AppData.Lab.QueueLab.Targets && this.pict.AppData.Lab.QueueLab.Targets.IDUltravisorInstance) || 0, 10);
-		let tmpActiveQueue = this.pict.AppData.Lab.ActiveView === 'QueueLab';
+			(this.pict.AppData.Lab.BeaconExercises && this.pict.AppData.Lab.BeaconExercises.Targets && this.pict.AppData.Lab.BeaconExercises.Targets.IDUltravisorInstance) || 0, 10);
+		let tmpActiveQueue = this.pict.AppData.Lab.ActiveView === 'BeaconExercises';
 		if (tmpActiveQueue && tmpUvID > 0)
 		{
 			tmpApi.getQueueSnapshot(tmpUvID, (pErr, pPayload) =>
 				{
-					if (!pErr && pPayload) { this.pict.AppData.Lab.QueueLab.Snapshot = pPayload; }
+					if (!pErr && pPayload) { this.pict.AppData.Lab.BeaconExercises.Snapshot = pPayload; }
 					tmpDone();
 				});
 		}
 		else
 		{
 			// Clear stale snapshot if user moved off the tab or unset target.
-			if (!tmpActiveQueue || tmpUvID === 0) { this.pict.AppData.Lab.QueueLab.Snapshot = null; }
+			if (!tmpActiveQueue || tmpUvID === 0) { this.pict.AppData.Lab.BeaconExercises.Snapshot = null; }
 			tmpDone();
 		}
 	}
@@ -571,14 +601,27 @@ class LabBrowserApplication extends libPictApplication
 			});
 	}
 
-	_bootstrapQueueScenarios(fCallback)
+	_bootstrapBeaconExercises(fCallback)
 	{
-		this.pict.providers.LabApi.listQueueScenarios(
+		this.pict.providers.LabApi.listBeaconExercises(
 			(pErr, pPayload) =>
 			{
 				if (!pErr && pPayload && Array.isArray(pPayload.Scenarios))
 				{
-					this.pict.AppData.Lab.QueueLab.Scenarios = pPayload.Scenarios;
+					this.pict.AppData.Lab.BeaconExercises.Scenarios = pPayload.Scenarios;
+				}
+				return fCallback();
+			});
+	}
+
+	_bootstrapOperationExercises(fCallback)
+	{
+		this.pict.providers.LabApi.listOperationExercises(
+			(pErr, pPayload) =>
+			{
+				if (!pErr && pPayload && Array.isArray(pPayload.Exercises))
+				{
+					this.pict.AppData.Lab.OperationExercises.Exercises = pPayload.Exercises;
 				}
 				return fCallback();
 			});
@@ -1783,37 +1826,143 @@ class LabBrowserApplication extends libPictApplication
 			});
 	}
 
-	// ── Queue Lab handlers ──────────────────────────────────────────────────
+	// ── Beacon Exercises handlers ──────────────────────────────────────────────────
 
-	_readQueueLabTargetFromDOM()
+	_readBeaconExerciseTargetFromDOM()
 	{
-		let tmpVal = this._domValue('#Lab-QueueLab-Targets-Ultravisor');
+		let tmpVal = this._domValue('#Lab-BeaconExercises-Targets-Ultravisor');
 		let tmpID = parseInt(tmpVal, 10);
 		return Number.isFinite(tmpID) ? tmpID : 0;
 	}
 
-	runQueueScenario(pHash)
+	/**
+	 * onchange handler on the Beacon Exercises UV dropdown.  Syncs the DOM-side
+	 * selection back to AppData so the scenario cards re-evaluate their
+	 * disabled state (Secure-required + running-required) and the snapshot
+	 * poll picks up the new target.
+	 */
+	setBeaconExerciseTargetUV()
 	{
-		let tmpUvID = this._readQueueLabTargetFromDOM();
-		this.pict.AppData.Lab.QueueLab.Targets.IDUltravisorInstance = tmpUvID;
+		let tmpUvID = this._readBeaconExerciseTargetFromDOM();
+		if (!this.pict.AppData.Lab.BeaconExercises.Targets) { this.pict.AppData.Lab.BeaconExercises.Targets = {}; }
+		this.pict.AppData.Lab.BeaconExercises.Targets.IDUltravisorInstance = tmpUvID;
+		// Clear stale snapshot when target changes; the next refresh will
+		// fetch the new target's snapshot if active and target is set.
+		this.pict.AppData.Lab.BeaconExercises.Snapshot = null;
+		// Re-render the BeaconExercises view's slots so cards update their
+		// disabled state immediately, without waiting for the next poll.
+		if (this.pict.AppData.Lab.ActiveView === 'BeaconExercises')
+		{
+			this.pict.views['Lab-BeaconExercises'].render('Lab-BeaconExercises-Board');
+			this.pict.views['Lab-BeaconExercises'].render('Lab-BeaconExercises-Scenarios');
+		}
+	}
+
+	/**
+	 * Auto-pick the first running UV (Secure or promiscuous) as the
+	 * BeaconExercises target if none is set yet.  Called from refreshAll
+	 * after instances list lands.  Mirrors _applySeedTargetDefaults's
+	 * pattern.  The card-enable rule downstream evaluates whether the
+	 * UV's auth configuration actually allows scenarios to run, so the
+	 * operator sees a specific hint when an auto-picked UV isn't
+	 * usable rather than no defaulting at all.
+	 */
+	_applyBeaconExerciseTargetDefaults()
+	{
+		let tmpState = this.pict.AppData.Lab.BeaconExercises;
+		if (!tmpState) { return; }
+		if (!tmpState.Targets) { tmpState.Targets = {}; }
+		if (tmpState.Targets.IDUltravisorInstance) { return; }  // already chosen
+		let tmpInstances = (this.pict.AppData.Lab.Ultravisor && this.pict.AppData.Lab.Ultravisor.Instances) || [];
+		let tmpEligible = tmpInstances.filter((pUv) => pUv.Status === 'running');
+		if (tmpEligible.length === 0) { return; }
+		tmpState.Targets.IDUltravisorInstance = tmpEligible[0].IDUltravisorInstance;
+	}
+
+	runBeaconExercise(pHash)
+	{
+		let tmpUvID = this._readBeaconExerciseTargetFromDOM();
+		this.pict.AppData.Lab.BeaconExercises.Targets.IDUltravisorInstance = tmpUvID;
 		if (!tmpUvID)
 		{
 			this._toastWarning('Pick a target Ultravisor first.');
 			return;
 		}
 		this._toast(`Starting scenario '${pHash}'...`, 'info', { duration: 2500 });
-		this.pict.providers.LabApi.runQueueScenario(pHash, { IDUltravisorInstance: tmpUvID },
+		this.pict.providers.LabApi.runBeaconExercise(pHash, { IDUltravisorInstance: tmpUvID },
 			(pErr, pResult) =>
 			{
 				if (pErr) { this._toastError('Run failed: ' + pErr.message); return; }
-				this._toastSuccess(`Scenario '${pHash}' running (run #${pResult.IDQueueScenarioRun}).`);
+				this._toastSuccess(`Scenario '${pHash}' running (run #${pResult.IDBeaconExerciseRun}).`);
 				this.refreshAll(() => {});
 			});
 	}
 
-	cancelQueueScenarioRun(pID)
+	cancelBeaconExerciseRun(pID)
 	{
-		this.pict.providers.LabApi.cancelQueueScenarioRun(pID, (pErr, pResult) =>
+		this.pict.providers.LabApi.cancelBeaconExerciseRun(pID, (pErr, pResult) =>
+			{
+				if (pErr) { this._toastError('Cancel failed: ' + pErr.message); return; }
+				let tmpUncan = (pResult && pResult.Uncancelable) ? pResult.Uncancelable.length : 0;
+				this._toast(`Cancel issued (uncancelable=${tmpUncan}).`, 'info');
+				this.refreshAll(() => {});
+			});
+	}
+
+	// ── Operation Exercises handlers ──────────────────────────────────────
+
+	_readOperationExerciseTargetFromDOM()
+	{
+		let tmpVal = this._domValue('#Lab-OperationExercises-Targets-Ultravisor');
+		let tmpID = parseInt(tmpVal, 10);
+		return Number.isFinite(tmpID) ? tmpID : 0;
+	}
+
+	setOperationExerciseTargetUV()
+	{
+		let tmpUvID = this._readOperationExerciseTargetFromDOM();
+		if (!this.pict.AppData.Lab.OperationExercises.Targets) { this.pict.AppData.Lab.OperationExercises.Targets = {}; }
+		this.pict.AppData.Lab.OperationExercises.Targets.IDUltravisorInstance = tmpUvID;
+		if (this.pict.AppData.Lab.ActiveView === 'OperationExercises')
+		{
+			this.pict.views['Lab-OperationExercises'].render('Lab-OperationExercises-Cards');
+		}
+	}
+
+	_applyOperationExerciseTargetDefaults()
+	{
+		let tmpState = this.pict.AppData.Lab.OperationExercises;
+		if (!tmpState) { return; }
+		if (!tmpState.Targets) { tmpState.Targets = {}; }
+		if (tmpState.Targets.IDUltravisorInstance) { return; }
+		let tmpInstances = (this.pict.AppData.Lab.Ultravisor && this.pict.AppData.Lab.Ultravisor.Instances) || [];
+		let tmpEligible = tmpInstances.filter((pUv) => pUv.Status === 'running');
+		if (tmpEligible.length === 0) { return; }
+		tmpState.Targets.IDUltravisorInstance = tmpEligible[0].IDUltravisorInstance;
+	}
+
+	runOperationExercise(pHash)
+	{
+		let tmpUvID = this._readOperationExerciseTargetFromDOM();
+		this.pict.AppData.Lab.OperationExercises.Targets.IDUltravisorInstance = tmpUvID;
+		if (!tmpUvID)
+		{
+			this._toastWarning('Pick a target Ultravisor first.');
+			return;
+		}
+		this._toast(`Starting exercise '${pHash}'...`, 'info', { duration: 2500 });
+		this.pict.providers.LabApi.runOperationExercise(pHash, { IDUltravisorInstance: tmpUvID },
+			(pErr, pResult) =>
+			{
+				if (pErr) { this._toastError('Run failed: ' + pErr.message); return; }
+				this._toastSuccess(`Exercise '${pHash}' running (run #${pResult.IDOperationExerciseRun}).`);
+				this.refreshAll(() => {});
+			});
+	}
+
+	cancelOperationExerciseRun(pID)
+	{
+		this.pict.providers.LabApi.cancelOperationExerciseRun(pID, (pErr, pResult) =>
 			{
 				if (pErr) { this._toastError('Cancel failed: ' + pErr.message); return; }
 				let tmpUncan = (pResult && pResult.Uncancelable) ? pResult.Uncancelable.length : 0;

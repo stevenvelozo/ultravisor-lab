@@ -157,7 +157,8 @@ const _ViewConfiguration =
 			<a class="{~D:AppData.Lab.Computed.Navigation.BeaconsClass~}"      href="#/view/beacons">Ultravisor Beacons</a>
 			<a class="{~D:AppData.Lab.Computed.Navigation.DBEnginesClass~}"    href="#/view/dbengines">DB Engines</a>
 			<a class="{~D:AppData.Lab.Computed.Navigation.SeedDatasetsClass~}" href="#/view/seeddatasets">Seed Data</a>
-			<a class="{~D:AppData.Lab.Computed.Navigation.QueueLabClass~}"     href="#/view/queuelab">Queue Lab</a>
+			<a class="{~D:AppData.Lab.Computed.Navigation.BeaconExercisesClass~}"     href="#/view/beaconexercises">Beacon Exercises</a>
+			<a class="{~D:AppData.Lab.Computed.Navigation.OperationExercisesClass~}"  href="#/view/operationexercises">Operation Exercises</a>
 		</nav>
 	</details>
 
@@ -168,7 +169,8 @@ const _ViewConfiguration =
 		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.BeaconsClass~}"      href="#/view/beacons">Ultravisor Beacons</a>
 		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.DBEnginesClass~}"    href="#/view/dbengines">DB Engines</a>
 		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.SeedDatasetsClass~}" href="#/view/seeddatasets">Seed Data</a>
-		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.QueueLabClass~}"     href="#/view/queuelab">Queue Lab</a>
+		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.BeaconExercisesClass~}"     href="#/view/beaconexercises">Beacon Exercises</a>
+		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.OperationExercisesClass~}"  href="#/view/operationexercises">Operation Exercises</a>
 	</nav>
 
 	<span class="lab-header-spacer"></span>
@@ -212,7 +214,8 @@ class LabNavigationView extends libPictView
 			UltravisorClass:     tmpActive === 'Ultravisor'   ? 'active' : '',
 			BeaconsClass:        tmpActive === 'Beacons'      ? 'active' : '',
 			SeedDatasetsClass:   tmpActive === 'SeedDatasets' ? 'active' : '',
-			QueueLabClass:       tmpActive === 'QueueLab'     ? 'active' : '',
+			BeaconExercisesClass:       tmpActive === 'BeaconExercises'     ? 'active' : '',
+			OperationExercisesClass:    tmpActive === 'OperationExercises'  ? 'active' : '',
 			EventsClass:         tmpActive === 'Events'       ? 'active' : ''
 		};
 

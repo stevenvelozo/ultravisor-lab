@@ -1,5 +1,5 @@
 {
-	"Hash": "qs-oversubscribed-single-beacon",
+	"Hash": "be-oversubscribed-single-beacon",
 	"Name": "Oversubscribed single beacon",
 	"Description": "Two synthetic beacons, each MaxConcurrent=1, advertising distinct capabilities.  Workload mixes both capabilities so head-of-line blocking on the global FIFO queue *can't* happen across beacons (each capability has its own dedicated worker).  If NoCrossCapabilityHeadOfLineBlocking fails here it indicates the scheduler is parking work for capability A behind capability B's items rather than dispatching to the idle B beacon -- the smoking-gun signal that cross-capability scheduling rules are needed.",
 	"Targets": {},

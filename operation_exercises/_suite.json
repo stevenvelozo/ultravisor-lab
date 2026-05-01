@@ -1,0 +1,19 @@
+{
+	"Name": "Operation Exercises Suite",
+	"Description": "Single global suite that owns the synthetic-beacon fleet shared by every operation exercise.  The fleet is provisioned once on the first run in a lab session; subsequent exercise runs reuse the connected beacons.  Beacons stay up until the lab process exits.  The two 'syn-direct-*' beacons advertise BindAddresses so UV's reachability prober can verify direct beacon-to-beacon transport (the rest are WS-only and show up as no-listener on the reachability map).",
+	"Fleet":
+	{
+		"Beacons":
+		[
+			{ "Name": "syn-parser",      "Capability": "Parser",          "Actions": ["Parse", "ParseStrict"],         "MaxConcurrent": 1, "DefaultDurationMs": 1500, "RunMode": "child-process" },
+			{ "Name": "syn-transformer", "Capability": "Transformer",     "Actions": ["Transform", "Enrich"],          "MaxConcurrent": 1, "DefaultDurationMs": 1500, "RunMode": "child-process" },
+			{ "Name": "syn-validator",   "Capability": "Validator",       "Actions": ["Validate", "ValidateStrict"],   "MaxConcurrent": 1, "DefaultDurationMs": 1500, "RunMode": "child-process" },
+			{ "Name": "syn-loader",      "Capability": "Loader",          "Actions": ["Load", "LoadIncremental"],      "MaxConcurrent": 2, "DefaultDurationMs": 1500, "RunMode": "child-process" },
+			{ "Name": "syn-di",          "Capability": "DataIntegration", "Actions": ["Process"],                       "MaxConcurrent": 1, "DefaultDurationMs": 1500, "RunMode": "child-process" },
+			{ "Name": "syn-vid",         "Capability": "VideoTranscode",  "Actions": ["Encode"],                        "MaxConcurrent": 1, "DefaultDurationMs": 1500, "RunMode": "child-process" },
+			{ "Name": "syn-file",        "Capability": "FileTransfer",    "Actions": ["Transfer"],                      "MaxConcurrent": 1, "DefaultDurationMs": 1500, "RunMode": "child-process" },
+			{ "Name": "syn-direct-a",    "Capability": "DirectA",         "Actions": ["Echo"],                          "MaxConcurrent": 1, "DefaultDurationMs": 500,  "RunMode": "child-process", "BindPort": 54401, "BindIP": "0.0.0.0", "AdvertiseIP": "host.docker.internal" },
+			{ "Name": "syn-direct-b",    "Capability": "DirectB",         "Actions": ["Echo"],                          "MaxConcurrent": 1, "DefaultDurationMs": 500,  "RunMode": "child-process", "BindPort": 54402, "BindIP": "0.0.0.0", "AdvertiseIP": "host.docker.internal" }
+		]
+	}
+}

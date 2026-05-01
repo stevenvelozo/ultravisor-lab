@@ -11,7 +11,8 @@
 		{ "path": "/view/ultravisor",     "template": "{~LV:Pict.PictApplication.setActiveView(`Ultravisor`)~}" },
 		{ "path": "/view/beacons",        "template": "{~LV:Pict.PictApplication.setActiveView(`Beacons`)~}" },
 		{ "path": "/view/seeddatasets",   "template": "{~LV:Pict.PictApplication.setActiveView(`SeedDatasets`)~}" },
-		{ "path": "/view/queuelab",       "template": "{~LV:Pict.PictApplication.setActiveView(`QueueLab`)~}" },
+		{ "path": "/view/beaconexercises",       "template": "{~LV:Pict.PictApplication.setActiveView(`BeaconExercises`)~}" },
+		{ "path": "/view/operationexercises",    "template": "{~LV:Pict.PictApplication.setActiveView(`OperationExercises`)~}" },
 		{ "path": "/view/events",         "template": "{~LV:Pict.PictApplication.setActiveView(`Events`)~}" },
 
 		{ "path": "/system/reconcile",    "template": "{~LV:Pict.PictApplication.triggerReconcile()~}" },
@@ -54,7 +55,12 @@
 		{ "path": "/seeds/:hash/run",           "template": "{~LV:Pict.PictApplication.runSeedDataset(Record.data.hash)~}" },
 		{ "path": "/seeds/:hash/seed-to-engine","template": "{~LV:Pict.PictApplication.seedDatasetToEngine(Record.data.hash)~}" },
 
-		{ "path": "/queuelab/:hash/run",        "template": "{~LV:Pict.PictApplication.runQueueScenario(Record.data.hash)~}" },
-		{ "path": "/queuelab/runs/:id/cancel",  "template": "{~LV:Pict.PictApplication.cancelQueueScenarioRun(Record.data.id)~}" }
+		{ "path": "/beaconexercises/select-uv",        "template": "{~LV:Pict.PictApplication.setBeaconExerciseTargetUV()~}" },
+		{ "path": "/beaconexercises/:hash/run",        "template": "{~LV:Pict.PictApplication.runBeaconExercise(Record.data.hash)~}" },
+		{ "path": "/beaconexercises/runs/:id/cancel",  "template": "{~LV:Pict.PictApplication.cancelBeaconExerciseRun(Record.data.id)~}" },
+
+		{ "path": "/operationexercises/select-uv",        "template": "{~LV:Pict.PictApplication.setOperationExerciseTargetUV()~}" },
+		{ "path": "/operationexercises/:hash/run",        "template": "{~LV:Pict.PictApplication.runOperationExercise(Record.data.hash)~}" },
+		{ "path": "/operationexercises/runs/:id/cancel",  "template": "{~LV:Pict.PictApplication.cancelOperationExerciseRun(Record.data.id)~}" }
 	]
 }

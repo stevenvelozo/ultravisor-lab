@@ -1,5 +1,5 @@
 {
-	"Hash": "qs-mixed-three-capability",
+	"Hash": "be-mixed-three-capability",
 	"Name": "Mixed three-capability drain",
 	"Description": "Three synthetic capabilities (data integration, video transcode, file transfer) each backed by a dedicated beacon.  Workload is interleaved so all three capabilities have items pending across the same wall-clock window.  All three should run in parallel; if a capability never observes concurrency or BlockingWindows fire, the scheduler is over-serializing across capabilities.",
 	"Targets": {},

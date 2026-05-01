@@ -35,7 +35,11 @@ let _Config =
 		Capability: 'Synthetic',
 		Actions: ['Process'],
 		DefaultDurationMs: 2000,
-		MaxConcurrent: 1
+		MaxConcurrent: 1,
+		BindPort: 0,
+		BindIP: '127.0.0.1',
+		BindProtocol: 'http',
+		AdvertiseIP: ''
 	};
 
 function parseActions(pValue)
@@ -78,6 +82,10 @@ for (let i = 2; i < process.argv.length; i++)
 	else if (tmpArg === '--actions' && process.argv[i + 1])            { _Config.Actions = parseActions(process.argv[++i]); }
 	else if (tmpArg === '--default-duration-ms' && process.argv[i + 1]) { _Config.DefaultDurationMs = Number(process.argv[++i]); }
 	else if (tmpArg === '--max-concurrent' && process.argv[i + 1])     { _Config.MaxConcurrent = Number(process.argv[++i]); }
+	else if (tmpArg === '--bind-port' && process.argv[i + 1])          { _Config.BindPort = Number(process.argv[++i]); }
+	else if (tmpArg === '--bind-ip' && process.argv[i + 1])            { _Config.BindIP = process.argv[++i]; }
+	else if (tmpArg === '--bind-protocol' && process.argv[i + 1])      { _Config.BindProtocol = process.argv[++i]; }
+	else if (tmpArg === '--advertise-ip' && process.argv[i + 1])       { _Config.AdvertiseIP = process.argv[++i]; }
 	else if (tmpArg === '--help' || tmpArg === '-h')
 	{
 		console.log(`Usage: synthetic-beacon-runner [options]
@@ -90,6 +98,13 @@ Options:
   --actions A,B,C            CSV of action names (default Process)
   --default-duration-ms N    Default sleep per action (default 2000)
   --max-concurrent N         Per-beacon concurrency limit (default 1)
+  --bind-port N              Bind a tiny HTTP listener so UV can probe
+                             direct reachability (default 0 = disabled)
+  --bind-ip IP               Listener bind IP (default 127.0.0.1)
+  --bind-protocol PROTO      Listener protocol (default http)
+  --advertise-ip IP          IP to advertise in BindAddresses (defaults
+                             to --bind-ip; set when UV runs in a
+                             container, e.g. host.docker.internal)
   --config PATH              JSON config file (overlaid before CLI args)
 `);
 		process.exit(0);
@@ -107,7 +122,11 @@ let tmpHarness = new libSyntheticBeaconHarness(
 		Capability: _Config.Capability,
 		Actions: _Config.Actions,
 		DefaultDurationMs: _Config.DefaultDurationMs,
-		MaxConcurrent: _Config.MaxConcurrent
+		MaxConcurrent: _Config.MaxConcurrent,
+		BindPort: _Config.BindPort,
+		BindIP: _Config.BindIP,
+		BindProtocol: _Config.BindProtocol,
+		AdvertiseIP: _Config.AdvertiseIP
 	});
 
 tmpHarness.start((pError, pBeaconID) =>

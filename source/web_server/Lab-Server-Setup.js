@@ -33,7 +33,8 @@ const libServiceBeaconTypeRegistry = require('../services/Service-BeaconTypeRegi
 const libServiceBeaconManager      = require('../services/Service-BeaconManager.js');
 const libServiceBeaconContainerManager = require('../services/Service-BeaconContainerManager.js');
 const libServiceSeedDatasetManager   = require('../services/Service-SeedDatasetManager.js');
-const libServiceQueueScenarioManager = require('../services/Service-QueueScenarioManager.js');
+const libServiceBeaconExerciseManager = require('../services/Service-BeaconExerciseManager.js');
+const libServiceOperationExerciseManager = require('../services/Service-OperationExerciseManager.js');
 const libServiceLabLifecycle         = require('../services/Service-LabLifecycle.js');
 
 const libRoutesSystem          = require('./routes/Lab-Api-System.js');
@@ -43,7 +44,8 @@ const libRoutesDBEngines       = require('./routes/Lab-Api-DBEngines.js');
 const libRoutesUltravisor      = require('./routes/Lab-Api-Ultravisor.js');
 const libRoutesBeacons         = require('./routes/Lab-Api-Beacons.js');
 const libRoutesSeedDatasets    = require('./routes/Lab-Api-SeedDatasets.js');
-const libRoutesQueueScenarios  = require('./routes/Lab-Api-QueueScenarios.js');
+const libRoutesBeaconExercises  = require('./routes/Lab-Api-BeaconExercises.js');
+const libRoutesOperationExercises = require('./routes/Lab-Api-OperationExercises.js');
 
 function setupLabServer(pOptions, fCallback)
 {
@@ -96,7 +98,8 @@ function setupLabServer(pOptions, fCallback)
 	tmpFable.addAndInstantiateServiceType('LabBeaconContainerManager', libServiceBeaconContainerManager);
 	tmpFable.addAndInstantiateServiceType('LabBeaconManager',      libServiceBeaconManager);
 	tmpFable.addAndInstantiateServiceType('LabSeedDatasetManager',   libServiceSeedDatasetManager);
-	tmpFable.addAndInstantiateServiceType('LabQueueScenarioManager', libServiceQueueScenarioManager);
+	tmpFable.addAndInstantiateServiceType('LabBeaconExerciseManager', libServiceBeaconExerciseManager);
+	tmpFable.addAndInstantiateServiceType('LabOperationExerciseManager', libServiceOperationExerciseManager);
 	tmpFable.addAndInstantiateServiceType('LabLifecycle',            libServiceLabLifecycle);
 
 	tmpFable.LabStateStore.initialize(
@@ -137,7 +140,8 @@ function setupLabServer(pOptions, fCallback)
 						BeaconManager:      tmpFable.LabBeaconManager,
 						BeaconContainerManager: tmpFable.LabBeaconContainerManager,
 						SeedDatasetManager:   tmpFable.LabSeedDatasetManager,
-						QueueScenarioManager: tmpFable.LabQueueScenarioManager,
+						BeaconExerciseManager: tmpFable.LabBeaconExerciseManager,
+						OperationExerciseManager: tmpFable.LabOperationExerciseManager,
 						Lifecycle:            tmpFable.LabLifecycle,
 						Package:              tmpPackage
 					};
@@ -166,7 +170,8 @@ function setupLabServer(pOptions, fCallback)
 							libRoutesUltravisor(tmpCore);
 							libRoutesBeacons(tmpCore);
 							libRoutesSeedDatasets(tmpCore);
-							libRoutesQueueScenarios(tmpCore);
+							libRoutesBeaconExercises(tmpCore);
+							libRoutesOperationExercises(tmpCore);
 
 							// Static bundle.  During dev we serve the `web/` source tree
 							// directly.  The browser bundle only exists after `npm run

@@ -23,11 +23,34 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ca-certificates \
+	&& apt-get install -y --no-install-recommends \
+		ca-certificates \
+		python3 \
+		make \
+		g++ \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& npm init -y >/dev/null \
 	&& npm install --omit=dev --ignore-scripts "ultravisor@${VERSION}" \
-	&& npm cache clean --force
+	&& npm rebuild better-sqlite3 \
+	&& npm cache clean --force \
+	&& apt-get purge -y python3 make g++ \
+	&& apt-get autoremove -y \
+	&& rm -rf /root/.npm
+
+# Notes on the install dance:
+#   - --ignore-scripts is intentional on the main install: ultravisor's
+#     postinstall builds the webinterface bundle, which is heavy and
+#     redundant (the published package already ships webinterface/dist).
+#   - But better-sqlite3 ships a native binding that MUST be compiled
+#     against the container's platform + node version.  npm rebuild
+#     runs just that package's install scripts, gyp-building the addon
+#     against the python3/make/g++ tools above.
+#   - Without the rebuild, BeaconQueueStore (and every UV service that
+#     uses better-sqlite3) fails to load with "Could not locate the
+#     bindings file" and the queue persistence layer disables itself,
+#     producing every-tick "No persistence backend (beacon or local)
+#     available" warnings in the UV log.
+#   - Build tools are purged at the end to keep the image lean.
 
 # Runtime state volume -- the lab bind-mounts the ultravisor's data dir here.
 # Layout expected inside: .ultravisor.json (config), operations/ (library),

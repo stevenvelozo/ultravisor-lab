@@ -1,5 +1,5 @@
 /**
- * PictView-Lab-QueueLab
+ * PictView-Lab-BeaconExercises
  *
  * Tab for the queue-testing harness: pick a target Ultravisor, see live
  * queue counters (per-capability + global buckets), browse the scenario
@@ -10,8 +10,8 @@
  * the UV's /Beacon/Queue REST endpoint) -- not via direct browser→UV
  * WebSocket, to keep the page same-origin.
  *
- * Data flow: persisted state lives in `AppData.Lab.QueueLab`. Derived
- * display records land in `AppData.Lab.Computed.QueueLab` during
+ * Data flow: persisted state lives in `AppData.Lab.BeaconExercises`. Derived
+ * display records land in `AppData.Lab.Computed.BeaconExercises` during
  * onBeforeRender. Templates iterate via {~TS:~}; no HTML construction
  * in JS.
  */
@@ -21,8 +21,8 @@ const libPictView = require('pict-view');
 
 const _ViewConfiguration =
 {
-	ViewIdentifier:            'Lab-QueueLab',
-	DefaultRenderable:         'Lab-QueueLab-Main',
+	ViewIdentifier:            'Lab-BeaconExercises',
+	DefaultRenderable:         'Lab-BeaconExercises-Main',
 	DefaultDestinationAddress: '#Lab-Content-Container',
 
 	AutoRender: false,
@@ -100,7 +100,7 @@ const _ViewConfiguration =
 .lab-queue-bycap-table th { background: #fcfcfd; color: #64748b; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
 .lab-queue-bycap-empty { padding: 12px 18px; text-align: center; color: #64748b; font-size: 12px; }
 
-.lab-queue-scenarios { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.lab-beacon-exercises { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
 .lab-queue-card
 {
 	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px;
@@ -152,6 +152,7 @@ const _ViewConfiguration =
 .lab-queue-runs-block .pill.timed-out        { background: #fef3c7; color: #92400e; }
 .lab-queue-runs-block .pill.canceled         { background: #e2e8f0; color: #475569; }
 .lab-queue-runs-block .pill.running          { background: #dbeafe; color: #1e40af; }
+.lab-queue-runs-block .pill.stalled          { background: #fef3c7; color: #b45309; }
 .lab-queue-runs-block .lab-queue-verdicts
 {
 	font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
@@ -177,28 +178,28 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	Templates:
 	[
 		{
-			Hash: 'Lab-QueueLab-Main-Template',
+			Hash: 'Lab-BeaconExercises-Main-Template',
 			Template: /*html*/`
 <div class="lab-queue">
 	<div class="lab-queue-toolbar">
-		<h2>Queue Lab</h2>
+		<h2>Beacon Exercises</h2>
 	</div>
 	<div class="lab-queue-targets">
 		<label>Target Ultravisor
-			<select id="Lab-QueueLab-Targets-Ultravisor">{~TS:Lab-QueueLab-TargetOption-Template:AppData.Lab.Computed.QueueLab.UltravisorOptions~}</select>
+			<select id="Lab-BeaconExercises-Targets-Ultravisor" onchange="{~P~}.PictApplication.navigateTo('/beaconexercises/select-uv')">{~TS:Lab-BeaconExercises-TargetOption-Template:AppData.Lab.Computed.BeaconExercises.UltravisorOptions~}</select>
 		</label>
 	</div>
-	<div id="Lab-QueueLab-BoardSlot"></div>
-	<div id="Lab-QueueLab-ScenariosSlot"></div>
-	<div id="Lab-QueueLab-RunsSlot"></div>
+	<div id="Lab-BeaconExercises-BoardSlot"></div>
+	<div id="Lab-BeaconExercises-ScenariosSlot"></div>
+	<div id="Lab-BeaconExercises-RunsSlot"></div>
 </div>`
 		},
 		{
-			Hash: 'Lab-QueueLab-Board-Template',
-			Template: /*html*/`{~TS:Lab-QueueLab-BoardCard-Template:AppData.Lab.Computed.QueueLab.BoardSlot~}`
+			Hash: 'Lab-BeaconExercises-Board-Template',
+			Template: /*html*/`{~TS:Lab-BeaconExercises-BoardCard-Template:AppData.Lab.Computed.BeaconExercises.BoardSlot~}`
 		},
 		{
-			Hash: 'Lab-QueueLab-BoardCard-Template',
+			Hash: 'Lab-BeaconExercises-BoardCard-Template',
 			Template: /*html*/`
 <div class="lab-queue-board">
 	<h3>Live queue <span class="lab-queue-board-tag">{~D:Record.Tag~}</span></h3>
@@ -224,48 +225,48 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 			<div class="lab-queue-bucket-label">Errored</div>
 		</div>
 	</div>
-	{~TS:Lab-QueueLab-ByCapTable-Template:Record.ByCapacityWrap~}
-	{~TS:Lab-QueueLab-ByCapEmpty-Template:Record.EmptyWrap~}
+	{~TS:Lab-BeaconExercises-ByCapTable-Template:Record.ByCapacityWrap~}
+	{~TS:Lab-BeaconExercises-ByCapEmpty-Template:Record.EmptyWrap~}
 </div>`
 		},
 		{
-			Hash: 'Lab-QueueLab-ByCapTable-Template',
+			Hash: 'Lab-BeaconExercises-ByCapTable-Template',
 			Template: /*html*/`
 <table class="lab-queue-bycap-table">
 	<thead>
 		<tr><th>Capability</th><th>Action</th><th>Queued</th><th>Running</th><th>Stalled</th></tr>
 	</thead>
-	<tbody>{~TS:Lab-QueueLab-ByCapRow-Template:Record.Rows~}</tbody>
+	<tbody>{~TS:Lab-BeaconExercises-ByCapRow-Template:Record.Rows~}</tbody>
 </table>`
 		},
 		{
-			Hash: 'Lab-QueueLab-ByCapRow-Template',
+			Hash: 'Lab-BeaconExercises-ByCapRow-Template',
 			Template: /*html*/`<tr><td>{~D:Record.Capability~}</td><td>{~D:Record.Action~}</td><td>{~D:Record.Queued~}</td><td>{~D:Record.Running~}</td><td>{~D:Record.Stalled~}</td></tr>`
 		},
 		{
-			Hash: 'Lab-QueueLab-ByCapEmpty-Template',
+			Hash: 'Lab-BeaconExercises-ByCapEmpty-Template',
 			Template: /*html*/`<div class="lab-queue-bycap-empty">No capabilities currently in flight.</div>`
 		},
 		{
-			Hash: 'Lab-QueueLab-TargetOption-Template',
+			Hash: 'Lab-BeaconExercises-TargetOption-Template',
 			Template: /*html*/`<option value="{~D:Record.Value~}" {~D:Record.SelectedAttr~} {~D:Record.DisabledAttr~}>{~D:Record.Label~}</option>`
 		},
 		{
-			Hash: 'Lab-QueueLab-Scenarios-Template',
+			Hash: 'Lab-BeaconExercises-Scenarios-Template',
 			Template: /*html*/`
-{~TS:Lab-QueueLab-Empty-Template:AppData.Lab.Computed.QueueLab.EmptySlot~}
-{~TS:Lab-QueueLab-CardsContainer-Template:AppData.Lab.Computed.QueueLab.ListSlot~}`
+{~TS:Lab-BeaconExercises-Empty-Template:AppData.Lab.Computed.BeaconExercises.EmptySlot~}
+{~TS:Lab-BeaconExercises-CardsContainer-Template:AppData.Lab.Computed.BeaconExercises.ListSlot~}`
 		},
 		{
-			Hash: 'Lab-QueueLab-Empty-Template',
-			Template: /*html*/`<div class="lab-queue-empty">No queue scenarios found under <code>queue_scenarios/</code>.</div>`
+			Hash: 'Lab-BeaconExercises-Empty-Template',
+			Template: /*html*/`<div class="lab-queue-empty">No queue scenarios found under <code>beacon_exercises/</code>.</div>`
 		},
 		{
-			Hash: 'Lab-QueueLab-CardsContainer-Template',
-			Template: /*html*/`<div class="lab-queue-scenarios">{~TS:Lab-QueueLab-Card-Template:Record.Cards~}</div>`
+			Hash: 'Lab-BeaconExercises-CardsContainer-Template',
+			Template: /*html*/`<div class="lab-beacon-exercises">{~TS:Lab-BeaconExercises-Card-Template:Record.Cards~}</div>`
 		},
 		{
-			Hash: 'Lab-QueueLab-Card-Template',
+			Hash: 'Lab-BeaconExercises-Card-Template',
 			Template: /*html*/`
 <div class="lab-queue-card">
 	<h3>{~D:Record.Name~}</h3>
@@ -276,16 +277,16 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<span><span class="k">Cadence:</span> <span class="v">{~D:Record.Cadence~}</span></span>
 	</div>
 	<div class="lab-queue-card-actions">
-		<a class="lab-btn {~D:Record.Disabled~}" href="#/queuelab/{~D:Record.Hash~}/run" title="{~D:Record.Hint~}">Run on Ultravisor →</a>
+		<a class="lab-btn {~D:Record.Disabled~}" href="#/beaconexercises/{~D:Record.Hash~}/run" title="{~D:Record.Hint~}">Run on Ultravisor →</a>
 	</div>
 </div>`
 		},
 		{
-			Hash: 'Lab-QueueLab-Runs-Template',
-			Template: /*html*/`{~TS:Lab-QueueLab-RunsBlock-Template:AppData.Lab.Computed.QueueLab.RunsSlot~}`
+			Hash: 'Lab-BeaconExercises-Runs-Template',
+			Template: /*html*/`{~TS:Lab-BeaconExercises-RunsBlock-Template:AppData.Lab.Computed.BeaconExercises.RunsSlot~}`
 		},
 		{
-			Hash: 'Lab-QueueLab-RunsBlock-Template',
+			Hash: 'Lab-BeaconExercises-RunsBlock-Template',
 			Template: /*html*/`
 <div class="lab-queue-runs-block">
 	<h3>Recent runs</h3>
@@ -300,12 +301,12 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 				<th>Verdicts</th>
 			</tr>
 		</thead>
-		<tbody>{~TS:Lab-QueueLab-RunRow-Template:Record.Rows~}</tbody>
+		<tbody>{~TS:Lab-BeaconExercises-RunRow-Template:Record.Rows~}</tbody>
 	</table>
 </div>`
 		},
 		{
-			Hash: 'Lab-QueueLab-RunRow-Template',
+			Hash: 'Lab-BeaconExercises-RunRow-Template',
 			Template: /*html*/`
 <tr>
 	<td>{~D:Record.Started~}</td>
@@ -313,11 +314,11 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	<td><span class="pill {~D:Record.Status~}">{~D:Record.Status~}</span></td>
 	<td>{~D:Record.DrainSeconds~}s</td>
 	<td>{~D:Record.Items~}</td>
-	<td>{~TS:Lab-QueueLab-VerdictLine-Template:Record.Verdicts~}{~D:Record.ErrorMessage~}</td>
+	<td>{~TS:Lab-BeaconExercises-VerdictLine-Template:Record.Verdicts~}{~D:Record.ErrorMessage~}</td>
 </tr>`
 		},
 		{
-			Hash: 'Lab-QueueLab-VerdictLine-Template',
+			Hash: 'Lab-BeaconExercises-VerdictLine-Template',
 			Template: /*html*/`<div class="lab-queue-verdict-row {~D:Record.PassClass~}">{~D:Record.Label~}</div>`
 		}
 	],
@@ -325,29 +326,29 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	Renderables:
 	[
 		{
-			RenderableHash:            'Lab-QueueLab-Main',
-			TemplateHash:              'Lab-QueueLab-Main-Template',
+			RenderableHash:            'Lab-BeaconExercises-Main',
+			TemplateHash:              'Lab-BeaconExercises-Main-Template',
 			ContentDestinationAddress: '#Lab-Content-Container'
 		},
 		{
-			RenderableHash:            'Lab-QueueLab-Board',
-			TemplateHash:              'Lab-QueueLab-Board-Template',
-			ContentDestinationAddress: '#Lab-QueueLab-BoardSlot'
+			RenderableHash:            'Lab-BeaconExercises-Board',
+			TemplateHash:              'Lab-BeaconExercises-Board-Template',
+			ContentDestinationAddress: '#Lab-BeaconExercises-BoardSlot'
 		},
 		{
-			RenderableHash:            'Lab-QueueLab-Scenarios',
-			TemplateHash:              'Lab-QueueLab-Scenarios-Template',
-			ContentDestinationAddress: '#Lab-QueueLab-ScenariosSlot'
+			RenderableHash:            'Lab-BeaconExercises-Scenarios',
+			TemplateHash:              'Lab-BeaconExercises-Scenarios-Template',
+			ContentDestinationAddress: '#Lab-BeaconExercises-ScenariosSlot'
 		},
 		{
-			RenderableHash:            'Lab-QueueLab-Runs',
-			TemplateHash:              'Lab-QueueLab-Runs-Template',
-			ContentDestinationAddress: '#Lab-QueueLab-RunsSlot'
+			RenderableHash:            'Lab-BeaconExercises-Runs',
+			TemplateHash:              'Lab-BeaconExercises-Runs-Template',
+			ContentDestinationAddress: '#Lab-BeaconExercises-RunsSlot'
 		}
 	]
 };
 
-class LabQueueLabView extends libPictView
+class LabBeaconExercisesView extends libPictView
 {
 	constructor(pFable, pOptions, pServiceHash)
 	{
@@ -356,9 +357,9 @@ class LabQueueLabView extends libPictView
 
 	onBeforeRender(pRenderable)
 	{
-		if (!this.pict.AppData.Lab.QueueLab) { this.pict.AppData.Lab.QueueLab = {}; }
+		if (!this.pict.AppData.Lab.BeaconExercises) { this.pict.AppData.Lab.BeaconExercises = {}; }
 		if (!this.pict.AppData.Lab.Computed) { this.pict.AppData.Lab.Computed = {}; }
-		let tmpState = this.pict.AppData.Lab.QueueLab;
+		let tmpState = this.pict.AppData.Lab.BeaconExercises;
 		if (!tmpState.Targets)   { tmpState.Targets = { IDUltravisorInstance: 0 }; }
 		if (!tmpState.Scenarios) { tmpState.Scenarios = []; }
 		if (!tmpState.Runs)      { tmpState.Runs = []; }
@@ -366,7 +367,7 @@ class LabQueueLabView extends libPictView
 		let tmpScenarios = tmpState.Scenarios;
 		let tmpRuns = tmpState.Runs;
 
-		this.pict.AppData.Lab.Computed.QueueLab =
+		this.pict.AppData.Lab.Computed.BeaconExercises =
 		{
 			UltravisorOptions: this._buildUltravisorOptions(tmpState),
 			BoardSlot:         [this._buildBoardRecord(tmpState)],
@@ -380,11 +381,11 @@ class LabQueueLabView extends libPictView
 	onAfterRender(pRenderable, pAddress, pRecord, pContent)
 	{
 		let tmpHash = pRenderable && pRenderable.RenderableHash;
-		if (tmpHash === 'Lab-QueueLab-Main' || !tmpHash)
+		if (tmpHash === 'Lab-BeaconExercises-Main' || !tmpHash)
 		{
-			this.render('Lab-QueueLab-Board');
-			this.render('Lab-QueueLab-Scenarios');
-			this.render('Lab-QueueLab-Runs');
+			this.render('Lab-BeaconExercises-Board');
+			this.render('Lab-BeaconExercises-Scenarios');
+			this.render('Lab-BeaconExercises-Runs');
 		}
 		this.pict.CSSMap.injectCSS();
 		return super.onAfterRender(pRenderable, pAddress, pRecord, pContent);
@@ -446,8 +447,63 @@ class LabQueueLabView extends libPictView
 	_buildCards(pState)
 	{
 		let tmpScenarios = pState.Scenarios || [];
-		let tmpHasTarget = !!(pState.Targets && pState.Targets.IDUltravisorInstance);
-		let tmpHint = tmpHasTarget ? 'Provision the scenario\'s beacons and drive its workload.' : 'Pick a target Ultravisor above first.';
+		let tmpTargetID = (pState.Targets && pState.Targets.IDUltravisorInstance) || 0;
+		let tmpInstances = (this.pict.AppData.Lab.Ultravisor && this.pict.AppData.Lab.Ultravisor.Instances) || [];
+		let tmpTargetUV = tmpInstances.find((pUv) => String(pUv.IDUltravisorInstance) === String(tmpTargetID));
+		// Whether the harness can enqueue depends on the UV's auth
+		// configuration.  With ultravisor>=1.0.31's anonymous-fallback
+		// fix, the UV synthesizes an anonymous session when no
+		// auth-beacon is connected -- so promiscuous UVs without an
+		// auth-beacon are exercisable.  Two valid modes:
+		//   - Secure + auth-beacon attached: harness bootstraps admin,
+		//                                    logs in, sends cookies.
+		//   - Promiscuous + no auth-beacon: harness enqueues anonymously,
+		//                                    UV accepts via fallback.
+		// Two invalid configs surface as hints:
+		//   - Secure + no auth-beacon: bootstrap/login can't run.
+		//   - Promiscuous + auth-beacon: auth-beacon present blocks the
+		//                                anonymous fallback, but no
+		//                                BootstrapAuthSecret to provision
+		//                                an admin to log in with.
+		let tmpAttachedAuth = this._hasAuthBeacon(tmpTargetID);
+		let tmpEnabled = false;
+		let tmpHint = '';
+		if (!tmpTargetID)
+		{
+			tmpHint = 'Pick a target Ultravisor above first.';
+		}
+		else if (!tmpTargetUV)
+		{
+			tmpHint = 'Selected Ultravisor not found in catalog.';
+		}
+		else if (tmpTargetUV.Status !== 'running')
+		{
+			tmpHint = `Ultravisor '${tmpTargetUV.Name}' is ${tmpTargetUV.Status}; start it first.`;
+		}
+		else if (tmpTargetUV.Secure)
+		{
+			if (!tmpAttachedAuth)
+			{
+				tmpHint = `Ultravisor '${tmpTargetUV.Name}' is in Secure mode but has no auth-beacon attached; attach an ultravisor-auth-beacon so the harness can bootstrap the admin user and log in.`;
+			}
+			else
+			{
+				tmpEnabled = true;
+				tmpHint = 'Secure mode + auth-beacon attached: harness bootstraps an admin, logs in, then provisions the scenario\'s beacons and drives its workload.';
+			}
+		}
+		else
+		{
+			if (tmpAttachedAuth)
+			{
+				tmpHint = `Ultravisor '${tmpTargetUV.Name}' is promiscuous but has an auth-beacon attached; the auth-beacon blocks the UV's anonymous-fallback path, and there's no BootstrapAuthSecret to log in with.  Either remove the auth-beacon or recreate the UV in Secure mode.`;
+			}
+			else
+			{
+				tmpEnabled = true;
+				tmpHint = 'Promiscuous mode (no auth-beacon): UV synthesizes an anonymous session for the harness; enqueue goes through without a login.';
+			}
+		}
 		return tmpScenarios.map((pSc) => (
 			{
 				Hash:          pSc.Hash,
@@ -456,9 +512,24 @@ class LabQueueLabView extends libPictView
 				BeaconCount:   pSc.BeaconCount,
 				WorkloadCount: pSc.WorkloadCount,
 				Cadence:       this._escape(pSc.Cadence || 'burst'),
-				Disabled:      tmpHasTarget ? '' : 'disabled',
+				Disabled:      tmpEnabled ? '' : 'disabled',
 				Hint:          tmpHint
 			}));
+	}
+
+	_hasAuthBeacon(pUvID)
+	{
+		if (!pUvID) { return false; }
+		let tmpBeacons = (this.pict.AppData.Lab.Beacons && this.pict.AppData.Lab.Beacons.Beacons) || [];
+		for (let i = 0; i < tmpBeacons.length; i++)
+		{
+			let tmpBeacon = tmpBeacons[i];
+			if (tmpBeacon.BeaconType !== 'ultravisor-auth-beacon') { continue; }
+			if (String(tmpBeacon.IDUltravisorInstance) !== String(pUvID)) { continue; }
+			if (tmpBeacon.Status !== 'running') { continue; }
+			return true;
+		}
+		return false;
 	}
 
 	_buildRunRows(pRuns)
@@ -526,5 +597,5 @@ class LabQueueLabView extends libPictView
 	}
 }
 
-module.exports = LabQueueLabView;
+module.exports = LabBeaconExercisesView;
 module.exports.default_configuration = _ViewConfiguration;

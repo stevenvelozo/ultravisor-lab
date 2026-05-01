@@ -1,0 +1,20 @@
+{
+	"Hash": "oe-mixed-concurrent",
+	"Name": "Mixed Concurrent",
+	"Description": "Three different operation graphs (etl-linear + etl-strict + validation-only) kicked at the same instant.  Exercises different ops sharing node types and RunID isolation.",
+	"Targets": {},
+	"Operations": [ "etl-linear", "etl-strict", "validation-only" ],
+	"Kicks":
+	[
+		{ "OperationHash": "etl-linear",      "Count": 1, "EnqueueAtMs": 0 },
+		{ "OperationHash": "etl-strict",      "Count": 1, "EnqueueAtMs": 0 },
+		{ "OperationHash": "validation-only", "Count": 1, "EnqueueAtMs": 0 }
+	],
+	"Assertions":
+	{
+		"AllOperationsCompleted": true,
+		"MaxOperationDurationSeconds": 45,
+		"MaxFailedOperations": 0,
+		"MinSuccessfulOperations": 3
+	}
+}

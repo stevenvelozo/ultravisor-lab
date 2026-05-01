@@ -1,0 +1,18 @@
+{
+	"Hash": "oe-loader-bottleneck",
+	"Name": "Loader Bottleneck",
+	"Description": "8 etl-linear operations kicked at 50ms intervals.  The Loader's MaxConcurrent=2 will serialize the load nodes; upstream nodes must not pile up unboundedly.",
+	"Targets": {},
+	"Operations": [ "etl-linear" ],
+	"Kicks":
+	[
+		{ "OperationHash": "etl-linear", "Count": 8, "EnqueueAtMs": 0, "EnqueueIntervalMs": 50 }
+	],
+	"Assertions":
+	{
+		"AllOperationsCompleted": true,
+		"MaxOperationDurationSeconds": 120,
+		"MaxFailedOperations": 0,
+		"MinSuccessfulOperations": 8
+	}
+}

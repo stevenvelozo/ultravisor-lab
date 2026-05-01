@@ -1,0 +1,22 @@
+{
+	"Hash": "oe-mass-parallel",
+	"Name": "Mass Parallel",
+	"Description": "20 operations distributed across all 5 library entries, kicked at 25ms intervals.  Stress-tests the scheduler under load.",
+	"Targets": {},
+	"Operations": [ "etl-linear", "etl-strict", "validation-only", "bulk-load-fanout", "mixed-pipeline" ],
+	"Kicks":
+	[
+		{ "OperationHash": "etl-linear",       "Count": 5, "EnqueueAtMs": 0,    "EnqueueIntervalMs": 25 },
+		{ "OperationHash": "etl-strict",       "Count": 4, "EnqueueAtMs": 125,  "EnqueueIntervalMs": 25 },
+		{ "OperationHash": "validation-only",  "Count": 4, "EnqueueAtMs": 225,  "EnqueueIntervalMs": 25 },
+		{ "OperationHash": "bulk-load-fanout", "Count": 3, "EnqueueAtMs": 325,  "EnqueueIntervalMs": 25 },
+		{ "OperationHash": "mixed-pipeline",   "Count": 4, "EnqueueAtMs": 400,  "EnqueueIntervalMs": 25 }
+	],
+	"Assertions":
+	{
+		"AllOperationsCompleted": true,
+		"MaxOperationDurationSeconds": 240,
+		"MaxFailedOperations": 0,
+		"MinSuccessfulOperations": 20
+	}
+}

@@ -1,7 +1,7 @@
 /**
- * Service-QueueScenarioManager
+ * Service-BeaconExerciseManager
  *
- * Loads queue-testing scenarios from queue_scenarios/<name>/scenario.json,
+ * Loads queue-testing scenarios from beacon_exercises/<name>/scenario.json,
  * provisions the synthetic beacons each scenario asks for, drives a
  * declared workload against the target Ultravisor's queue, taps the
  * queue.* WebSocket envelopes, persists run + event rows, and evaluates
@@ -10,13 +10,13 @@
  * Public surface:
  *   list()                                     -- catalog
  *   get(pHash)                                  -- one scenario fixture
- *   run(pHash, pOptions, fCallback)             -- start a run; returns {IDQueueScenarioRun, Status}
+ *   run(pHash, pOptions, fCallback)             -- start a run; returns {IDBeaconExerciseRun, Status}
  *   listRuns()                                  -- historical runs
  *   getRun(pID)                                 -- one run + verdicts
  *   listRunEvents(pID, pPaging)                 -- raw envelopes for a run
  *   cancelRun(pID, fCallback)                   -- best-effort cancel of outstanding work items
  *
- * The scenario JSON shape lives at queue_scenarios/<name>/scenario.json:
+ * The scenario JSON shape lives at beacon_exercises/<name>/scenario.json:
  *   { Hash, Name, Description, Targets: { RequireUVName? },
  *     Beacons: [{ Name, Capability, Actions, MaxConcurrent, DefaultDurationMs, RunMode }],
  *     Workload: [{ Capability, Action, Count, Settings }],
@@ -35,7 +35,7 @@ const libFableServiceProviderBase = require('fable-serviceproviderbase');
 
 const libQueueWebSocketTap = require('./queue/QueueWebSocketTap.js');
 
-const QUEUE_SCENARIOS_ROOT = libPath.resolve(__dirname, '..', '..', 'queue_scenarios');
+const BEACON_EXERCISES_ROOT = libPath.resolve(__dirname, '..', '..', 'beacon_exercises');
 const SYNTHETIC_BEACON_BIN = libPath.resolve(__dirname, '..', 'synthetic-beacon', 'bin', 'synthetic-beacon-runner.js');
 
 // The harness logs into the target UV with a hardcoded admin user it
@@ -53,18 +53,24 @@ const RECOGNIZED_CAPABILITY_TOPICS = new Set(
 		'queue.running',
 		'queue.completed',
 		'queue.failed',
-		'queue.canceled'
+		'queue.canceled',
+		// Phase 2: stall lifecycle.  queue.stalled removes the item
+		// from the Pending/Running counters (the scheduler force-finalizes
+		// it via the Coordinator's stall path); queue.unstalled puts a
+		// recovered item back into Running.
+		'queue.stalled',
+		'queue.unstalled'
 	]);
 
-class ServiceQueueScenarioManager extends libFableServiceProviderBase
+class ServiceBeaconExerciseManager extends libFableServiceProviderBase
 {
 	constructor(pFable, pOptions, pServiceHash)
 	{
 		super(pFable, pOptions, pServiceHash);
-		this.serviceType = 'LabQueueScenarioManager';
+		this.serviceType = 'LabBeaconExerciseManager';
 
 		this._catalog = this._buildCatalog();
-		this._activeRuns = new Map();  // IDQueueScenarioRun → run context
+		this._activeRuns = new Map();  // IDBeaconExerciseRun → run context
 	}
 
 	// ── Catalog ────────────────────────────────────────────────────────────
@@ -73,18 +79,18 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 	{
 		let tmpCatalog = [];
 		let tmpEntries = [];
-		try { tmpEntries = libFs.readdirSync(QUEUE_SCENARIOS_ROOT); }
+		try { tmpEntries = libFs.readdirSync(BEACON_EXERCISES_ROOT); }
 		catch (pErr)
 		{
-			this.fable.log.warn(`QueueScenarioManager: cannot read ${QUEUE_SCENARIOS_ROOT} (${pErr.message})`);
+			this.fable.log.warn(`BeaconExerciseManager: cannot read ${BEACON_EXERCISES_ROOT} (${pErr.message})`);
 			return [];
 		}
 		for (let i = 0; i < tmpEntries.length; i++)
 		{
 			let tmpEntry = tmpEntries[i];
 			if (tmpEntry.startsWith('_') || tmpEntry.startsWith('.')) { continue; }
-			let tmpDir = libPath.join(QUEUE_SCENARIOS_ROOT, tmpEntry);
-			let tmpScenarioPath = libPath.join(tmpDir, 'scenario.json');
+			let tmpDir = libPath.join(BEACON_EXERCISES_ROOT, tmpEntry);
+			let tmpScenarioPath = libPath.join(tmpDir, 'exercise.json');
 			if (!libFs.existsSync(tmpScenarioPath)) { continue; }
 			try
 			{
@@ -93,7 +99,7 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 			}
 			catch (pParseErr)
 			{
-				this.fable.log.warn(`QueueScenarioManager: invalid scenario.json in ${tmpEntry}: ${pParseErr.message}`);
+				this.fable.log.warn(`BeaconExerciseManager: invalid scenario.json in ${tmpEntry}: ${pParseErr.message}`);
 			}
 		}
 		return tmpCatalog;
@@ -138,14 +144,14 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 
 	listRuns()
 	{
-		return this.fable.LabStateStore.list('QueueScenarioRun');
+		return this.fable.LabStateStore.list('BeaconExerciseRun');
 	}
 
 	getRun(pID)
 	{
 		let tmpID = parseInt(pID, 10);
 		if (!Number.isFinite(tmpID) || tmpID <= 0) { return null; }
-		return this.fable.LabStateStore.getById('QueueScenarioRun', 'IDQueueScenarioRun', tmpID);
+		return this.fable.LabStateStore.getById('BeaconExerciseRun', 'IDBeaconExerciseRun', tmpID);
 	}
 
 	listRunEvents(pID, pPaging)
@@ -155,8 +161,8 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 		// list() orders by PK DESC newest-first; we want chronological for
 		// timeline reading.  Reverse here; offset/limit are applied by the
 		// route layer if needed.
-		let tmpRows = this.fable.LabStateStore.list('QueueScenarioEvent',
-			{ IDQueueScenarioRun: tmpID });
+		let tmpRows = this.fable.LabStateStore.list('BeaconExerciseEvent',
+			{ IDBeaconExerciseRun: tmpID });
 		tmpRows.reverse();
 		let tmpOffset = (pPaging && Number.isFinite(parseInt(pPaging.offset, 10))) ? parseInt(pPaging.offset, 10) : 0;
 		let tmpLimit = (pPaging && Number.isFinite(parseInt(pPaging.limit, 10))) ? parseInt(pPaging.limit, 10) : tmpRows.length;
@@ -184,22 +190,23 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 		}
 		if (!tmpInstance) { return fCallback(new Error('Target Ultravisor not found.')); }
 		if (tmpInstance.Status !== 'running') { return fCallback(new Error(`Ultravisor '${tmpInstance.Name}' is not running.`)); }
-		// Risk #1 in the plan was inverted: /Beacon/Work/Enqueue gates on
-		// _requireSession unconditionally, so non-Secure UVs (no bootstrap
-		// secret, no admin) can't be enqueued against.  Phase 2 requires
-		// Secure mode so the harness can bootstrap a known admin and log in.
-		if (!tmpInstance.Secure || !tmpInstance.BootstrapAuthSecret)
-		{
-			return fCallback(new Error(
-				`Ultravisor '${tmpInstance.Name}' must be created in Secure mode (Secure: true) so the harness can bootstrap an admin user and authenticate to enqueue work.  Recreate the UV with {"Secure": true} and retry.`));
-		}
+		// Auth flow branches on the UV's mode + auth-beacon presence:
+		//   - Secure + auth-beacon attached: bootstrap-or-login path
+		//     produces a session cookie, sent on enqueues.
+		//   - Promiscuous + no auth-beacon: UV's _requireSession (post
+		//     anonymous-fallback fix, ultravisor>=1.0.31) synthesizes an
+		//     anonymous session, so the harness enqueues without a
+		//     cookie and the UV accepts it.
+		// The two unsupported configs (Secure + no auth-beacon, or
+		// promiscuous + auth-beacon attached) are surfaced to the
+		// operator via the BeaconExercises view's hint and won't get this far.
 
 		let tmpUVURL = `http://127.0.0.1:${tmpInstance.Port}`;
 
-		// Persist the run row first so the IDQueueScenarioRun is available
+		// Persist the run row first so the IDBeaconExerciseRun is available
 		// even if provisioning fails (the row records the failure).
 		let tmpStartedAt = new Date().toISOString();
-		let tmpRunID = this.fable.LabStateStore.insert('QueueScenarioRun',
+		let tmpRunID = this.fable.LabStateStore.insert('BeaconExerciseRun',
 			{
 				ScenarioHash:         tmpScenario.Hash || pHash,
 				ScenarioName:         tmpScenario.Name || pHash,
@@ -218,11 +225,12 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 
 		let tmpRunCtx =
 			{
-				IDQueueScenarioRun: tmpRunID,
+				IDBeaconExerciseRun: tmpRunID,
 				Scenario:           tmpScenario,
 				Instance:           tmpInstance,
 				UVURL:              tmpUVURL,
 				SessionCookie:      '',         // populated by _ensureLoggedIn
+				UVRunID:            '',         // hub-assigned RunID from /Beacon/Run/Start; set in _startUVRun
 				ChildProcesses:     [],          // PID list for child-process beacons
 				BeaconsByName:      new Map(),   // Name → beacon spec (for assertion analysis)
 				CapabilitySlots:    new Map(),   // Capability → total MaxConcurrent across scenario beacons
@@ -234,6 +242,14 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 				FailedHashes:       new Set(),
 				CompletedHashes:    new Set(),
 				EnqueuedHashes:     new Set(),
+				// Phase 2: Stalled tracking for the MaxStalledItems and
+				// StalledRecovered assertions.  EverStalledHashes counts
+				// every distinct work item that flipped to Stalled at
+				// least once during the run.  RecoveredStalledHashes
+				// counts the subset that came back via queue.unstalled
+				// before the operation finalized.
+				EverStalledHashes:  new Set(),
+				RecoveredStalledHashes: new Set(),
 				FirstEnqueueAt:     0,
 				FirstDispatchedAt:  0,
 				DrainedAt:          0,
@@ -241,15 +257,28 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 				HistoryReset:       false,
 				Tap:                null,
 				CompletionTimer:    null,
-				FinishedSettling:   false
+				FinishedSettling:   false,
+				// Tracking for enqueue-side failures so the run row's
+				// ErrorMessage carries the actual cause instead of a
+				// downstream "Drain watchdog fired" symptom when nothing
+				// ever made it onto the queue.
+				EnqueueErrorCount:  0,
+				FirstEnqueueError:  '',
+				AbortReason:        ''
 			};
 		this._activeRuns.set(tmpRunID, tmpRunCtx);
 
 		// Pre-compute the capability → slot count map from the scenario.
 		this._buildCapabilitySlotMap(tmpScenario, tmpRunCtx);
 
-		// Login (bootstrapping the admin if first run) → provision beacons
-		// → start tap → drive cadence → wait for drain.
+		// Login (bootstrapping the admin if first run) → start UV Run →
+		// provision beacons → start tap → drive cadence → wait for drain.
+		// Wrapping every scenario in a hub-owned Run (via /Beacon/Run/Start)
+		// makes the work items first-class citizens of UV's execution
+		// machinery: each item's RunID is set, the run shows up in UV's
+		// /Beacon/Queue, and a manifest is finalized on End.  Without
+		// this, items dispatch but UV sees them as orphan work items
+		// with no Run wrapping them and no manifest entry.
 		this._ensureLoggedIn(tmpRunCtx, (pLoginErr) =>
 			{
 				if (pLoginErr)
@@ -257,26 +286,46 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 					this._finishRun(tmpRunCtx, 'failed', pLoginErr.message);
 					return;
 				}
-				this._provisionBeacons(tmpRunCtx, (pProvisionErr) =>
+				this._startUVRun(tmpRunCtx, (pRunErr) =>
 					{
-						if (pProvisionErr)
+						if (pRunErr)
 						{
-							this._finishRun(tmpRunCtx, 'failed', pProvisionErr.message);
+							this._finishRun(tmpRunCtx, 'failed', pRunErr.message);
 							return;
 						}
-						this._startWebSocketTap(tmpRunCtx);
-						this._driveCadence(tmpRunCtx);
-						this._armDrainWatchdog(tmpRunCtx);
+						this._provisionBeacons(tmpRunCtx, (pProvisionErr) =>
+							{
+								if (pProvisionErr)
+								{
+									this._finishRun(tmpRunCtx, 'failed', pProvisionErr.message);
+									return;
+								}
+								this._startWebSocketTap(tmpRunCtx);
+								this._driveCadence(tmpRunCtx);
+								this._armDrainWatchdog(tmpRunCtx);
+							});
 					});
 			});
 
-		return fCallback(null, { IDQueueScenarioRun: tmpRunID, Status: 'running' });
+		return fCallback(null, { IDBeaconExerciseRun: tmpRunID, Status: 'running' });
 	}
 
 	// ── Auth: bootstrap-if-needed + login ──────────────────────────────────
 
 	_ensureLoggedIn(pCtx, fCallback)
 	{
+		// Promiscuous UVs (Secure: false, no BootstrapAuthSecret) rely
+		// on the UV's anonymous-fallback path -- /Beacon/Work/Enqueue
+		// returns a synthetic anonymous session when no auth-beacon is
+		// connected.  No login required; SessionCookie stays empty.
+		// Requires ultravisor>=1.0.31 in the running container; older
+		// versions will 401 unconditionally and the run will fail with
+		// a clear "Enqueue rejected" error from _enqueueOne.
+		if (!pCtx.Instance.Secure || !pCtx.Instance.BootstrapAuthSecret)
+		{
+			return fCallback(null);
+		}
+
 		// Try login first.  If the admin already exists from a prior run,
 		// this short-circuits the bootstrap path entirely.
 		this._login(pCtx, (pLoginErr, pCookie) =>
@@ -321,6 +370,68 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 					tmpCookie = tmpSetCookie[0].split(';')[0];
 				}
 				return fCallback(null, tmpCookie);
+			});
+	}
+
+	// ── UV Run lifecycle (wraps the scenario in a hub-owned Run) ──────────
+
+	_startUVRun(pCtx, fCallback)
+	{
+		// Attach the scenario's stable hash as IdempotencyKey so a
+		// re-run of the same scenario against the same UV doesn't
+		// stack up duplicate Run rows on UV's side -- it's the run-
+		// manager's job to dedup.  IdempotencyKey is conceptually a
+		// per-attempt token; we'd usually generate a new one each
+		// click, but for the harness's repeat-runs flow re-using the
+		// hash is fine (and makes audit history terser).
+		let tmpBody = JSON.stringify(
+			{
+				IdempotencyKey: `qs-${pCtx.Scenario.Hash || ''}-${pCtx.IDBeaconExerciseRun}`,
+				SubmitterTag:   'ultravisor-lab/beacon-exercise',
+				Metadata:
+					{
+						ScenarioHash: pCtx.Scenario.Hash || '',
+						ScenarioName: pCtx.Scenario.Name || '',
+						IDBeaconExerciseRun: pCtx.IDBeaconExerciseRun
+					}
+			});
+		this._httpPostJSON(pCtx.UVURL + '/Beacon/Run/Start', tmpBody, this._cookieHeaders(pCtx),
+			(pErr, pResponse, pStatus) =>
+			{
+				if (pErr) { return fCallback(new Error(`Run/Start failed: ${pErr.message}`)); }
+				if (pStatus >= 400)
+				{
+					let tmpDetail = (pResponse && pResponse.Error) || `HTTP ${pStatus}`;
+					return fCallback(new Error(`Run/Start rejected: ${tmpDetail}`));
+				}
+				if (!pResponse || !pResponse.RunID)
+				{
+					return fCallback(new Error('Run/Start succeeded but no RunID in response.'));
+				}
+				pCtx.UVRunID = pResponse.RunID;
+				this.fable.log.info(`BeaconExerciseManager: scenario run ${pCtx.IDBeaconExerciseRun} → UV RunID=${pCtx.UVRunID}`);
+				return fCallback(null);
+			});
+	}
+
+	_endUVRun(pCtx, pState, fCallback)
+	{
+		// Best-effort.  If End fails (e.g. UV unreachable mid-teardown),
+		// log and proceed -- the lab-side run row is already final.
+		if (!pCtx.UVRunID)
+		{
+			return fCallback ? fCallback(null) : null;
+		}
+		let tmpURL = `${pCtx.UVURL}/Beacon/Run/${encodeURIComponent(pCtx.UVRunID)}/End`;
+		let tmpBody = JSON.stringify({ State: pState || 'Ended' });
+		this._httpPostJSON(tmpURL, tmpBody, this._cookieHeaders(pCtx), (pErr, pResponse, pStatus) =>
+			{
+				if (pErr || pStatus >= 400)
+				{
+					let tmpReason = pErr ? pErr.message : `HTTP ${pStatus}: ${(pResponse && pResponse.Error) || ''}`;
+					this.fable.log.warn(`BeaconExerciseManager: Run/End failed for run ${pCtx.IDBeaconExerciseRun} (UV RunID=${pCtx.UVRunID}): ${tmpReason}`);
+				}
+				return fCallback ? fCallback(null) : null;
 			});
 	}
 
@@ -503,7 +614,7 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 				OnEnvelope: (pEnv) => this._handleEnvelope(pCtx, pEnv),
 				OnError: (pErr) =>
 					{
-						this.fable.log.warn(`QueueScenarioManager: WS tap error on run ${pCtx.IDQueueScenarioRun}: ${pErr.message || pErr}`);
+						this.fable.log.warn(`BeaconExerciseManager: WS tap error on run ${pCtx.IDBeaconExerciseRun}: ${pErr.message || pErr}`);
 					},
 				OnReset: () => { pCtx.HistoryReset = true; },
 				Log: this.fable.log
@@ -523,9 +634,9 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 		let tmpBeaconID = tmpPayload.BeaconID || tmpPayload.AssignedBeaconID || '';
 		try
 		{
-			this.fable.LabStateStore.insert('QueueScenarioEvent',
+			this.fable.LabStateStore.insert('BeaconExerciseEvent',
 				{
-					IDQueueScenarioRun: pCtx.IDQueueScenarioRun,
+					IDBeaconExerciseRun: pCtx.IDBeaconExerciseRun,
 					Topic:              pEnvelope.Topic || '',
 					EventGUID:          pEnvelope.EventGUID || '',
 					WorkItemHash:       tmpHash,
@@ -537,7 +648,7 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 		}
 		catch (pErr)
 		{
-			this.fable.log.warn(`QueueScenarioManager: could not persist event row: ${pErr.message}`);
+			this.fable.log.warn(`BeaconExerciseManager: could not persist event row: ${pErr.message}`);
 		}
 
 		// queue.summary carries per-capability { Queued, Running, Stalled }
@@ -614,6 +725,28 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 				this._setRemove(pCtx.PendingByCapability, tmpCap, tmpHash);
 				this._setRemove(pCtx.RunningByCapability, tmpCap, tmpHash);
 				this._maybeFinishOnDrain(pCtx);
+				break;
+			case 'queue.stalled':
+				// Track for MaxStalledItems assertion.  The Coordinator's
+				// stall path force-finalizes the work item; we expect a
+				// follow-on queue.failed/queue.completed in most paths,
+				// but treat the stall itself as terminal for accounting
+				// (drop from Pending/Running and decrement Outstanding)
+				// so the drain watchdog doesn't hang waiting for a
+				// completion that won't arrive.
+				pCtx.EverStalledHashes.add(tmpHash);
+				pCtx.OutstandingHashes.delete(tmpHash);
+				this._setRemove(pCtx.PendingByCapability, tmpCap, tmpHash);
+				this._setRemove(pCtx.RunningByCapability, tmpCap, tmpHash);
+				this._maybeFinishOnDrain(pCtx);
+				break;
+			case 'queue.unstalled':
+				// Item recovered before stall-finalize landed.  Put it
+				// back into RunningByCapability and re-add to Outstanding
+				// so the drain accounting reflects reality.
+				pCtx.RecoveredStalledHashes.add(tmpHash);
+				pCtx.OutstandingHashes.add(tmpHash);
+				this._setAdd(pCtx.RunningByCapability, tmpCap, tmpHash);
 				break;
 		}
 	}
@@ -758,24 +891,52 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 				Capability: pItem.Capability,
 				Action:     pItem.Action,
 				Settings:   pItem.Settings || {},
+				RunID:      pCtx.UVRunID || '',
 				Metadata:
 					{
-						ScenarioRunID:    pCtx.IDQueueScenarioRun,
+						ScenarioRunID:    pCtx.IDBeaconExerciseRun,
 						ScenarioItemIdx:  pIdx
 					}
 			});
+		// Don't keep firing enqueues against a UV that's already
+		// rejected one before any item landed -- the run is going to
+		// fail the same way 20 times in a row otherwise.  AbortReason
+		// is set the moment we decide to short-circuit.
+		if (pCtx.AbortReason)
+		{
+			return fCallback(new Error(pCtx.AbortReason));
+		}
+
 		this._httpPostJSON(pCtx.UVURL + '/Beacon/Work/Enqueue', tmpBody, this._cookieHeaders(pCtx), (pErr, pResponse, pStatus) =>
 			{
+				let tmpReason = '';
 				if (pErr)
 				{
-					this.fable.log.warn(`QueueScenarioManager: enqueue failed for run ${pCtx.IDQueueScenarioRun}: ${pErr.message}`);
-					return fCallback(pErr);
+					tmpReason = pErr.message || String(pErr);
 				}
-				if (pStatus >= 400)
+				else if (pStatus >= 400)
 				{
-					this.fable.log.warn(`QueueScenarioManager: enqueue HTTP ${pStatus} for run ${pCtx.IDQueueScenarioRun}: ${JSON.stringify(pResponse).slice(0, 200)}`);
-					return fCallback(new Error(`Enqueue rejected: HTTP ${pStatus} ${(pResponse && pResponse.Error) || ''}`));
+					let tmpDetail = (pResponse && pResponse.Error) || (pResponse ? JSON.stringify(pResponse).slice(0, 160) : '');
+					tmpReason = `HTTP ${pStatus}` + (tmpDetail ? ` — ${tmpDetail}` : '');
 				}
+
+				if (tmpReason)
+				{
+					pCtx.EnqueueErrorCount++;
+					if (!pCtx.FirstEnqueueError) { pCtx.FirstEnqueueError = tmpReason; }
+					this.fable.log.warn(`BeaconExerciseManager: enqueue failed for run ${pCtx.IDBeaconExerciseRun} (item ${pIdx}): ${tmpReason}`);
+					// Fail fast when the very first attempts all fail
+					// before any item has landed.  Without this the
+					// drain watchdog (≥35s) would fire with a symptom
+					// message; this surfaces the actual cause now.
+					if (pCtx.EnqueuedHashes.size === 0 && !pCtx.FinishedSettling)
+					{
+						pCtx.AbortReason = tmpReason;
+						this._finishRun(pCtx, 'failed', `Enqueue rejected: ${tmpReason}`);
+					}
+					return fCallback(new Error(`Enqueue rejected: ${tmpReason}`));
+				}
+
 				if (pResponse && pResponse.WorkItemHash)
 				{
 					pCtx.OutstandingHashes.add(pResponse.WorkItemHash);
@@ -850,12 +1011,31 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 			tmpFinalStatus = 'failed-assertions';
 		}
 
+		// Promote enqueue-side errors into the run row when the
+		// caller-supplied message doesn't already cover them.  The
+		// fast-fail path in _enqueueOne already passes a fully-formed
+		// reason via pErrorMessage and sets pCtx.AbortReason; in that
+		// case we don't want to append a duplicate.  We DO append when
+		// _finishRun was reached via a different path (watchdog, cancel,
+		// manual stop) and there are still enqueue errors worth
+		// surfacing.
+		let tmpErrorMessage = pErrorMessage || '';
+		if (pCtx.FirstEnqueueError && !pCtx.AbortReason)
+		{
+			let tmpFromEnqueue = (pCtx.EnqueuedHashes.size === 0)
+				? `Enqueue failed (${pCtx.EnqueueErrorCount} attempts): ${pCtx.FirstEnqueueError}`
+				: `${pCtx.EnqueueErrorCount} enqueue error(s); first: ${pCtx.FirstEnqueueError}`;
+			tmpErrorMessage = tmpErrorMessage
+				? (tmpErrorMessage + ' — ' + tmpFromEnqueue)
+				: tmpFromEnqueue;
+		}
+
 		let tmpMaxConcurrencyByCapability = {};
 		pCtx.MaxConcurrencyByCapability.forEach((pV, pK) => { tmpMaxConcurrencyByCapability[pK] = pV; });
 
 		try
 		{
-			this.fable.LabStateStore.update('QueueScenarioRun', 'IDQueueScenarioRun', pCtx.IDQueueScenarioRun,
+			this.fable.LabStateStore.update('BeaconExerciseRun', 'IDBeaconExerciseRun', pCtx.IDBeaconExerciseRun,
 				{
 					Status:         tmpFinalStatus,
 					CompletedAt:    new Date().toISOString(),
@@ -865,29 +1045,29 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 					TotalFailed:    pCtx.FailedHashes.size,
 					VerdictsJSON:   JSON.stringify({ Verdicts: tmpVerdicts, MaxConcurrencyByCapability: tmpMaxConcurrencyByCapability }),
 					TimingJSON:     JSON.stringify(tmpTiming),
-					ErrorMessage:   pErrorMessage || ''
+					ErrorMessage:   tmpErrorMessage
 				});
 		}
 		catch (pErr)
 		{
-			this.fable.log.warn(`QueueScenarioManager: could not finalize run row ${pCtx.IDQueueScenarioRun}: ${pErr.message}`);
+			this.fable.log.warn(`BeaconExerciseManager: could not finalize run row ${pCtx.IDBeaconExerciseRun}: ${pErr.message}`);
 		}
 
 		try
 		{
 			this.fable.LabStateStore.recordEvent(
 				{
-					EntityType: 'QueueScenarioRun',
-					EntityID:   pCtx.IDQueueScenarioRun,
+					EntityType: 'BeaconExerciseRun',
+					EntityID:   pCtx.IDBeaconExerciseRun,
 					EntityName: pCtx.Scenario.Name || pCtx.Scenario.Hash || '',
-					EventType:  'queue-scenario-' + tmpFinalStatus,
+					EventType:  'beacon-exercise-' + tmpFinalStatus,
 					Severity:   tmpFinalStatus === 'complete' ? 'info' : 'warning',
 					Message:    `Scenario '${pCtx.Scenario.Name}' ended ${tmpFinalStatus} (drain ${tmpTiming.DrainSeconds}s)`,
 					Detail:     JSON.stringify(
 						{
 							Verdicts: tmpVerdicts,
 							Timing:   tmpTiming,
-							ErrorMessage: pErrorMessage || ''
+							ErrorMessage: tmpErrorMessage
 						})
 				});
 		}
@@ -898,6 +1078,28 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 
 	_teardownRun(pCtx)
 	{
+		// End the UV-side Run so the manifest pipeline finalizes.
+		// Map the lab-side terminal state to a sensible UV state:
+		//   complete           → 'Ended'
+		//   failed-assertions  → 'Ended' (the work itself completed; the
+		//                                 lab's verdict layer judged it)
+		//   failed / timed-out → 'Failed'
+		//   canceled           → 'Canceled'
+		// Best-effort; failures are logged and don't block teardown.
+		let tmpUVState = 'Ended';
+		// We don't have direct access to the run row's Status here,
+		// but pCtx.AbortReason / OutstandingHashes give us enough.
+		if (pCtx.AbortReason || (pCtx.FirstEnqueueError && pCtx.EnqueuedHashes.size === 0))
+		{
+			tmpUVState = 'Failed';
+		}
+		else if (pCtx.OutstandingHashes.size > 0)
+		{
+			// Watchdog or cancel path with items still in flight.
+			tmpUVState = (pCtx.FailedHashes.size > 0) ? 'Failed' : 'Canceled';
+		}
+		this._endUVRun(pCtx, tmpUVState);
+
 		if (pCtx.Tap) { try { pCtx.Tap.stop(); } catch (pErr) { /* best effort */ } pCtx.Tap = null; }
 		for (let i = 0; i < pCtx.ChildProcesses.length; i++)
 		{
@@ -915,7 +1117,7 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 					catch (pErr) { /* gone already */ }
 				}
 			}, 5000).unref();
-		this._activeRuns.delete(pCtx.IDQueueScenarioRun);
+		this._activeRuns.delete(pCtx.IDBeaconExerciseRun);
 	}
 
 	// ── Cancel ─────────────────────────────────────────────────────────────
@@ -985,6 +1187,32 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 				});
 		}
 
+		// Phase 2: stall-aware assertions.  MaxStalledItems is a soft
+		// gate (default omitted = no constraint, default 0 if a scenario
+		// declares stall sensitivity); StalledRecovered counts items
+		// that flipped Stalled then came back via queue.unstalled before
+		// the operation finalized.
+		if (Number.isFinite(tmpAsserts.MaxStalledItems))
+		{
+			tmpResults.push(
+				{
+					Assertion: 'MaxStalledItems',
+					Pass: pCtx.EverStalledHashes.size <= tmpAsserts.MaxStalledItems,
+					Spec: tmpAsserts.MaxStalledItems,
+					Observed: pCtx.EverStalledHashes.size
+				});
+		}
+		if (Number.isFinite(tmpAsserts.StalledRecovered))
+		{
+			tmpResults.push(
+				{
+					Assertion: 'StalledRecovered',
+					Pass: pCtx.RecoveredStalledHashes.size >= tmpAsserts.StalledRecovered,
+					Spec: tmpAsserts.StalledRecovered,
+					Observed: pCtx.RecoveredStalledHashes.size
+				});
+		}
+
 		if (tmpAsserts.MinObservedConcurrencyByCapability && typeof tmpAsserts.MinObservedConcurrencyByCapability === 'object')
 		{
 			let tmpDetail = {};
@@ -1026,8 +1254,8 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 		// is the only stable signal that captures concurrency state.
 		// Contiguous "blocked" snapshots collapse into one window with
 		// FromMs/ToMs relative to the run's first-enqueue timestamp.
-		let tmpEvents = this.fable.LabStateStore.list('QueueScenarioEvent',
-			{ IDQueueScenarioRun: pCtx.IDQueueScenarioRun });
+		let tmpEvents = this.fable.LabStateStore.list('BeaconExerciseEvent',
+			{ IDBeaconExerciseRun: pCtx.IDBeaconExerciseRun });
 		tmpEvents.reverse();  // list() is newest-first; we want chronological
 
 		let tmpOpenWindow = new Map(); // cap → { FromMs, QueueDepthAtStart }
@@ -1174,4 +1402,4 @@ class ServiceQueueScenarioManager extends libFableServiceProviderBase
 	}
 }
 
-module.exports = ServiceQueueScenarioManager;
+module.exports = ServiceBeaconExerciseManager;

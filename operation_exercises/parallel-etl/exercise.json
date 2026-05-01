@@ -1,0 +1,18 @@
+{
+	"Hash": "oe-parallel-etl",
+	"Name": "Parallel ETL",
+	"Description": "5 etl-linear operations kicked simultaneously.  Exercises scheduler fairness and contention on every shared node in the fleet.",
+	"Targets": {},
+	"Operations": [ "etl-linear" ],
+	"Kicks":
+	[
+		{ "OperationHash": "etl-linear", "Count": 5, "EnqueueAtMs": 0 }
+	],
+	"Assertions":
+	{
+		"AllOperationsCompleted": true,
+		"MaxOperationDurationSeconds": 90,
+		"MaxFailedOperations": 0,
+		"MinSuccessfulOperations": 5
+	}
+}

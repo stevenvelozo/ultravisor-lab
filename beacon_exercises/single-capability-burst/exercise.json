@@ -1,5 +1,5 @@
 {
-	"Hash": "qs-single-capability-burst",
+	"Hash": "be-single-capability-burst",
 	"Name": "Single capability burst",
 	"Description": "Control case.  One beacon advertising one capability, burst-enqueue 10 work items, measure drain.  No mixed-capability blocking is possible by construction; this scenario establishes the baseline drain time and validates the harness wire path before more interesting scenarios run.",
 	"Targets": {},
