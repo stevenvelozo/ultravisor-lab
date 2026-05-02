@@ -27,6 +27,10 @@ class SyntheticBeaconHarness
 		this._MaxConcurrent = Number.isFinite(tmpOptions.MaxConcurrent) ? tmpOptions.MaxConcurrent : 1;
 		this._StagingPath = tmpOptions.StagingPath || process.cwd();
 		this._Log = tmpOptions.Log || console;
+		// Phase 4 — Pillar 3: when 'poll', skip WS and use the HTTP poll
+		// path exclusively. Verifies the polling-mode beacon path on the
+		// same fleet machinery.
+		this._Mode = tmpOptions.Mode || 'auto';
 
 		// Optional HTTP listener mode.  When BindPort is set, the
 		// harness spins up a tiny HTTP server (any GET returns 200) and
@@ -70,7 +74,13 @@ class SyntheticBeaconHarness
 					JoinSecret: this._JoinSecret,
 					Providers: [ this._Provider ],
 					HeartbeatIntervalMs: 30000,
-					Tags: { Role: 'synthetic-load', Capability: this._Provider.Capability }
+					Tags: { Role: 'synthetic-load', Capability: this._Provider.Capability, Mode: this._Mode },
+					// Phase 4 — Pillar 3: poll-mode beacons skip the WS
+					// transport entirely. PollIntervalMs is bumped down to
+					// match real polling clients that keep latency in the
+					// sub-second range.
+					ForceHTTPTransport: this._Mode === 'poll',
+					PollIntervalMs: this._Mode === 'poll' ? 750 : 5000
 				};
 
 			if (this._BindPort > 0)

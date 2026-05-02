@@ -45,6 +45,17 @@ const SYNTHETIC_BEACON_BIN = libPath.resolve(__dirname, '..', 'synthetic-beacon'
 const HARNESS_ADMIN_USER = 'harness-admin';
 const HARNESS_ADMIN_PASSWORD = 'harness-pass';
 
+// Shared keep-alive HTTP agent — same shape and reasoning as
+// Service-OperationExerciseManager. Bounded socket pool (maxSockets=64)
+// + idle reuse window (keepAliveMsecs=30000) so a high-volume burst
+// can't exhaust the local ephemeral-port table the way a fresh-socket
+// per-request loop does.
+const KEEPALIVE_HTTP_AGENT = new libHttp.Agent({
+	keepAlive: true,
+	maxSockets: 64,
+	keepAliveMsecs: 30000
+});
+
 const TERMINAL_TOPICS = new Set(['queue.completed', 'queue.failed', 'queue.canceled']);
 const RECOGNIZED_CAPABILITY_TOPICS = new Set(
 	[
@@ -1355,7 +1366,8 @@ class ServiceBeaconExerciseManager extends libFableServiceProviderBase
 				port:     tmpURL.port || 80,
 				path:     tmpURL.pathname + (tmpURL.search || ''),
 				method:   'POST',
-				headers:  tmpHeaders
+				headers:  tmpHeaders,
+				agent:    KEEPALIVE_HTTP_AGENT
 			},
 			(pRes) =>
 			{
@@ -1383,7 +1395,8 @@ class ServiceBeaconExerciseManager extends libFableServiceProviderBase
 				hostname: tmpURL.hostname,
 				port:     tmpURL.port || 80,
 				path:     tmpURL.pathname + (tmpURL.search || ''),
-				method:   'GET'
+				method:   'GET',
+				agent:    KEEPALIVE_HTTP_AGENT
 			},
 			(pRes) =>
 			{

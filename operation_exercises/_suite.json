@@ -13,7 +13,8 @@
 			{ "Name": "syn-vid",         "Capability": "VideoTranscode",  "Actions": ["Encode"],                        "MaxConcurrent": 1, "DefaultDurationMs": 1500, "RunMode": "child-process" },
 			{ "Name": "syn-file",        "Capability": "FileTransfer",    "Actions": ["Transfer"],                      "MaxConcurrent": 1, "DefaultDurationMs": 1500, "RunMode": "child-process" },
 			{ "Name": "syn-direct-a",    "Capability": "DirectA",         "Actions": ["Echo"],                          "MaxConcurrent": 1, "DefaultDurationMs": 500,  "RunMode": "child-process", "BindPort": 54401, "BindIP": "0.0.0.0", "AdvertiseIP": "host.docker.internal" },
-			{ "Name": "syn-direct-b",    "Capability": "DirectB",         "Actions": ["Echo"],                          "MaxConcurrent": 1, "DefaultDurationMs": 500,  "RunMode": "child-process", "BindPort": 54402, "BindIP": "0.0.0.0", "AdvertiseIP": "host.docker.internal" }
+			{ "Name": "syn-direct-b",    "Capability": "DirectB",         "Actions": ["Echo"],                          "MaxConcurrent": 1, "DefaultDurationMs": 500,  "RunMode": "child-process", "BindPort": 54402, "BindIP": "0.0.0.0", "AdvertiseIP": "host.docker.internal" },
+			{ "Name": "syn-poll-only",   "Capability": "PollOnly",        "Actions": ["Process"],                       "MaxConcurrent": 1, "DefaultDurationMs": 500,  "RunMode": "child-process", "Mode": "poll" }
 		]
 	}
 }

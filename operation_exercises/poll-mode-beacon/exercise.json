@@ -1,0 +1,18 @@
+{
+	"Hash": "oe-poll-mode-beacon",
+	"Name": "Poll-Mode Beacon (Phase 4 Pillar 3)",
+	"Description": "Drives 8 operations of poll-mode-only against a single synthetic beacon running with --mode=poll (HTTP polling only, no WebSocket).  Verifies that Phase 4's polling-mode beacon path participates in the same fleet machinery as WS beacons, completing within one poll cycle of a WS-equivalent.",
+	"Targets": {},
+	"Operations": [ "poll-mode-only" ],
+	"Kicks":
+	[
+		{ "OperationHash": "poll-mode-only", "Count": 8, "EnqueueAtMs": 0, "EnqueueIntervalMs": 250 }
+	],
+	"Assertions":
+	{
+		"AllOperationsCompleted": true,
+		"MaxOperationDurationSeconds": 60,
+		"MaxFailedOperations": 0,
+		"MinSuccessfulOperations": 8
+	}
+}

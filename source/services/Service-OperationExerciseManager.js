@@ -47,6 +47,19 @@ const HARNESS_ADMIN_PASSWORD = 'harness-pass';
 // surfaced as 'Error' at the operation level.
 const TERMINAL_RUN_STATES = new Set(['Complete', 'Error', 'Failed', 'Stalled', 'Abandoned', 'Canceled']);
 
+// Shared keep-alive HTTP agent for every outbound call to the target
+// UV. Phase 4 hardens the lab against the EADDRNOTAVAIL cascade we hit
+// in huge-stress: without keep-alive, each kick / manifest poll opens
+// a fresh TCP connection from a fresh ephemeral port and the local
+// port table fills inside ~30s of sustained traffic. With keep-alive
+// the connection pool tops out at maxSockets sockets and Node reuses
+// idle ones for 30s.
+const KEEPALIVE_HTTP_AGENT = new libHttp.Agent({
+	keepAlive: true,
+	maxSockets: 64,
+	keepAliveMsecs: 30000
+});
+
 class ServiceOperationExerciseManager extends libFableServiceProviderBase
 {
 	constructor(pFable, pOptions, pServiceHash)
@@ -530,6 +543,13 @@ class ServiceOperationExerciseManager extends libFableServiceProviderBase
 			if (pBeaconSpec.BindIP)       { tmpArgs.push('--bind-ip',       pBeaconSpec.BindIP); }
 			if (pBeaconSpec.BindProtocol) { tmpArgs.push('--bind-protocol', pBeaconSpec.BindProtocol); }
 			if (pBeaconSpec.AdvertiseIP)  { tmpArgs.push('--advertise-ip',  pBeaconSpec.AdvertiseIP); }
+		}
+		// Phase 4 — Pillar 3: pass through transport mode when set in
+		// the suite spec. 'poll' forces HTTP-only on this beacon so the
+		// regression exercise can prove the polling code path works.
+		if (pBeaconSpec.Mode === 'poll' || pBeaconSpec.Mode === 'auto')
+		{
+			tmpArgs.push('--mode', pBeaconSpec.Mode);
 		}
 		let tmpChild;
 		try
@@ -1252,7 +1272,8 @@ class ServiceOperationExerciseManager extends libFableServiceProviderBase
 				port:     tmpURL.port || 80,
 				path:     tmpURL.pathname + (tmpURL.search || ''),
 				method:   'POST',
-				headers:  tmpHeaders
+				headers:  tmpHeaders,
+				agent:    KEEPALIVE_HTTP_AGENT
 			},
 			(pRes) =>
 			{
@@ -1280,7 +1301,8 @@ class ServiceOperationExerciseManager extends libFableServiceProviderBase
 				hostname: tmpURL.hostname,
 				port:     tmpURL.port || 80,
 				path:     tmpURL.pathname + (tmpURL.search || ''),
-				method:   'GET'
+				method:   'GET',
+				agent:    KEEPALIVE_HTTP_AGENT
 			},
 			(pRes) =>
 			{

@@ -1,0 +1,63 @@
+{
+  "Hash": "poll-mode-only",
+  "Name": "Poll Mode Only",
+  "Description": "Single-stage operation that targets the PollOnly capability — bound to a synthetic beacon running with --mode=poll (no WebSocket). Used by the oe-poll-mode-beacon regression exercise to prove Phase 4 Pillar 3's polling code path supports the same fleet machinery WS beacons use.",
+  "Tags": [
+    "lab",
+    "operation-exercise",
+    "phase-4"
+  ],
+  "Version": "1.0.0",
+  "Graph": {
+    "Nodes": [
+      {
+        "Hash": "start",
+        "Type": "start",
+        "X": 50,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "Start",
+        "Ports": [
+          { "Hash": "start-out", "Direction": "output", "Side": "right-bottom", "Label": "Out" }
+        ],
+        "Data": {}
+      },
+      {
+        "Hash": "process",
+        "Type": "beacon-pollonly-process",
+        "X": 250,
+        "Y": 200,
+        "Width": 200,
+        "Height": 110,
+        "Title": "Process",
+        "Ports": [
+          { "Hash": "process-Trigger",  "Direction": "input",  "Side": "left-bottom",  "Label": "Trigger" },
+          { "Hash": "process-Complete", "Direction": "output", "Side": "right-bottom", "Label": "Complete" },
+          { "Hash": "process-Error",    "Direction": "output", "Side": "bottom",       "Label": "Error" }
+        ],
+        "Data": {
+          "DurationMs": 400
+        }
+      },
+      {
+        "Hash": "end",
+        "Type": "end",
+        "X": 500,
+        "Y": 200,
+        "Width": 140,
+        "Height": 80,
+        "Title": "End",
+        "Ports": [
+          { "Hash": "end-in", "Direction": "input", "Side": "left-bottom", "Label": "In" }
+        ],
+        "Data": {}
+      }
+    ],
+    "Connections": [
+      { "SourceNodeHash": "start",   "SourcePortHash": "start-out",        "TargetNodeHash": "process", "TargetPortHash": "process-Trigger" },
+      { "SourceNodeHash": "process", "SourcePortHash": "process-Complete", "TargetNodeHash": "end",     "TargetPortHash": "end-in" }
+    ]
+  },
+  "ViewState": { "X": 0, "Y": 0, "Scale": 1 }
+}

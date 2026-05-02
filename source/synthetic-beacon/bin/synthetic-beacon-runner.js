@@ -39,7 +39,12 @@ let _Config =
 		BindPort: 0,
 		BindIP: '127.0.0.1',
 		BindProtocol: 'http',
-		AdvertiseIP: ''
+		AdvertiseIP: '',
+		// Phase 4 — Pillar 3: 'auto' = WS-then-poll fallback (current
+		// default). 'poll' = HTTP-poll only, used by the poll-mode
+		// regression exercise to prove the polling path works end to
+		// end on the same fleet machinery.
+		Mode: 'auto'
 	};
 
 function parseActions(pValue)
@@ -86,6 +91,7 @@ for (let i = 2; i < process.argv.length; i++)
 	else if (tmpArg === '--bind-ip' && process.argv[i + 1])            { _Config.BindIP = process.argv[++i]; }
 	else if (tmpArg === '--bind-protocol' && process.argv[i + 1])      { _Config.BindProtocol = process.argv[++i]; }
 	else if (tmpArg === '--advertise-ip' && process.argv[i + 1])       { _Config.AdvertiseIP = process.argv[++i]; }
+	else if (tmpArg === '--mode' && process.argv[i + 1])               { _Config.Mode = process.argv[++i]; }
 	else if (tmpArg === '--help' || tmpArg === '-h')
 	{
 		console.log(`Usage: synthetic-beacon-runner [options]
@@ -105,6 +111,10 @@ Options:
   --advertise-ip IP          IP to advertise in BindAddresses (defaults
                              to --bind-ip; set when UV runs in a
                              container, e.g. host.docker.internal)
+  --mode auto|poll           Transport mode (default auto). 'poll' forces
+                             HTTP polling and skips the WebSocket attempt
+                             — used by the polling-mode regression
+                             exercise.
   --config PATH              JSON config file (overlaid before CLI args)
 `);
 		process.exit(0);
@@ -126,7 +136,8 @@ let tmpHarness = new libSyntheticBeaconHarness(
 		BindPort: _Config.BindPort,
 		BindIP: _Config.BindIP,
 		BindProtocol: _Config.BindProtocol,
-		AdvertiseIP: _Config.AdvertiseIP
+		AdvertiseIP: _Config.AdvertiseIP,
+		Mode: _Config.Mode
 	});
 
 tmpHarness.start((pError, pBeaconID) =>
