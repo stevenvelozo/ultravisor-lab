@@ -33,6 +33,7 @@ const libBeaconsView        = require('./views/PictView-Lab-Beacons.js');
 const libSeedDatasetsView   = require('./views/PictView-Lab-SeedDatasets.js');
 const libBeaconExercisesView       = require('./views/PictView-Lab-BeaconExercises.js');
 const libOperationExercisesView    = require('./views/PictView-Lab-OperationExercises.js');
+const libStacksView                = require('./views/PictView-Lab-Stacks.js');
 
 const POLL_INTERVAL_MS = 10000;
 
@@ -55,6 +56,7 @@ class LabBrowserApplication extends libPictApplication
 		this.pict.addView('Lab-SeedDatasets', libSeedDatasetsView.default_configuration, libSeedDatasetsView);
 		this.pict.addView('Lab-BeaconExercises',     libBeaconExercisesView.default_configuration,     libBeaconExercisesView);
 		this.pict.addView('Lab-OperationExercises',  libOperationExercisesView.default_configuration,  libOperationExercisesView);
+		this.pict.addView('Lab-Stacks',       libStacksView.default_configuration,       libStacksView);
 		this.pict.addView('Lab-Events',       libEventsView.default_configuration,       libEventsView);
 
 		// Modal + toast toolkit: replaces window.alert/confirm app-wide.
@@ -117,6 +119,19 @@ class LabBrowserApplication extends libPictApplication
 				Exercises: [],
 				Runs:      [],
 				Targets:   { IDUltravisorInstance: 0 }
+			},
+			Stacks:
+			{
+				Screen:        'list',          // 'list' | 'preset-chooser' | 'editor' | 'detail'
+				Stacks:        [],              // saved stacks (summary rows)
+				Presets:       [],              // preset library (summary rows)
+				EditorRecord:  null,            // full Stack record being edited
+				DetailRecord:  null,            // full Stack record on detail page
+				InputValues:   {},              // user-entered input values for editor
+				LastPreflight:    null,         // { Hash, Report } most recent preflight
+				LastStatus:       null,         // { Hash, Status } most recent status poll
+				LastYaml:         null,         // { Hash, YAML, Source }
+				LastLaunchResult: null          // { Hash, Result } last upStack response (incl. RawOutput on failure)
 			}
 		};
 		return super.onBeforeInitializeAsync(fCallback);
@@ -243,6 +258,7 @@ class LabBrowserApplication extends libPictApplication
 		else if (tmpName === 'BeaconExercises')     { this.pict.views['Lab-BeaconExercises'].render(); }
 		else if (tmpName === 'OperationExercises')  { this.pict.views['Lab-OperationExercises'].render(); }
 		else if (tmpName === 'Events')       { this.pict.views['Lab-Events'].render(); }
+		else if (tmpName === 'Stacks')       { this.pict.views['Lab-Stacks'].render(); }
 	}
 
 	/**
@@ -1969,6 +1985,280 @@ class LabBrowserApplication extends libPictApplication
 				this._toast(`Cancel issued (uncancelable=${tmpUncan}).`, 'info');
 				this.refreshAll(() => {});
 			});
+	}
+
+	// ─────────────────────────────────────────────────────────────────
+	//  Stacks (Phase 8)
+	// ─────────────────────────────────────────────────────────────────
+
+	openStacks()
+	{
+		this.pict.AppData.Lab.Stacks.Screen = 'list';
+		this._loadStacks(() =>
+		{
+			this.setActiveView('Stacks');
+		});
+	}
+
+	openPresetChooser()
+	{
+		this.pict.AppData.Lab.Stacks.Screen = 'preset-chooser';
+		this._loadPresets(() =>
+		{
+			this.setActiveView('Stacks');
+		});
+	}
+
+	openStackEditor(pHash)
+	{
+		this.pict.providers.LabApi.getStack(pHash, (pErr, pResult) =>
+		{
+			if (pErr) { this._toastError('Load failed: ' + pErr.message); return; }
+			let tmpRecord = pResult && pResult.Stack;
+			if (!tmpRecord) { this._toastError('Stack not found'); return; }
+			let tmpState = this.pict.AppData.Lab.Stacks;
+			tmpState.Screen = 'editor';
+			tmpState.EditorRecord = tmpRecord;
+			// Saved input values come back on the record; clone so
+			// in-progress edits don't mutate it.
+			tmpState.InputValues = Object.assign({}, tmpRecord.InputValues || {});
+			tmpState.LastPreflight = null;
+			tmpState.LastLaunchResult = null;
+			// setActiveView covers the deep-link case where the user
+			// landed here from outside the Stacks tab; it's idempotent
+			// when Stacks is already active.
+			this.setActiveView('Stacks');
+		});
+	}
+
+	openStackDetail(pHash)
+	{
+		this.pict.providers.LabApi.getStack(pHash, (pErr, pResult) =>
+		{
+			if (pErr) { this._toastError('Load failed: ' + pErr.message); return; }
+			let tmpRecord = pResult && pResult.Stack;
+			if (!tmpRecord) { this._toastError('Stack not found'); return; }
+			let tmpState = this.pict.AppData.Lab.Stacks;
+			tmpState.Screen = 'detail';
+			tmpState.DetailRecord = tmpRecord;
+			// Fire two parallel refreshes — status + YAML.
+			this._loadStackStatus(pHash, () => {
+				this._loadStackYaml(pHash, () => {
+					this.setActiveView('Stacks');
+				});
+			});
+		});
+	}
+
+	cloneStackPreset(pPresetHash)
+	{
+		this.pict.providers.LabApi.clonePreset(pPresetHash, '', (pErr, pResult) =>
+		{
+			if (pErr) { this._toastError('Clone failed: ' + pErr.message); return; }
+			let tmpStack = pResult && pResult.Stack;
+			if (!tmpStack) { this._toastError('Clone returned no stack'); return; }
+			this._toastSuccess('Cloned preset → ' + tmpStack.Hash);
+			// Drop straight into editor for the clone.
+			this.openStackEditor(tmpStack.Hash);
+		});
+	}
+
+	saveStackFromEditor(pHash)
+	{
+		let tmpState = this.pict.AppData.Lab.Stacks;
+		if (!tmpState.EditorRecord || tmpState.EditorRecord.Hash !== pHash)
+		{
+			this._toastError('Editor state lost; reopen the stack');
+			return;
+		}
+		// Marshal current input field values + send them along with the
+		// spec. The Stack table has an InputValuesJSON column so values
+		// persist across reloads and across machines (canonical in SQLite).
+		this._marshalEditorInputs();
+		this.pict.providers.LabApi.saveStack(tmpState.EditorRecord.Spec, tmpState.InputValues, (pErr, pResult) =>
+		{
+			if (pErr) { this._toastError('Save failed: ' + pErr.message); return; }
+			// Refresh EditorRecord with what the server canonicalized.
+			let tmpSaved = pResult && pResult.Stack;
+			if (tmpSaved) { tmpState.EditorRecord = tmpSaved; }
+			this._toastSuccess('Stack saved');
+		});
+	}
+
+	runStackPreflight(pHash)
+	{
+		let tmpState = this.pict.AppData.Lab.Stacks;
+		this._marshalEditorInputs();
+		this.pict.providers.LabApi.preflightStack(pHash, tmpState.InputValues, (pErr, pResult) =>
+		{
+			if (pErr) { this._toastError('Preflight failed: ' + pErr.message); return; }
+			tmpState.LastPreflight = { Hash: pHash, Report: (pResult && pResult.Report) || { Status:'ready', Items:[] } };
+			this.pict.views['Lab-Stacks'].render();
+		});
+	}
+
+	launchStack(pHash)
+	{
+		let tmpState = this.pict.AppData.Lab.Stacks;
+		this._marshalEditorInputs();
+		// Persist the inputs we're about to launch with so the editor
+		// remembers them on next visit (the button is "Save & Launch").
+		// Skip when EditorRecord is missing — e.g. launch fired from
+		// the detail view, where we don't have the spec in hand.
+		if (tmpState.EditorRecord && tmpState.EditorRecord.Hash === pHash)
+		{
+			this.pict.providers.LabApi.saveStack(
+				tmpState.EditorRecord.Spec, tmpState.InputValues, () => { /* fire-and-forget */ });
+		}
+		this._toast('Launching stack...', 'info', { duration: 2000 });
+		this.pict.providers.LabApi.upStack(pHash, tmpState.InputValues, (pErr, pResult) =>
+		{
+			if (pErr) { this._toastError('Launch failed: ' + pErr.message); return; }
+			// Always persist the latest launch result so the editor can
+			// surface the full preflight + raw compose output on failure.
+			tmpState.LastLaunchResult = { Hash: pHash, Result: pResult || {} };
+			if (pResult && pResult.PreflightReport)
+			{
+				tmpState.LastPreflight = { Hash: pHash, Report: pResult.PreflightReport };
+			}
+			if (pResult && pResult.Status === 'preflight-blocked')
+			{
+				this._toastError('Preflight blocked launch — see report below');
+				this.pict.views['Lab-Stacks'].render();
+				return;
+			}
+			if (pResult && pResult.Status === 'error')
+			{
+				let tmpSummary = this._summarizeRawOutput(pResult.RawOutput) || 'see launch output below';
+				this._toastError('Launch failed: ' + tmpSummary);
+				this.pict.views['Lab-Stacks'].render();
+				// Refresh the events list so the matching stack-launch-failed
+				// row shows up without the user hitting Refresh.
+				this.refreshAll(() => {});
+				return;
+			}
+			this._toastSuccess('Stack ' + (pResult ? pResult.Status : 'launched'));
+			this.refreshAll(() => {});
+			// Switch to detail view for live status.
+			this.openStackDetail(pHash);
+		});
+	}
+
+	_summarizeRawOutput(pRaw)
+	{
+		if (!pRaw) return '';
+		let tmpLines = String(pRaw).split('\n').map((pL) => pL.trim())
+			.filter((pL) => pL.length > 0 && pL !== '[stderr]');
+		for (let i = tmpLines.length - 1; i >= 0; i--)
+		{
+			if (/error/i.test(tmpLines[i])) return tmpLines[i].slice(0, 200);
+		}
+		return (tmpLines[tmpLines.length - 1] || '').slice(0, 200);
+	}
+
+	teardownStack(pHash)
+	{
+		this._modal().confirm('Tear down this stack? Containers will be removed; bind-mounted folders survive.',
+			{ confirmLabel: 'Teardown', dangerous: true })
+			.then((pOk) =>
+			{
+				if (!pOk) return;
+				this._toast('Tearing down...', 'info', { duration: 2000 });
+				this.pict.providers.LabApi.downStack(pHash, (pErr, pResult) =>
+				{
+					if (pErr) { this._toastError('Teardown failed: ' + pErr.message); return; }
+					this._toastSuccess('Stack ' + (pResult ? pResult.Status : 'stopped'));
+					this.openStackDetail(pHash);
+				});
+			});
+	}
+
+	removeStack(pHash)
+	{
+		this._modal().confirm('Remove this stack from the lab? Will tear down first if running.',
+			{ confirmLabel: 'Remove', dangerous: true })
+			.then((pOk) =>
+			{
+				if (!pOk) return;
+				this.pict.providers.LabApi.removeStack(pHash, (pErr) =>
+				{
+					if (pErr) { this._toastError('Remove failed: ' + pErr.message); return; }
+					this._toastSuccess('Stack removed');
+					this.openStacks();
+				});
+			});
+	}
+
+	refreshStackDetail(pHash)
+	{
+		this._loadStackStatus(pHash, () => {
+			this._loadStackYaml(pHash, () => {
+				this.pict.views['Lab-Stacks'].render();
+				this._toast('Refreshed', 'info', { duration: 1500 });
+			});
+		});
+	}
+
+	_loadStacks(fCallback)
+	{
+		this.pict.providers.LabApi.listStacks((pErr, pResult) =>
+		{
+			if (!pErr && pResult) { this.pict.AppData.Lab.Stacks.Stacks = pResult.Stacks || []; }
+			return fCallback();
+		});
+	}
+
+	_loadPresets(fCallback)
+	{
+		this.pict.providers.LabApi.listStackPresets((pErr, pResult) =>
+		{
+			if (!pErr && pResult) { this.pict.AppData.Lab.Stacks.Presets = pResult.Presets || []; }
+			return fCallback();
+		});
+	}
+
+	_loadStackStatus(pHash, fCallback)
+	{
+		this.pict.providers.LabApi.getStackStatus(pHash, (pErr, pStatus) =>
+		{
+			if (!pErr && pStatus)
+			{
+				this.pict.AppData.Lab.Stacks.LastStatus = { Hash: pHash, Status: pStatus };
+			}
+			return fCallback();
+		});
+	}
+
+	_loadStackYaml(pHash, fCallback)
+	{
+		this.pict.providers.LabApi.getStackComposeYaml(pHash, (pErr, pResult) =>
+		{
+			if (!pErr && pResult)
+			{
+				this.pict.AppData.Lab.Stacks.LastYaml = {
+					Hash: pHash, YAML: pResult.YAML || '', Source: pResult.Source || ''
+				};
+			}
+			return fCallback();
+		});
+	}
+
+	// Walk the editor's <input data-input-key> nodes and pull current
+	// values into AppData.Lab.Stacks.InputValues. Read-on-action style;
+	// no per-keystroke listeners.
+	_marshalEditorInputs()
+	{
+		let tmpInputs = document.querySelectorAll('[data-input-key]');
+		let tmpState = this.pict.AppData.Lab.Stacks;
+		if (!tmpState.InputValues) { tmpState.InputValues = {}; }
+		for (let i = 0; i < tmpInputs.length; i++)
+		{
+			let tmpEl = tmpInputs[i];
+			let tmpKey = tmpEl.getAttribute('data-input-key');
+			if (!tmpKey) continue;
+			let tmpVal = tmpEl.value;
+			if (tmpVal !== undefined && tmpVal !== '') { tmpState.InputValues[tmpKey] = tmpVal; }
+		}
 	}
 }
 

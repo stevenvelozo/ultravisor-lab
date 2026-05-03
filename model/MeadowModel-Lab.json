@@ -556,6 +556,57 @@
 					"EmittedAt": "", "PayloadJSON": ""
 				}
 			}
+		},
+
+		"Stack":
+		{
+			"TableName": "Stack",
+			"Domain": "Default",
+			"_comment": "Phase 8 — multi-service deployment recipes. SpecJSON carries the full spec (inputs, components, dependencies); cloning a preset writes a row with PresetSource set. The lab also mirrors every save to ${dataDir}/stacks/<Hash>.json so an operator can inspect/copy the spec without touching SQLite. SQLite is canonical; file mirror is one-way.",
+			"Columns":
+			[
+				{ "Column": "IDStack",       "DataType": "ID" },
+				{ "Column": "Hash",          "DataType": "String", "Size": "128" },
+				{ "Column": "Name",          "DataType": "String", "Size": "200" },
+				{ "Column": "Description",   "DataType": "Text" },
+				{ "Column": "PresetSource",  "DataType": "String", "Size": "128" },
+				{ "Column": "SchemaVersion", "DataType": "Numeric", "Size": "int" },
+				{ "Column": "SpecJSON",         "DataType": "Text" },
+				{ "Column": "InputValuesJSON",  "DataType": "Text" },
+				{ "Column": "Status",           "DataType": "String", "Size": "32" },
+				{ "Column": "StatusDetail",     "DataType": "Text" },
+				{ "Column": "CreateDate",       "DataType": "DateTime" },
+				{ "Column": "UpdateDate",       "DataType": "DateTime" }
+			],
+			"MeadowSchema":
+			{
+				"Scope": "Stack",
+				"DefaultIdentifier": "IDStack",
+				"Domain": "Default",
+				"Schema":
+				[
+					{ "Column": "IDStack",         "Type": "AutoIdentity", "Size": "Default" },
+					{ "Column": "Hash",            "Type": "String",       "Size": "128", "Indexed": true },
+					{ "Column": "Name",            "Type": "String",       "Size": "200" },
+					{ "Column": "Description",     "Type": "Text",         "Size": "Default" },
+					{ "Column": "PresetSource",    "Type": "String",       "Size": "128" },
+					{ "Column": "SchemaVersion",   "Type": "Integer",      "Size": "int" },
+					{ "Column": "SpecJSON",        "Type": "Text",         "Size": "Default" },
+					{ "Column": "InputValuesJSON", "Type": "Text",         "Size": "Default" },
+					{ "Column": "Status",          "Type": "String",       "Size": "32" },
+					{ "Column": "StatusDetail",    "Type": "Text",         "Size": "Default" },
+					{ "Column": "CreateDate",      "Type": "CreateDate",   "Size": "Default" },
+					{ "Column": "UpdateDate",      "Type": "UpdateDate",   "Size": "Default" }
+				],
+				"DefaultObject":
+				{
+					"IDStack": 0, "Hash": "", "Name": "", "Description": "",
+					"PresetSource": "", "SchemaVersion": 1, "SpecJSON": "",
+					"InputValuesJSON": "",
+					"Status": "stopped", "StatusDetail": "",
+					"CreateDate": null, "UpdateDate": null
+				}
+			}
 		}
 	},
 
@@ -571,6 +622,7 @@
 		"BeaconExerciseRun",
 		"BeaconExerciseEvent",
 		"OperationExerciseRun",
-		"OperationExerciseEvent"
+		"OperationExerciseEvent",
+		"Stack"
 	]
 }

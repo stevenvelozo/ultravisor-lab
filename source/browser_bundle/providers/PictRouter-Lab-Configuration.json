@@ -61,6 +61,18 @@
 
 		{ "path": "/operationexercises/select-uv",        "template": "{~LV:Pict.PictApplication.setOperationExerciseTargetUV()~}" },
 		{ "path": "/operationexercises/:hash/run",        "template": "{~LV:Pict.PictApplication.runOperationExercise(Record.data.hash)~}" },
-		{ "path": "/operationexercises/runs/:id/cancel",  "template": "{~LV:Pict.PictApplication.cancelOperationExerciseRun(Record.data.id)~}" }
+		{ "path": "/operationexercises/runs/:id/cancel",  "template": "{~LV:Pict.PictApplication.cancelOperationExerciseRun(Record.data.id)~}" },
+
+		{ "path": "/view/stacks",                         "template": "{~LV:Pict.PictApplication.openStacks()~}" },
+		{ "path": "/stacks/new",                          "template": "{~LV:Pict.PictApplication.openPresetChooser()~}" },
+		{ "path": "/stacks/clone-preset/:presetHash",     "template": "{~LV:Pict.PictApplication.cloneStackPreset(Record.data.presetHash)~}" },
+		{ "path": "/stacks/:hash",                        "template": "{~LV:Pict.PictApplication.openStackDetail(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/edit",                   "template": "{~LV:Pict.PictApplication.openStackEditor(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/save",                   "template": "{~LV:Pict.PictApplication.saveStackFromEditor(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/preflight",              "template": "{~LV:Pict.PictApplication.runStackPreflight(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/launch",                 "template": "{~LV:Pict.PictApplication.launchStack(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/down",                   "template": "{~LV:Pict.PictApplication.teardownStack(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/remove",                 "template": "{~LV:Pict.PictApplication.removeStack(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/refresh-status",         "template": "{~LV:Pict.PictApplication.refreshStackDetail(Record.data.hash)~}" }
 	]
 }

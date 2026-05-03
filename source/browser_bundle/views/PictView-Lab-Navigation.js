@@ -159,6 +159,7 @@ const _ViewConfiguration =
 			<a class="{~D:AppData.Lab.Computed.Navigation.SeedDatasetsClass~}" href="#/view/seeddatasets">Seed Data</a>
 			<a class="{~D:AppData.Lab.Computed.Navigation.BeaconExercisesClass~}"     href="#/view/beaconexercises">Beacon Exercises</a>
 			<a class="{~D:AppData.Lab.Computed.Navigation.OperationExercisesClass~}"  href="#/view/operationexercises">Operation Exercises</a>
+			<a class="{~D:AppData.Lab.Computed.Navigation.StacksClass~}"             href="#/view/stacks">Stacks</a>
 		</nav>
 	</details>
 
@@ -171,6 +172,7 @@ const _ViewConfiguration =
 		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.SeedDatasetsClass~}" href="#/view/seeddatasets">Seed Data</a>
 		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.BeaconExercisesClass~}"     href="#/view/beaconexercises">Beacon Exercises</a>
 		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.OperationExercisesClass~}"  href="#/view/operationexercises">Operation Exercises</a>
+		<a class="lab-nav-tab {~D:AppData.Lab.Computed.Navigation.StacksClass~}"             href="#/view/stacks">Stacks</a>
 	</nav>
 
 	<span class="lab-header-spacer"></span>
@@ -216,6 +218,7 @@ class LabNavigationView extends libPictView
 			SeedDatasetsClass:   tmpActive === 'SeedDatasets' ? 'active' : '',
 			BeaconExercisesClass:       tmpActive === 'BeaconExercises'     ? 'active' : '',
 			OperationExercisesClass:    tmpActive === 'OperationExercises'  ? 'active' : '',
+			StacksClass:         tmpActive === 'Stacks'       ? 'active' : '',
 			EventsClass:         tmpActive === 'Events'       ? 'active' : ''
 		};
 

@@ -153,6 +153,14 @@ class LabEventsView extends libPictView
 				if      (pEvt.EntityType === 'Beacon')   { tmpHref = `#/beacons/${pEvt.EntityID}/logs`; }
 				else if (pEvt.EntityType === 'DBEngine') { tmpHref = `#/dbengines/${pEvt.EntityID}/logs`; }
 			}
+			// Stacks are addressed by Hash; we tucked it into Detail at
+			// recordEvent time so we can build a link without a schema
+			// migration. Detail comes back as a JSON string.
+			if (!tmpHref && pEvt.EntityType === 'Stack')
+			{
+				let tmpHash = this._extractDetailHash(pEvt.Detail);
+				if (tmpHash) { tmpHref = `#/stacks/${encodeURIComponent(tmpHash)}`; }
+			}
 			let tmpEntity = { Href: tmpHref, Text: this._escape(tmpText) };
 			return {
 				TimeLabel: this._formatTime(pEvt.Timestamp),
@@ -198,6 +206,21 @@ class LabEventsView extends libPictView
 			.replace(/</g, '&lt;')
 			.replace(/>/g, '&gt;')
 			.replace(/"/g, '&quot;');
+	}
+
+	// Detail is stored as a JSON string (StateStore.recordEvent
+	// stringifies object Details). Parse on demand and pull Hash out.
+	_extractDetailHash(pDetail)
+	{
+		if (!pDetail) return '';
+		if (typeof pDetail === 'object' && pDetail.Hash) return pDetail.Hash;
+		if (typeof pDetail !== 'string') return '';
+		try
+		{
+			let tmpParsed = JSON.parse(pDetail);
+			return (tmpParsed && tmpParsed.Hash) ? tmpParsed.Hash : '';
+		}
+		catch (pErr) { return ''; }
 	}
 }
 

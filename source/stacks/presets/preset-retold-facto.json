@@ -1,0 +1,149 @@
+{
+	"Hash": "preset-retold-facto",
+	"Name": "Retold Facto + MySQL",
+	"Description": "Single-node data movement deployment. MySQL holds the operational data; meadow-integration syncs from a remote Meadow API; retold-databeacon registers with Ultravisor as a beacon. All retold-* images are built from your local monorepo checkout (set MonorepoRoot).",
+	"SchemaVersion": 1,
+	"Inputs":
+	{
+		"DataRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/facto",
+			"Description": "Where MySQL data + logs + UV state + beacon SQLite persist on the host. Subdirectories will be created if missing."
+		},
+		"MonorepoRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/Code/retold",
+			"Description": "Path to your retold monorepo checkout. Ultravisor + retold-databeacon + meadow-integration are built from MonorepoRoot/modules/... at launch time."
+		},
+		"UVAdminPassword":
+		{
+			"Type": "secret",
+			"Default": "",
+			"Description": "First-run admin password for Ultravisor. Used by the beacons to authenticate."
+		},
+		"UVPort":
+		{
+			"Type": "port",
+			"Default": 54321,
+			"Description": "Host port for the Ultravisor API."
+		},
+		"MysqlPort":
+		{
+			"Type": "port",
+			"Default": 3306,
+			"Description": "Host port for the MySQL listener."
+		},
+		"BeaconPort":
+		{
+			"Type": "port",
+			"Default": 8389,
+			"Description": "Host port for retold-databeacon's REST + web UI."
+		},
+		"DBName":
+		{
+			"Type": "string",
+			"Default": "facto",
+			"Description": "Operational database name. Created on first launch by mysql; meadow-integration writes its clone here."
+		},
+		"SchemaPath":
+		{
+			"Type": "string",
+			"Default": "",
+			"Description": "In-container path to the Meadow extended schema JSON for the data-clone job. Leave blank to use meadow-integration's bundled BookStore default (smoke-test friendly). Override to mount your own schema via DataRoot and point at it."
+		}
+	},
+	"Components":
+	[
+		{
+			"Hash": "mysql",
+			"Type": "docker-service",
+			"Image": "mysql:8.0",
+			"Ports": [ { "Host": "${input.MysqlPort}", "Container": 3306 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/mysql/data", "Container": "/var/lib/mysql", "Mode": "rw" },
+				{ "Host": "${input.DataRoot}/mysql/logs", "Container": "/var/log/mysql", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"MYSQL_ROOT_PASSWORD": "${input.UVAdminPassword}",
+				"MYSQL_DATABASE": "${input.DBName}"
+			},
+			"HealthCheck":
+			{
+				"Command": "mysqladmin ping -h localhost -uroot -p${input.UVAdminPassword}",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "ultravisor",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.UVPort}", "Container": 54321 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/uv/data", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_LOG_LEVEL": "info",
+				"ULTRAVISOR_BOOTSTRAP_USER": "admin",
+				"ULTRAVISOR_BOOTSTRAP_PASSWORD": "${input.UVAdminPassword}"
+			},
+			"HealthCheck":
+			{
+				"Command": "wget -qO- http://localhost:54321/status || exit 1",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "retold-databeacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.BeaconPort}", "Container": 8389 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/databeacon", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"DATABEACON_ULTRAVISOR_URL": "http://${component.ultravisor.host}:54321",
+				"DATABEACON_BEACON_NAME": "facto-databeacon",
+				"DATABEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"DATABEACON_MAX_CONCURRENT": "3"
+			},
+			"DependsOn": [ "ultravisor" ]
+		},
+		{
+			"Hash": "meadow-integration",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/meadow/meadow-integration",
+			"Dockerfile": "Dockerfile",
+			"RestartPolicy": "no",
+			"Environment":
+			{
+				"MEADOW_INTEGRATION_API_SERVER": "http://${component.ultravisor.host}:54321",
+				"MEADOW_INTEGRATION_API_USERNAME": "admin",
+				"MEADOW_INTEGRATION_API_PASSWORD": "${input.UVAdminPassword}",
+				"MEADOW_INTEGRATION_DB_PROVIDER": "MySQL",
+				"MEADOW_INTEGRATION_DB_HOST": "${component.mysql.host}",
+				"MEADOW_INTEGRATION_DB_PORT": "3306",
+				"MEADOW_INTEGRATION_DB_USERNAME": "root",
+				"MEADOW_INTEGRATION_DB_PASSWORD": "${input.UVAdminPassword}",
+				"MEADOW_INTEGRATION_DB_NAME": "${input.DBName}",
+				"MEADOW_INTEGRATION_SCHEMA_PATH": "${input.SchemaPath}"
+			},
+			"DependsOn": [ "mysql", "ultravisor" ]
+		}
+	]
+}

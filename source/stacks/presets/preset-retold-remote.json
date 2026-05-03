@@ -1,0 +1,152 @@
+{
+	"Hash": "preset-retold-remote",
+	"Name": "Retold Remote + Conversion + MariaDB",
+	"Description": "File-server + content-conversion deployment. Ultravisor coordinates a retold-remote (browse + serve files from a host folder) and orator-conversion (image / document transforms) backed by MariaDB for cache + audit. The NavigationRoot input pins what folder retold-remote treats as its root.",
+	"SchemaVersion": 1,
+	"Inputs":
+	{
+		"DataRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/remote",
+			"Description": "Where MariaDB data + UV state + conversion cache persist on the host."
+		},
+		"MonorepoRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/Code/retold",
+			"Description": "Path to your retold monorepo checkout. Ultravisor + retold-remote + orator-conversion are built from MonorepoRoot/modules/... at launch time."
+		},
+		"NavigationRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}",
+			"Description": "Folder retold-remote serves as its root. Anything below this becomes browseable; anything above is invisible."
+		},
+		"CacheRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/remote/cache",
+			"Description": "Where orator-conversion stores its converted-output cache. Safe to wipe."
+		},
+		"UVAdminPassword":
+		{
+			"Type": "secret",
+			"Default": "",
+			"Description": "First-run admin password for Ultravisor and the MariaDB root user."
+		},
+		"UVPort":
+		{
+			"Type": "port",
+			"Default": 54321,
+			"Description": "Host port for the Ultravisor API."
+		},
+		"RemotePort":
+		{
+			"Type": "port",
+			"Default": 8443,
+			"Description": "Host port for retold-remote's HTTPS UI."
+		},
+		"MariaPort":
+		{
+			"Type": "port",
+			"Default": 3307,
+			"Description": "Host port for the MariaDB listener (3307 to avoid colliding with a host MySQL on 3306)."
+		}
+	},
+	"Components":
+	[
+		{
+			"Hash": "mariadb",
+			"Type": "docker-service",
+			"Image": "mariadb:11",
+			"Ports": [ { "Host": "${input.MariaPort}", "Container": 3306 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/mariadb/data", "Container": "/var/lib/mysql", "Mode": "rw" },
+				{ "Host": "${input.DataRoot}/mariadb/logs", "Container": "/var/log/mysql", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"MARIADB_ROOT_PASSWORD": "${input.UVAdminPassword}",
+				"MARIADB_DATABASE": "remote"
+			},
+			"HealthCheck":
+			{
+				"Command": "mariadb-admin ping -h localhost -uroot -p${input.UVAdminPassword}",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "ultravisor",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.UVPort}", "Container": 54321 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/uv/data", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_LOG_LEVEL": "info",
+				"ULTRAVISOR_BOOTSTRAP_USER": "admin",
+				"ULTRAVISOR_BOOTSTRAP_PASSWORD": "${input.UVAdminPassword}"
+			},
+			"HealthCheck":
+			{
+				"Command": "wget -qO- http://localhost:54321/status || exit 1",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "retold-remote",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-remote",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.RemotePort}", "Container": 8443 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.NavigationRoot}", "Container": "/srv/root", "Mode": "ro" },
+				{ "Host": "${input.DataRoot}/remote/state", "Container": "/app/state", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"UV_URL": "http://${component.ultravisor.host}:54321",
+				"UV_USER": "admin",
+				"UV_PASSWORD": "${input.UVAdminPassword}",
+				"NAVIGATION_ROOT": "/srv/root",
+				"CONVERSION_URL": "http://${component.orator-conversion.host}:8080"
+			},
+			"DependsOn": [ "ultravisor", "orator-conversion" ]
+		},
+		{
+			"Hash": "orator-conversion",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/orator/orator-conversion",
+			"Dockerfile": "Dockerfile",
+			"Volumes":
+			[
+				{ "Host": "${input.CacheRoot}", "Container": "/cache", "Mode": "rw" },
+				{ "Host": "${input.NavigationRoot}", "Container": "/srv/root", "Mode": "ro" }
+			],
+			"Environment":
+			{
+				"DB_HOST": "${component.mariadb.host}",
+				"DB_PORT": "3306",
+				"DB_USER": "root",
+				"DB_PASSWORD": "${input.UVAdminPassword}",
+				"DB_NAME": "remote",
+				"CACHE_DIR": "/cache",
+				"SOURCE_ROOT": "/srv/root"
+			},
+			"DependsOn": [ "mariadb" ]
+		}
+	]
+}

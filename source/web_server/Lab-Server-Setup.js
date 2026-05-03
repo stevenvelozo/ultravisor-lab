@@ -36,6 +36,11 @@ const libServiceSeedDatasetManager   = require('../services/Service-SeedDatasetM
 const libServiceBeaconExerciseManager = require('../services/Service-BeaconExerciseManager.js');
 const libServiceOperationExerciseManager = require('../services/Service-OperationExerciseManager.js');
 const libServiceLabLifecycle         = require('../services/Service-LabLifecycle.js');
+const libServiceStackStore           = require('../services/Service-StackStore.js');
+const libServiceStackResolver        = require('../services/Service-StackResolver.js');
+const libServiceStackPreflight       = require('../services/Service-StackPreflight.js');
+const libServiceStackComposer        = require('../services/Service-StackComposer.js');
+const libServiceStackLifecycle       = require('../services/Service-StackLifecycle.js');
 
 const libRoutesSystem          = require('./routes/Lab-Api-System.js');
 const libRoutesEntities        = require('./routes/Lab-Api-Entities.js');
@@ -46,6 +51,7 @@ const libRoutesBeacons         = require('./routes/Lab-Api-Beacons.js');
 const libRoutesSeedDatasets    = require('./routes/Lab-Api-SeedDatasets.js');
 const libRoutesBeaconExercises  = require('./routes/Lab-Api-BeaconExercises.js');
 const libRoutesOperationExercises = require('./routes/Lab-Api-OperationExercises.js');
+const libRoutesStacks            = require('./routes/Lab-Api-Stacks.js');
 
 function setupLabServer(pOptions, fCallback)
 {
@@ -102,6 +108,16 @@ function setupLabServer(pOptions, fCallback)
 	tmpFable.addAndInstantiateServiceType('LabOperationExerciseManager', libServiceOperationExerciseManager);
 	tmpFable.addAndInstantiateServiceType('LabLifecycle',            libServiceLabLifecycle);
 
+	// Phase 8 — Stacks. SQLite is canonical (Stack table); every save
+	// also mirrors to ${dataDir}/stacks/<Hash>.json. The store loads
+	// the read-only preset library from source/stacks/presets/*.json
+	// on first listPresets() call.
+	tmpFable.addAndInstantiateServiceType('LabStackStore',           libServiceStackStore,        { DataDir: tmpDataDir });
+	tmpFable.addAndInstantiateServiceType('LabStackResolver',        libServiceStackResolver);
+	tmpFable.addAndInstantiateServiceType('LabStackPreflight',       libServiceStackPreflight);
+	tmpFable.addAndInstantiateServiceType('LabStackComposer',        libServiceStackComposer,     { DataDir: tmpDataDir });
+	tmpFable.addAndInstantiateServiceType('LabStackLifecycle',       libServiceStackLifecycle);
+
 	tmpFable.LabStateStore.initialize(
 		(pStateErr) =>
 		{
@@ -143,6 +159,11 @@ function setupLabServer(pOptions, fCallback)
 						BeaconExerciseManager: tmpFable.LabBeaconExerciseManager,
 						OperationExerciseManager: tmpFable.LabOperationExerciseManager,
 						Lifecycle:            tmpFable.LabLifecycle,
+						StackStore:           tmpFable.LabStackStore,
+						StackResolver:        tmpFable.LabStackResolver,
+						StackPreflight:       tmpFable.LabStackPreflight,
+						StackComposer:        tmpFable.LabStackComposer,
+						StackLifecycle:       tmpFable.LabStackLifecycle,
 						Package:              tmpPackage
 					};
 
@@ -172,6 +193,7 @@ function setupLabServer(pOptions, fCallback)
 							libRoutesSeedDatasets(tmpCore);
 							libRoutesBeaconExercises(tmpCore);
 							libRoutesOperationExercises(tmpCore);
+							libRoutesStacks(tmpCore);
 
 							// Static bundle.  During dev we serve the `web/` source tree
 							// directly.  The browser bundle only exists after `npm run

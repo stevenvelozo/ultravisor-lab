@@ -1,0 +1,96 @@
+{
+	"Hash": "preset-retold-labs",
+	"Name": "Retold Labs (ML beacon-ready)",
+	"Description": "Ultravisor + retold-labs deployment ready for machine-learning beacons. Retold-labs is built from the local monorepo checkout (it isn't on npm), so this stack assumes you have the retold monorepo cloned at the path you set in MonorepoRoot. ML beacons can then be added one at a time without restarting the stack.",
+	"SchemaVersion": 1,
+	"Inputs":
+	{
+		"DataRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/labs",
+			"Description": "Where UV state + retold-labs scratch space persist on the host."
+		},
+		"MonorepoRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/Code/retold",
+			"Description": "Path to your retold monorepo checkout. retold-labs is built from MonorepoRoot/modules/apps/retold-labs at launch time."
+		},
+		"ModelCacheRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/labs/models",
+			"Description": "Where ML model weights are cached on the host. Pre-warm this folder if you want offline-only operation."
+		},
+		"UVAdminPassword":
+		{
+			"Type": "secret",
+			"Default": "",
+			"Description": "First-run admin password for Ultravisor."
+		},
+		"UVPort":
+		{
+			"Type": "port",
+			"Default": 54321,
+			"Description": "Host port for the Ultravisor API."
+		},
+		"LabsPort":
+		{
+			"Type": "port",
+			"Default": 44443,
+			"Description": "Host port for the retold-labs UI."
+		}
+	},
+	"Components":
+	[
+		{
+			"Hash": "ultravisor",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.UVPort}", "Container": 54321 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/uv/data", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_LOG_LEVEL": "info",
+				"ULTRAVISOR_BOOTSTRAP_USER": "admin",
+				"ULTRAVISOR_BOOTSTRAP_PASSWORD": "${input.UVAdminPassword}"
+			},
+			"HealthCheck":
+			{
+				"Command": "wget -qO- http://localhost:54321/status || exit 1",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "retold-labs",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-labs",
+			"Dockerfile": "Dockerfile",
+			"DockerfileFallback": "node-22-alpine",
+			"Ports": [ { "Host": "${input.LabsPort}", "Container": 44443 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/labs/state", "Container": "/app/data", "Mode": "rw" },
+				{ "Host": "${input.ModelCacheRoot}", "Container": "/app/models", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"UV_URL": "http://${component.ultravisor.host}:54321",
+				"UV_USER": "admin",
+				"UV_PASSWORD": "${input.UVAdminPassword}",
+				"RETOLD_LABS_ALLOW_NETWORK": "0",
+				"HF_HUB_OFFLINE": "1",
+				"MODEL_CACHE_DIR": "/app/models"
+			},
+			"DependsOn": [ "ultravisor" ]
+		}
+	]
+}

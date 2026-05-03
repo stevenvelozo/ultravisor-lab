@@ -309,6 +309,84 @@ class LabApiProvider extends libFableServiceProviderBase
 	{
 		return _request('POST', '/api/lab/operation-exercise-runs/' + pID + '/cancel', {}, fCallback);
 	}
+
+	// ── Stacks (Phase 8) ────────────────────────────────────────────────────
+
+	listStackPresets(fCallback)
+	{
+		return _request('GET', '/api/lab/stack-presets', null, fCallback);
+	}
+
+	getStackPreset(pPresetHash, fCallback)
+	{
+		return _request('GET', '/api/lab/stack-presets/' + encodeURIComponent(pPresetHash), null, fCallback);
+	}
+
+	listStacks(fCallback)
+	{
+		return _request('GET', '/api/lab/stacks', null, fCallback);
+	}
+
+	getStack(pHash, fCallback)
+	{
+		return _request('GET', '/api/lab/stacks/' + encodeURIComponent(pHash), null, fCallback);
+	}
+
+	saveStack(pSpec, pInputValues, fCallback)
+	{
+		// Back-compat: older callers passed (pSpec, fCallback).
+		if (typeof pInputValues === 'function')
+		{
+			fCallback = pInputValues;
+			pInputValues = undefined;
+		}
+		let tmpBody = { Spec: pSpec };
+		if (pInputValues !== undefined) { tmpBody.InputValues = pInputValues; }
+		return _request('POST', '/api/lab/stacks', tmpBody, fCallback);
+	}
+
+	clonePreset(pPresetHash, pName, fCallback)
+	{
+		return _request('POST',
+			'/api/lab/stacks/clone-preset/' + encodeURIComponent(pPresetHash),
+			{ Name: pName || '' }, fCallback);
+	}
+
+	removeStack(pHash, fCallback)
+	{
+		return _request('DELETE', '/api/lab/stacks/' + encodeURIComponent(pHash), null, fCallback);
+	}
+
+	preflightStack(pHash, pInputValues, fCallback)
+	{
+		return _request('POST',
+			'/api/lab/stacks/' + encodeURIComponent(pHash) + '/preflight',
+			{ InputValues: pInputValues || {} }, fCallback);
+	}
+
+	upStack(pHash, pInputValues, fCallback)
+	{
+		return _request('POST',
+			'/api/lab/stacks/' + encodeURIComponent(pHash) + '/up',
+			{ InputValues: pInputValues || {} }, fCallback);
+	}
+
+	downStack(pHash, fCallback)
+	{
+		return _request('POST', '/api/lab/stacks/' + encodeURIComponent(pHash) + '/down', {}, fCallback);
+	}
+
+	getStackStatus(pHash, fCallback)
+	{
+		return _request('GET', '/api/lab/stacks/' + encodeURIComponent(pHash) + '/status', null, fCallback);
+	}
+
+	getStackComposeYaml(pHash, fCallback)
+	{
+		return _request('GET',
+			'/api/lab/stacks/' + encodeURIComponent(pHash) + '/compose-yaml',
+			null, fCallback);
+	}
 }
 
 module.exports = LabApiProvider;
