@@ -148,7 +148,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	</div>
 	<div class="lab-opex-targets">
 		<label>Target Ultravisor
-			<select id="Lab-OperationExercises-Targets-Ultravisor" onchange="{~P~}.PictApplication.navigateTo('/operationexercises/select-uv')">{~TS:Lab-OperationExercises-TargetOption-Template:AppData.Lab.Computed.OperationExercises.UltravisorOptions~}</select>
+			<select id="Lab-OperationExercises-Targets-Ultravisor" onchange="{~P~}.PictApplication.navigateTo('/operationexercise-form/select-uv')">{~TS:Lab-OperationExercises-TargetOption-Template:AppData.Lab.Computed.OperationExercises.UltravisorOptions~}</select>
 		</label>
 	</div>
 	<div id="Lab-OperationExercises-ActiveSlot"></div>

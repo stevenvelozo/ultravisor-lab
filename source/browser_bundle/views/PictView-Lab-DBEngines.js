@@ -260,7 +260,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 <div class="lab-engines">
 	<div class="lab-engines-toolbar">
 		<h2>DB Engines</h2>
-		<a class="lab-btn" href="#/dbengines/form/toggle">{~D:AppData.Lab.Computed.DBEngines.FormButtonLabel~}</a>
+		<a class="lab-btn" href="#/dbengine-form/toggle">{~D:AppData.Lab.Computed.DBEngines.FormButtonLabel~}</a>
 	</div>
 	<div id="Lab-Engines-FormSlot"></div>
 	<div id="Lab-Engines-ListSlot"></div>
@@ -296,9 +296,9 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<input type="text" id="Lab-EngineForm-Password" placeholder="auto" value="{~D:Record.Password~}">
 	</label>
 	<div class="lab-engine-form-actions">
-		<a class="lab-btn secondary" href="#/dbengines/form/suggest-port">↻ Suggest port</a>
-		<a class="lab-btn secondary" href="#/dbengines/form/toggle">Cancel</a>
-		<a class="lab-btn" href="#/dbengines/submit">Create engine</a>
+		<a class="lab-btn secondary" href="#/dbengine-form/suggest-port">↻ Suggest port</a>
+		<a class="lab-btn secondary" href="#/dbengine-form/toggle">Cancel</a>
+		<a class="lab-btn" href="#/dbengine-form/submit">Create engine</a>
 	</div>
 	<div class="lab-engine-form-error" id="Lab-EngineForm-Error">{~D:Record.Error~}</div>
 </div>`

@@ -166,7 +166,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 <div class="lab-uv">
 	<div class="lab-uv-toolbar">
 		<h2>Ultravisor Instances</h2>
-		<a class="lab-btn" href="#/ultravisor/form/toggle">{~D:AppData.Lab.Computed.Ultravisor.FormButtonLabel~}</a>
+		<a class="lab-btn" href="#/ultravisor-form/toggle">{~D:AppData.Lab.Computed.Ultravisor.FormButtonLabel~}</a>
 	</div>
 	<div id="Lab-Ultravisor-FormSlot"></div>
 	<div id="Lab-Ultravisor-ListSlot"></div>
@@ -199,8 +199,8 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		<span>Secure mode (non-promiscuous, requires auth beacon to admit other beacons)</span>
 	</label>
 	<div class="lab-uv-form-actions">
-		<a class="lab-btn secondary" href="#/ultravisor/form/toggle">Cancel</a>
-		<a class="lab-btn" href="#/ultravisor/submit">Create Ultravisor</a>
+		<a class="lab-btn secondary" href="#/ultravisor-form/toggle">Cancel</a>
+		<a class="lab-btn" href="#/ultravisor-form/submit">Create Ultravisor</a>
 	</div>
 	<div class="lab-uv-form-error">{~D:Record.Error~}</div>
 </div>`

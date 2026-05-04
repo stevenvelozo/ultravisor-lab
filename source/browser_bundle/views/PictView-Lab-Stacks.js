@@ -278,8 +278,9 @@ const _ViewConfiguration =
 .lab-stack-component-status
 {
 	display: grid;
-	grid-template-columns: 1fr 100px 100px 120px;
+	grid-template-columns: 1fr 90px 90px 100px minmax(120px, 1.2fr);
 	gap: 10px;
+	align-items: center;
 	padding: 6px 0;
 	font-size: 12px;
 	border-bottom: 1px dashed #1e293b;
@@ -289,6 +290,97 @@ const _ViewConfiguration =
 .lab-stack-component-status .state { color: #cbd5e1; }
 .lab-stack-component-status .health { color: #94a3b8; }
 .lab-stack-component-status .uptime { color: #64748b; font-size: 11px; }
+.lab-stack-component-status .ports { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+
+.lab-port-link
+{
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 8px;
+	border-radius: 4px;
+	font-size: 11px;
+	font-weight: 500;
+	text-decoration: none;
+	border: 1px solid transparent;
+	transition: background 0.15s, border-color 0.15s;
+	white-space: nowrap;
+}
+.lab-port-link:hover { text-decoration: none; }
+.lab-port-link .lab-port-icon { font-size: 12px; line-height: 1; }
+.lab-port-link .lab-port-num  { color: inherit; opacity: 0.85; font-family: monospace; }
+.lab-port-link.lab-port-http
+{
+	background: rgba(59, 130, 246, 0.15);
+	color: #93c5fd;
+	border-color: rgba(59, 130, 246, 0.35);
+}
+.lab-port-link.lab-port-http:hover { background: rgba(59, 130, 246, 0.3); border-color: #3b82f6; }
+.lab-port-link.lab-port-sql-mysql,
+.lab-port-link.lab-port-sql-postgres,
+.lab-port-link.lab-port-sql-mssql
+{
+	background: rgba(245, 158, 11, 0.15);
+	color: #fcd34d;
+	border-color: rgba(245, 158, 11, 0.35);
+	cursor: pointer;
+}
+.lab-port-link.lab-port-sql-mysql:hover,
+.lab-port-link.lab-port-sql-postgres:hover,
+.lab-port-link.lab-port-sql-mssql:hover
+{
+	background: rgba(245, 158, 11, 0.3);
+	border-color: #f59e0b;
+}
+
+.lab-sql-conn-table
+{
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px 0 12px 0;
+}
+.lab-sql-conn-row
+{
+	display: grid;
+	grid-template-columns: 90px 1fr auto auto;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 12px;
+	background: #0f172a;
+	border: 1px solid #1e293b;
+	border-radius: 4px;
+	font-size: 13px;
+}
+.lab-sql-conn-row .k { color: #94a3b8; font-weight: 500; text-transform: uppercase; font-size: 11px; }
+.lab-sql-conn-row .v { color: #f8fafc; overflow: hidden; }
+.lab-sql-conn-row .v code { background: transparent; color: #e2e8f0; font-family: monospace; font-size: 12px; }
+.lab-sql-conn-row .v em   { color: #64748b; font-style: italic; font-size: 12px; }
+.lab-sql-conn-row a.lab-sql-copy,
+.lab-sql-conn-row a.lab-sql-reveal
+{
+	background: #1e293b;
+	color: #cbd5e1;
+	border: 1px solid #334155;
+	padding: 3px 10px;
+	border-radius: 4px;
+	font-size: 11px;
+	text-decoration: none;
+	cursor: pointer;
+}
+.lab-sql-conn-row a.lab-sql-copy:hover,
+.lab-sql-conn-row a.lab-sql-reveal:hover { background: #334155; border-color: #475569; }
+.lab-sql-conn-help
+{
+	font-size: 12px;
+	color: #94a3b8;
+	padding: 8px 12px;
+	background: rgba(59, 130, 246, 0.08);
+	border-left: 3px solid #3b82f6;
+	border-radius: 4px;
+	line-height: 1.5;
+}
+.lab-sql-conn-help code { background: #0f172a; color: #93c5fd; padding: 1px 6px; border-radius: 3px; font-family: monospace; font-size: 11px; }
 
 .lab-yaml-preview
 {
@@ -337,7 +429,7 @@ const _ViewConfiguration =
 			Template: /*html*/`
 <div class="lab-stacks-toolbar">
 	<h2>Stacks</h2>
-	<a class="lab-btn" href="#/stacks/new">+ New stack from preset</a>
+	<a class="lab-btn" href="#/stack-form/new">+ New stack from preset</a>
 </div>
 {~TS:Lab-Stacks-Empty-Template:Record.EmptySlot~}
 {~TS:Lab-Stacks-Card-Template:Record.Stacks~}`
@@ -393,7 +485,7 @@ const _ViewConfiguration =
 		{~D:Record.ComponentCount~} component{~D:Record.PluralComp~} · {~D:Record.InputCount~} input{~D:Record.PluralInp~}
 	</div>
 	<div class="lab-preset-actions">
-		<a class="lab-btn" href="#/stacks/clone-preset/{~D:Record.HashEnc~}">Clone &amp; edit</a>
+		<a class="lab-btn" href="#/stack-form/clone-preset/{~D:Record.HashEnc~}">Clone &amp; edit</a>
 	</div>
 </div>`
 		},
@@ -529,7 +621,12 @@ const _ViewConfiguration =
 	<span class="state">{~D:Record.State~}</span>
 	<span class="health">{~D:Record.Health~}</span>
 	<span class="uptime">{~D:Record.Uptime~}</span>
+	<span class="ports">{~TS:Lab-Stacks-DetailComponentPort-Template:Record.Ports~}</span>
 </div>`
+		},
+		{
+			Hash: 'Lab-Stacks-DetailComponentPort-Template',
+			Template: /*html*/`{~D:Record.LinkHTML~}`
 		},
 		{
 			Hash: 'Lab-Stacks-DetailEmptyComponents-Template',
@@ -571,6 +668,132 @@ function _statusClass(pStatus)
 	let tmp = String(pStatus || 'stopped').toLowerCase();
 	if (['stopped','starting','running','unhealthy','stopping','error'].indexOf(tmp) >= 0) return tmp;
 	return 'stopped';
+}
+
+// Classify a container port + image into a connection kind. Used to
+// decide whether to render a plain web link (open in new tab) or a
+// "show connection details" trigger that opens a credentials modal.
+function _portKind(pContainerPort, pImage)
+{
+	let tmpImg = String(pImage || '').toLowerCase();
+	let tmpPort = parseInt(pContainerPort, 10);
+	if (tmpPort === 3306 || /\bmysql\b/.test(tmpImg) || /\bmariadb\b/.test(tmpImg)) return 'sql-mysql';
+	if (tmpPort === 5432 || /\bpostgres/.test(tmpImg))                              return 'sql-postgres';
+	if (tmpPort === 1433 || /\bmssql\b/.test(tmpImg) || /\bsqlserver\b/.test(tmpImg)) return 'sql-mssql';
+	return 'http';
+}
+
+function _portKindLabel(pKind)
+{
+	if (pKind === 'sql-mysql')    return 'MySQL';
+	if (pKind === 'sql-postgres') return 'PostgreSQL';
+	if (pKind === 'sql-mssql')    return 'MSSQL';
+	return 'Web';
+}
+
+function _portKindIcon(pKind)
+{
+	if (pKind === 'sql-mysql' || pKind === 'sql-postgres' || pKind === 'sql-mssql') return '⛁';
+	return '↗';
+}
+
+// Walk a docker-compose YAML string and return { serviceName: [{Host, Container}] }.
+// We use this rather than re-resolving ${input.X} from the spec because
+// the YAML is what docker-compose actually launched — InputValues on a
+// stack record can be empty (the user accepted defaults at launch time
+// and they were never persisted back), but the YAML on disk is always
+// the canonical "what's actually running."
+function _parseYamlPortMap(pYamlText)
+{
+	let tmpResult = {};
+	if (!pYamlText || typeof pYamlText !== 'string') return tmpResult;
+	let tmpLines = pYamlText.split(/\n/);
+	let tmpCurrentService = null;
+	let tmpInPorts = false;
+	for (let i = 0; i < tmpLines.length; i++)
+	{
+		let line = tmpLines[i];
+		// Service header at indent 2 spaces under "services:".
+		let mSvc = /^  ([A-Za-z0-9_.-]+):\s*$/.exec(line);
+		if (mSvc) { tmpCurrentService = mSvc[1]; tmpInPorts = false; if (!tmpResult[tmpCurrentService]) tmpResult[tmpCurrentService] = []; continue; }
+		if (!tmpCurrentService) continue;
+		if (/^    ports:\s*$/.test(line)) { tmpInPorts = true; continue; }
+		// Any other 4-space top-level key under a service ends the ports list.
+		if (tmpInPorts && /^    [A-Za-z0-9_]+:/.test(line)) { tmpInPorts = false; }
+		if (tmpInPorts)
+		{
+			// Lines look like:  - "55432:5432"  or  - 55432:5432  or  - "55432:5432/tcp"
+			let mPort = /^\s*-\s*"?(\d+):(\d+)(?:\/[a-z]+)?"?\s*$/.exec(line);
+			if (mPort) tmpResult[tmpCurrentService].push({ Host: parseInt(mPort[1], 10), Container: parseInt(mPort[2], 10) });
+		}
+	}
+	return tmpResult;
+}
+
+// Resolve ${input.Name} placeholders. Order: explicit user values →
+// preset defaults → leave the placeholder visible so the operator
+// can see something is missing rather than getting a silent broken
+// link.
+function _resolveInputPlaceholder(pValue, pInputValues, pInputDefs)
+{
+	if (typeof pValue !== 'string') return String(pValue);
+	if (pValue.indexOf('${input.') < 0) return pValue;
+	return pValue.replace(/\$\{input\.([A-Za-z0-9_]+)\}/g, (m, key) =>
+	{
+		let tmpExplicit = pInputValues && pInputValues[key];
+		if (tmpExplicit !== undefined && tmpExplicit !== '') return String(tmpExplicit);
+		let tmpDef = pInputDefs && pInputDefs[key] && pInputDefs[key].Default;
+		if (tmpDef !== undefined && tmpDef !== '') return String(tmpDef);
+		return m;
+	});
+}
+
+// Build the per-port link payload for one component. Each entry carries
+// pre-formed HTML (LinkHTML) that the Pict template inserts verbatim;
+// the values composed in are all from preset config (port numbers,
+// component hashes), never user-typed input.
+function _buildComponentPorts(pStackHash, pSpecComp, pInputValues, pInputDefs, pYamlPorts)
+{
+	// Prefer the YAML-resolved port mapping (canonical) over the raw spec
+	// (which may still contain ${input.X} placeholders). Fall back to the
+	// spec when YAML hasn't loaded yet so the column isn't empty.
+	let tmpYamlForComp = pYamlPorts && pYamlPorts[(pSpecComp && pSpecComp.Hash) || ''];
+	let tmpPorts = (tmpYamlForComp && tmpYamlForComp.length > 0)
+		? tmpYamlForComp
+		: ((pSpecComp && Array.isArray(pSpecComp.Ports)) ? pSpecComp.Ports : []);
+	let tmpImage = (pSpecComp && pSpecComp.Image) || '';
+	let tmpStackEnc = encodeURIComponent(pStackHash || '');
+	let tmpCompEnc  = encodeURIComponent((pSpecComp && pSpecComp.Hash) || '');
+	return tmpPorts.map((pP) =>
+	{
+		let tmpHostPort = _resolveInputPlaceholder(pP.Host, pInputValues, pInputDefs);
+		let tmpKind = _portKind(pP.Container, tmpImage);
+		let tmpKindLabel = _portKindLabel(tmpKind);
+		let tmpIcon = _portKindIcon(tmpKind);
+		let tmpHref;
+		let tmpTarget;
+		let tmpTitle;
+		if (tmpKind === 'http')
+		{
+			tmpHref = 'http://127.0.0.1:' + tmpHostPort + '/';
+			tmpTarget = '_blank';
+			tmpTitle = 'Open ' + (pSpecComp.Hash || '') + ' web UI on host port ' + tmpHostPort;
+		}
+		else
+		{
+			tmpHref = '#/stack-modal/sql/' + tmpStackEnc + '/' + tmpCompEnc + '/' + encodeURIComponent(tmpHostPort);
+			tmpTarget = '';
+			tmpTitle = tmpKindLabel + ' connection details for ' + (pSpecComp.Hash || '') + ' on host port ' + tmpHostPort;
+		}
+		let tmpLinkHTML = '<a class="lab-port-link lab-port-' + tmpKind + '"'
+			+ ' href="' + tmpHref + '"'
+			+ (tmpTarget ? (' target="' + tmpTarget + '"') : '')
+			+ ' title="' + _escapeAttr(tmpTitle) + '"'
+			+ '><span class="lab-port-icon">' + tmpIcon + '</span>'
+			+ '<span class="lab-port-label">' + tmpKindLabel + '</span>'
+			+ '<span class="lab-port-num">:' + tmpHostPort + '</span></a>';
+		return { LinkHTML: tmpLinkHTML };
+	});
 }
 
 class LabStacksView extends libPictView
@@ -724,13 +947,24 @@ class LabStacksView extends libPictView
 		let tmpStatus = pState.LastStatus && pState.LastStatus.Hash === tmpD.Hash
 			? pState.LastStatus.Status : null;
 
+		// Index spec components by Hash so each running container's row
+		// can be joined with its declared Ports (and Image, used by the
+		// SQL-vs-HTTP classifier).
+		let tmpSpecByHash = {};
+		(tmpSpec.Components || []).forEach((pC) => { tmpSpecByHash[pC.Hash] = pC; });
+
+		let tmpInputValues = tmpD.InputValues || {};
+		let tmpInputDefs   = tmpSpec.Inputs || {};
+		let tmpYamlText    = (pState.LastYaml && pState.LastYaml.Hash === tmpD.Hash) ? (pState.LastYaml.YAML || '') : '';
+		let tmpYamlPorts   = _parseYamlPortMap(tmpYamlText);
 		let tmpComponents = (tmpStatus && Array.isArray(tmpStatus.Components))
 			? tmpStatus.Components.map((pC) => (
 				{
 					Hash:    _escape(pC.Hash || ''),
 					State:   _escape(pC.State || ''),
 					Health:  _escape(pC.Health || ''),
-					Uptime:  _escape(pC.Uptime || '')
+					Uptime:  _escape(pC.Uptime || ''),
+					Ports:   _buildComponentPorts(tmpD.Hash, tmpSpecByHash[pC.Hash], tmpInputValues, tmpInputDefs, tmpYamlPorts)
 				}))
 			: [];
 		let tmpStatusValue = (tmpStatus && tmpStatus.Phase) || tmpD.Status || 'stopped';

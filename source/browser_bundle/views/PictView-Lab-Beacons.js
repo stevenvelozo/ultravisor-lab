@@ -232,7 +232,7 @@ const _ViewConfiguration =
 		},
 		{
 			Hash: 'Lab-Beacons-TypeButton-Template',
-			Template: /*html*/`<a class="lab-btn secondary" href="#/beacons/form/open/{~D:Record.BeaconType~}">+ Add {~D:Record.DisplayName~}</a>`
+			Template: /*html*/`<a class="lab-btn secondary" href="#/beacon-form/open/{~D:Record.BeaconType~}">+ Add {~D:Record.DisplayName~}</a>`
 		},
 		{
 			Hash: 'Lab-Beacons-FormBody-Template',
@@ -279,9 +279,9 @@ const _ViewConfiguration =
 		</div>
 	</details>
 	<div class="lab-beacons-form-actions">
-		<a class="lab-btn secondary" href="#/beacons/form/suggest-port">↻ Suggest port</a>
-		<a class="lab-btn secondary" href="#/beacons/form/close">Cancel</a>
-		<a class="lab-btn" href="#/beacons/submit">Create beacon</a>
+		<a class="lab-btn secondary" href="#/beacon-form/suggest-port">↻ Suggest port</a>
+		<a class="lab-btn secondary" href="#/beacon-form/close">Cancel</a>
+		<a class="lab-btn" href="#/beacon-form/submit">Create beacon</a>
 	</div>
 	<div class="lab-beacons-form-error">{~D:Record.Error~}</div>
 </div>`

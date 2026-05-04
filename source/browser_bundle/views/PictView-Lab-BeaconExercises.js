@@ -186,7 +186,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	</div>
 	<div class="lab-queue-targets">
 		<label>Target Ultravisor
-			<select id="Lab-BeaconExercises-Targets-Ultravisor" onchange="{~P~}.PictApplication.navigateTo('/beaconexercises/select-uv')">{~TS:Lab-BeaconExercises-TargetOption-Template:AppData.Lab.Computed.BeaconExercises.UltravisorOptions~}</select>
+			<select id="Lab-BeaconExercises-Targets-Ultravisor" onchange="{~P~}.PictApplication.navigateTo('/beaconexercise-form/select-uv')">{~TS:Lab-BeaconExercises-TargetOption-Template:AppData.Lab.Computed.BeaconExercises.UltravisorOptions~}</select>
 		</label>
 	</div>
 	<div id="Lab-BeaconExercises-BoardSlot"></div>

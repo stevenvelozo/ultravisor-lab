@@ -158,6 +158,7 @@ class LabBrowserApplication extends libPictApplication
 													() =>
 													{
 														this._pollTimer = setInterval(() => this.refreshAll(() => {}), POLL_INTERVAL_MS);
+														this._honorInitialURL();
 														return super.onAfterInitializeAsync(fCallback);
 													});
 											});
@@ -182,6 +183,62 @@ class LabBrowserApplication extends libPictApplication
 
 	onLoginAsync(fCallback) { return super.onLoginAsync(fCallback); }
 	onLoadDataAsync(fCallback) { return super.onLoadDataAsync(fCallback); }
+
+	// On a fresh page load, pict-router doesn't auto-fire whatever's
+	// already in the URL hash — the app boots into the default view
+	// regardless. That makes reloads on a deep-linked URL (e.g. a stack
+	// detail) lose context and require two clicks to recover.
+	//
+	// pict-router.navigateCurrent() exists for this case but it
+	// delegates to navigate(), which dedupes against the URL already
+	// in the bar and turns into a no-op on initial load. So instead we
+	// dispatch directly to the matching handler.
+	//
+	// Only stateful destination patterns get replayed:
+	//   /view/<slug>   — view switches
+	//   /stacks/<hash> — stack detail
+	// Action routes (start/stop/remove, form toggles, modal triggers,
+	// /system/teardown, etc.) are deliberately NOT replayed because
+	// re-firing them on reload would re-execute the action.
+	_honorInitialURL()
+	{
+		let tmpHash = (typeof window !== 'undefined' && window.location) ? window.location.hash : '';
+		if (!tmpHash || tmpHash === '#' || tmpHash === '#/') return;
+
+		let tmpStackMatch = /^#\/stacks\/([A-Za-z0-9_-]+)$/.exec(tmpHash);
+		if (tmpStackMatch && typeof this.openStackDetail === 'function')
+		{
+			this.openStackDetail(tmpStackMatch[1]);
+			return;
+		}
+
+		let tmpViewMatch = /^#\/view\/([A-Za-z0-9_-]+)$/.exec(tmpHash);
+		if (tmpViewMatch)
+		{
+			// URL slug → handler. Most views just flip ActiveView,
+			// but Stacks has to load its list first (the data isn't
+			// part of the global refreshAll cycle). Mirror what each
+			// handler does in PictRouter-Lab-Configuration.json so
+			// reload behavior matches click-through behavior.
+			let tmpSlug = tmpViewMatch[1].toLowerCase();
+			let tmpDispatch =
+			{
+				'overview':           () => this.setActiveView('Overview'),
+				'dbengines':          () => this.setActiveView('DBEngines'),
+				'ultravisor':         () => this.setActiveView('Ultravisor'),
+				'beacons':            () => this.setActiveView('Beacons'),
+				'seeddatasets':       () => this.setActiveView('SeedDatasets'),
+				'beaconexercises':    () => this.setActiveView('BeaconExercises'),
+				'operationexercises': () => this.setActiveView('OperationExercises'),
+				'events':             () => this.setActiveView('Events'),
+				'stacks':             () => this.openStacks()
+			};
+			if (typeof tmpDispatch[tmpSlug] === 'function')
+			{
+				tmpDispatch[tmpSlug]();
+			}
+		}
+	}
 
 	/**
 	 * Navigate to a route using pict-router.  Every `onclick` in the lab's
@@ -729,7 +786,7 @@ class LabBrowserApplication extends libPictApplication
 	}
 
 	/**
-	 * Route handler for /dbengines/form/suggest-port -- read the currently
+	 * Route handler for /dbengine-form/suggest-port -- read the currently
 	 * selected engine type from the DOM and fetch a fresh suggested port.
 	 * Used because there is no onchange on the engine-type select; users
 	 * explicitly click "Suggest port" after picking a type.
@@ -921,7 +978,7 @@ class LabBrowserApplication extends libPictApplication
 	// ── Unified Beacons form ────────────────────────────────────────────────
 
 	/**
-	 * Route handler for `/beacons/form/open/:type` -- open the create form
+	 * Route handler for `/beacon-form/open/:type` -- open the create form
 	 * pre-locked to `pBeaconType`.  There is no "switch type after open"
 	 * flow; the user closes + picks a different "+ Add" button instead.
 	 */
@@ -957,7 +1014,7 @@ class LabBrowserApplication extends libPictApplication
 	}
 
 	/**
-	 * Route handler for `/beacons/form/close` -- hide the create form and
+	 * Route handler for `/beacon-form/close` -- hide the create form and
 	 * clear its error.  Called by the Cancel button.
 	 */
 	closeBeaconForm()
@@ -969,7 +1026,7 @@ class LabBrowserApplication extends libPictApplication
 	}
 
 	/**
-	 * Route handler for `/beacons/form/suggest-port` -- fetch a fresh
+	 * Route handler for `/beacon-form/suggest-port` -- fetch a fresh
 	 * suggested port for the currently-selected beacon type.  Users click
 	 * the "Suggest port" button explicitly since there is no onchange.
 	 */
@@ -2197,6 +2254,217 @@ class LabBrowserApplication extends libPictApplication
 				this._toast('Refreshed', 'info', { duration: 1500 });
 			});
 		});
+	}
+
+	// ── SQL connection-details modal (per stack component) ────────────────
+	// Triggered by clicking a SQL port pill in the stack detail. Surfaces
+	// host/port/user/database/password from the component's Environment so
+	// the operator can paste into a SQL client without grep-ing the YAML.
+
+	openStackSQLModal(pStackHash, pComponentHash, pHostPort)
+	{
+		let tmpStacksState = this.pict.AppData.Lab.Stacks || {};
+		let tmpDetail = tmpStacksState.DetailRecord;
+		if (!tmpDetail || tmpDetail.Hash !== pStackHash || !tmpDetail.Spec)
+		{
+			this._toastError('Stack detail not loaded.');
+			return;
+		}
+		let tmpComp = (tmpDetail.Spec.Components || []).find((c) => c.Hash === pComponentHash);
+		if (!tmpComp)
+		{
+			this._toastError('Component "' + pComponentHash + '" not found in stack spec.');
+			return;
+		}
+
+		let tmpInputValues = tmpDetail.InputValues || {};
+		let tmpInputDefs   = (tmpDetail.Spec && tmpDetail.Spec.Inputs) || {};
+		let resolveInput = (pVal) =>
+		{
+			if (typeof pVal !== 'string' || pVal.indexOf('${input.') < 0) return pVal;
+			return pVal.replace(/\$\{input\.([A-Za-z0-9_]+)\}/g, (m, k) =>
+			{
+				let v = tmpInputValues[k];
+				if (v !== undefined && v !== '') return String(v);
+				let d = tmpInputDefs[k] && tmpInputDefs[k].Default;
+				if (d !== undefined && d !== '') return String(d);
+				return m;
+			});
+		};
+		// The compose YAML has fully-resolved environment values (the lab
+		// substituted ${input.X} when launching). For secrets that weren't
+		// captured into the saved Stack record, the YAML is the only place
+		// the actual value lives.
+		let tmpYamlText = (tmpStacksState.LastYaml && tmpStacksState.LastYaml.Hash === pStackHash) ? (tmpStacksState.LastYaml.YAML || '') : '';
+		let tmpYamlEnv = this._parseYamlEnv(tmpYamlText);
+		let tmpResolvedEnv = (tmpYamlEnv[pComponentHash] || {});
+		let envOrResolve = (pKey) => (tmpResolvedEnv[pKey] !== undefined ? tmpResolvedEnv[pKey] : resolveInput(tmpEnv[pKey]));
+
+		let tmpEnv = tmpComp.Environment || {};
+		// Heuristic for kind label: container port + image string.
+		let tmpFirstPort = (tmpComp.Ports || [])[0] || {};
+		let tmpKindLabel = 'SQL';
+		let tmpUser, tmpPass, tmpDB;
+		let tmpImg = String(tmpComp.Image || '').toLowerCase();
+		if (tmpFirstPort.Container === 3306 || /\bmysql\b/.test(tmpImg) || /\bmariadb\b/.test(tmpImg))
+		{
+			tmpKindLabel = 'MySQL';
+			tmpUser = envOrResolve('MYSQL_USER') || 'root';
+			tmpPass = envOrResolve('MYSQL_ROOT_PASSWORD') || envOrResolve('MYSQL_PASSWORD') || '';
+			tmpDB   = envOrResolve('MYSQL_DATABASE') || '';
+		}
+		else if (tmpFirstPort.Container === 5432 || /\bpostgres/.test(tmpImg))
+		{
+			tmpKindLabel = 'PostgreSQL';
+			tmpUser = envOrResolve('POSTGRES_USER') || 'postgres';
+			tmpPass = envOrResolve('POSTGRES_PASSWORD') || '';
+			tmpDB   = envOrResolve('POSTGRES_DB') || '';
+		}
+		else if (tmpFirstPort.Container === 1433 || /\bmssql\b/.test(tmpImg))
+		{
+			tmpKindLabel = 'MSSQL';
+			tmpUser = 'sa';
+			tmpPass = envOrResolve('MSSQL_SA_PASSWORD') || envOrResolve('SA_PASSWORD') || '';
+			tmpDB   = '';
+		}
+
+		// Stash the password keyed by an opaque token so the copy/reveal
+		// hashroutes don't have to URL-encode the raw secret. Token is
+		// regenerated each time the modal opens — single-use within a
+		// session, no plaintext in window history or shareable links.
+		let tmpToken = 'p' + Date.now() + Math.random().toString(36).slice(2, 8);
+		this.pict.AppData.Lab.Stacks.ModalSQLPasswordToken = tmpToken;
+		this.pict.AppData.Lab.Stacks.ModalSQLPasswordValue = tmpPass;
+
+		let tmpRows =
+		[
+			{ key: 'Host',     value: '127.0.0.1' },
+			{ key: 'Port',     value: String(pHostPort) },
+			{ key: 'User',     value: tmpUser || '(not set in environment)' },
+			{ key: 'Database', value: tmpDB || '(none specified — connect to server-default)' }
+		];
+
+		let tmpRowsHTML = tmpRows.map((r) =>
+			`<div class="lab-sql-conn-row">
+				<div class="k">${this._escapeHTML(r.key)}</div>
+				<div class="v"><code>${this._escapeHTML(r.value)}</code></div>
+				<a class="lab-sql-copy" href="#/stack-modal/copy/${encodeURIComponent(r.value)}" title="Copy to clipboard">Copy</a>
+			</div>`).join('');
+
+		let tmpPasswordHTML = tmpPass
+			? `<div class="lab-sql-conn-row">
+					<div class="k">Password</div>
+					<div class="v">
+						<code class="lab-sql-pw-masked">••••••••••</code>
+						<code class="lab-sql-pw-raw" style="display:none;">${this._escapeHTML(tmpPass)}</code>
+					</div>
+					<a class="lab-sql-copy" href="#/stack-modal/copy/${encodeURIComponent('__PWTOKEN__:' + tmpToken)}" title="Copy password to clipboard">Copy</a>
+					<a class="lab-sql-reveal" href="#/stack-modal/toggle-password" title="Show / hide password">Reveal</a>
+				</div>`
+			: `<div class="lab-sql-conn-row"><div class="k">Password</div><div class="v"><em>(not set in environment)</em></div></div>`;
+
+		let tmpHelp = `<div class="lab-sql-conn-help">Connect from your host machine — the port is published by docker-compose. Inside the compose network, the same database is reachable as <code>${this._escapeHTML(pComponentHash)}:${this._escapeHTML(String(tmpFirstPort.Container || ''))}</code>.</div>`;
+
+		let tmpContent = `<div class="lab-sql-conn-table">${tmpRowsHTML}${tmpPasswordHTML}</div>${tmpHelp}`;
+
+		this._modal().show(
+			{
+				title:     pComponentHash + ' — ' + tmpKindLabel + ' connection',
+				content:   tmpContent,
+				width:     'min(560px, 92vw)',
+				closeable: true,
+				buttons:   [{ Hash: 'close', Label: 'Close', Style: 'primary' }]
+			})
+			.finally(() =>
+			{
+				// Wipe the staged password from AppData once the modal
+				// is dismissed so it doesn't sit in memory longer than
+				// it needs to.
+				this.pict.AppData.Lab.Stacks.ModalSQLPasswordToken = null;
+				this.pict.AppData.Lab.Stacks.ModalSQLPasswordValue = null;
+			});
+	}
+
+	copyStackModalValue(pValue)
+	{
+		// Password values are passed indirectly via a token to keep them
+		// out of the URL bar and history. Resolve the token to the staged
+		// raw value before writing to the clipboard.
+		let tmpResolved = pValue;
+		if (typeof pValue === 'string' && pValue.indexOf('__PWTOKEN__:') === 0)
+		{
+			let tmpToken = pValue.slice('__PWTOKEN__:'.length);
+			let tmpStashedToken = this.pict.AppData.Lab.Stacks && this.pict.AppData.Lab.Stacks.ModalSQLPasswordToken;
+			if (tmpToken !== tmpStashedToken) { this._toastError('Password expired — reopen the modal.'); return; }
+			tmpResolved = this.pict.AppData.Lab.Stacks.ModalSQLPasswordValue || '';
+		}
+
+		let fDone = (pOk, pErr) =>
+		{
+			if (pOk) { this._toastSuccess('Copied to clipboard.'); return; }
+			this._toastError('Copy failed' + (pErr ? (': ' + pErr) : '.'));
+		};
+
+		if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function')
+		{
+			navigator.clipboard.writeText(tmpResolved)
+				.then(() => fDone(true))
+				.catch((pEx) => this._copyFallback(tmpResolved, fDone, pEx));
+			return;
+		}
+		this._copyFallback(tmpResolved, fDone);
+	}
+
+	toggleStackModalPassword()
+	{
+		// Modal content is mounted by pict-section-modal into its own
+		// dialog DOM; toggle visibility of the masked/raw spans there.
+		let tmpMasked = document.querySelector('.lab-sql-pw-masked');
+		let tmpRaw    = document.querySelector('.lab-sql-pw-raw');
+		let tmpBtn    = document.querySelector('.lab-sql-reveal');
+		if (!tmpMasked || !tmpRaw) { return; }
+		if (tmpRaw.style.display === 'none')
+		{
+			tmpRaw.style.display = '';
+			tmpMasked.style.display = 'none';
+			if (tmpBtn) tmpBtn.textContent = 'Hide';
+		}
+		else
+		{
+			tmpRaw.style.display = 'none';
+			tmpMasked.style.display = '';
+			if (tmpBtn) tmpBtn.textContent = 'Reveal';
+		}
+	}
+
+	// Walk a docker-compose YAML string and collect resolved environment
+	// values per service: { serviceName: { KEY: 'value', ... } }. The lab
+	// substitutes ${input.X} placeholders when generating compose, so the
+	// YAML is the canonical source for secrets that aren't persisted on
+	// the saved Stack record.
+	_parseYamlEnv(pYamlText)
+	{
+		let tmpResult = {};
+		if (!pYamlText || typeof pYamlText !== 'string') return tmpResult;
+		let tmpLines = pYamlText.split(/\n/);
+		let tmpService = null;
+		let tmpInEnv   = false;
+		for (let i = 0; i < tmpLines.length; i++)
+		{
+			let line = tmpLines[i];
+			let mSvc = /^  ([A-Za-z0-9_.-]+):\s*$/.exec(line);
+			if (mSvc) { tmpService = mSvc[1]; tmpInEnv = false; if (!tmpResult[tmpService]) tmpResult[tmpService] = {}; continue; }
+			if (!tmpService) continue;
+			if (/^    environment:\s*$/.test(line)) { tmpInEnv = true; continue; }
+			// 4-space indented top-level key under a service ends the env block.
+			if (tmpInEnv && /^    [A-Za-z0-9_]+:/.test(line)) { tmpInEnv = false; }
+			if (tmpInEnv)
+			{
+				let mKV = /^      ([A-Za-z0-9_]+):\s*"?(.*?)"?\s*$/.exec(line);
+				if (mKV) tmpResult[tmpService][mKV[1]] = mKV[2];
+			}
+		}
+		return tmpResult;
 	}
 
 	_loadStacks(fCallback)
