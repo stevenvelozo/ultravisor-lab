@@ -1,0 +1,383 @@
+{
+	"Hash": "preset-data-platform",
+	"Name": "Data Platform (Phase 0)",
+	"Description": "Topology-validating preset for the data-platform initiative (see modules/apps/retold-data-mapper/PLAN.md). Launches: ultravisor + ultravisor-auth-beacon + retold-data-mapper + 3 retold-databeacon instances (configs, lake, opdb) + meadow-integration, plus the postgres + mysql backing databases for lake and opdb. Phase 0 success criteria: stack launches cleanly, all containers reach healthy, all four beacons (auth, configs, lake, opdb) register with UV, retold-data-mapper UI loads. Beacon-to-backend connections (lake → postgres, opdb → mysql) are wired up by the operator via each beacon's web UI after launch — not auto-configured here, since the data flow comes online in Phase 1.",
+	"SchemaVersion": 1,
+	"Inputs":
+	{
+		"DataRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/data-platform",
+			"Description": "Base directory for all volume mounts (postgres + mysql + ultravisor + each beacon + mapper data). Subdirectories created on first launch."
+		},
+		"MonorepoRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/Code/retold",
+			"Description": "Path to your retold monorepo checkout. All retold-* images are built from MonorepoRoot/modules/... at launch."
+		},
+		"UVAdminPassword":
+		{
+			"Type": "secret",
+			"Default": "",
+			"Description": "Bootstrap admin password for Ultravisor. Also used as the bearer password for every beacon connection in this stack."
+		},
+		"DBPassword":
+		{
+			"Type": "secret",
+			"Default": "",
+			"Description": "Root password for both postgres (lake backend) and mysql (opdb backend). Same secret for both is fine in the lab; split per-engine in production."
+		},
+		"UVPort":
+		{
+			"Type": "port",
+			"Default": 54321,
+			"Description": "Host port for the Ultravisor API."
+		},
+		"MapperPort":
+		{
+			"Type": "port",
+			"Default": 8395,
+			"Description": "Host port for retold-data-mapper's REST + web UI."
+		},
+		"ConfigsBeaconPort":
+		{
+			"Type": "port",
+			"Default": 8390,
+			"Description": "Host port for the configs retold-databeacon (mappings, operations, dashboards). SQLite-backed."
+		},
+		"LakeBeaconPort":
+		{
+			"Type": "port",
+			"Default": 8391,
+			"Description": "Host port for the lake retold-databeacon. Backend is the postgres container in this stack — wire the connection via the beacon's web UI after launch."
+		},
+		"OpdbBeaconPort":
+		{
+			"Type": "port",
+			"Default": 8392,
+			"Description": "Host port for the operational-DB retold-databeacon. Backend is the mysql container in this stack — wire the connection via the beacon's web UI after launch."
+		},
+		"PostgresPort":
+		{
+			"Type": "port",
+			"Default": 5432,
+			"Description": "Host port for the postgres listener (lake backend)."
+		},
+		"MysqlPort":
+		{
+			"Type": "port",
+			"Default": 3306,
+			"Description": "Host port for the mysql listener (operational-DB backend)."
+		},
+		"CustomerMysqlPort":
+		{
+			"Type": "port",
+			"Default": 3307,
+			"Description": "Host port for the simulated 'customer-side' mysql. Stand-in for a customer's external database we're cloning from."
+		},
+		"CustomerBeaconPort":
+		{
+			"Type": "port",
+			"Default": 8393,
+			"Description": "Host port for the simulated 'customer-side' retold-databeacon. Demonstrates the customer-installed-beacon onboarding flow."
+		},
+		"DashboardMysqlPort":
+		{
+			"Type": "port",
+			"Default": 3308,
+			"Description": "Host port for the dashboard-DB mysql listener. CachedView_* tables produced by Operations live here, separate from opdb so operational data and dashboard cache stay isolated."
+		},
+		"DashboardBeaconPort":
+		{
+			"Type": "port",
+			"Default": 8394,
+			"Description": "Host port for the dashboard retold-databeacon. Backend is the dashboard-mysql container in this stack — wire the connection via the beacon's web UI after launch."
+		}
+	},
+	"Components":
+	[
+		{
+			"Hash": "postgres",
+			"Type": "docker-service",
+			"Image": "postgres:16",
+			"Ports": [ { "Host": "${input.PostgresPort}", "Container": 5432 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/postgres/data", "Container": "/var/lib/postgresql/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"POSTGRES_PASSWORD": "${input.DBPassword}",
+				"POSTGRES_DB": "lake",
+				"POSTGRES_USER": "lake"
+			},
+			"HealthCheck":
+			{
+				"Command": "pg_isready -U lake -d lake",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "mysql",
+			"Type": "docker-service",
+			"Image": "mysql:8.0",
+			"Ports": [ { "Host": "${input.MysqlPort}", "Container": 3306 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/mysql/data", "Container": "/var/lib/mysql", "Mode": "rw" },
+				{ "Host": "${input.DataRoot}/mysql/logs", "Container": "/var/log/mysql", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"MYSQL_ROOT_PASSWORD": "${input.DBPassword}",
+				"MYSQL_DATABASE": "opdb"
+			},
+			"HealthCheck":
+			{
+				"Command": "mysqladmin ping -h localhost -uroot -p${input.DBPassword}",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "ultravisor",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.UVPort}", "Container": 54321 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/ultravisor/data", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_LOG_LEVEL": "info",
+				"ULTRAVISOR_BOOTSTRAP_USER": "admin",
+				"ULTRAVISOR_BOOTSTRAP_PASSWORD": "${input.UVAdminPassword}"
+			},
+			"HealthCheck":
+			{
+				"Command": "wget -qO- http://localhost:54321/status || exit 1",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "ultravisor-auth-beacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor-auth-beacon",
+			"Dockerfile": "Dockerfile",
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/auth-beacon/config", "Container": "/app/config", "Mode": "rw" }
+			],
+			"Command":
+			[
+				"node",
+				"bin/ultravisor-auth-beacon.js",
+				"--ultravisor",
+				"http://ultravisor:54321",
+				"--name",
+				"auth-beacon"
+			],
+			"DependsOn": [ "ultravisor" ]
+		},
+		{
+			"Hash": "retold-databeacon-configs",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.ConfigsBeaconPort}", "Container": 8389 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/databeacon/configs", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"DATABEACON_ULTRAVISOR_URL": "http://${component.ultravisor.host}:54321",
+				"DATABEACON_BEACON_NAME": "configs-databeacon",
+				"DATABEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"DATABEACON_MAX_CONCURRENT": "3"
+			},
+			"DependsOn": [ "ultravisor" ]
+		},
+		{
+			"Hash": "retold-databeacon-lake",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.LakeBeaconPort}", "Container": 8389 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/databeacon/lake", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"DATABEACON_ULTRAVISOR_URL": "http://${component.ultravisor.host}:54321",
+				"DATABEACON_BEACON_NAME": "lake-databeacon",
+				"DATABEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"DATABEACON_MAX_CONCURRENT": "5"
+			},
+			"DependsOn": [ "ultravisor", "postgres" ]
+		},
+		{
+			"Hash": "retold-databeacon-opdb",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.OpdbBeaconPort}", "Container": 8389 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/databeacon/opdb", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"DATABEACON_ULTRAVISOR_URL": "http://${component.ultravisor.host}:54321",
+				"DATABEACON_BEACON_NAME": "opdb-databeacon",
+				"DATABEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"DATABEACON_MAX_CONCURRENT": "5"
+			},
+			"DependsOn": [ "ultravisor", "mysql" ]
+		},
+		{
+			"Hash": "retold-data-mapper",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-data-mapper",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.MapperPort}", "Container": 8395 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/data-mapper", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_URL": "http://${component.ultravisor.host}:54321",
+				"BEACON_NAME": "data-mapper"
+			},
+			"Command":
+			[
+				"node",
+				"bin/retold-data-mapper.js",
+				"serve",
+				"--ultravisor",
+				"http://ultravisor:54321",
+				"--name",
+				"data-mapper"
+			],
+			"DependsOn": [ "ultravisor", "retold-databeacon-configs" ]
+		},
+		{
+			"Hash": "meadow-integration",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/meadow/meadow-integration",
+			"Dockerfile": "Dockerfile",
+			"RestartPolicy": "no",
+			"Environment":
+			{
+				"MEADOW_INTEGRATION_API_SERVER": "http://${component.ultravisor.host}:54321",
+				"MEADOW_INTEGRATION_API_USERNAME": "admin",
+				"MEADOW_INTEGRATION_API_PASSWORD": "${input.UVAdminPassword}",
+				"MEADOW_INTEGRATION_DB_PROVIDER": "MySQL",
+				"MEADOW_INTEGRATION_DB_HOST": "${component.mysql.host}",
+				"MEADOW_INTEGRATION_DB_PORT": "3306",
+				"MEADOW_INTEGRATION_DB_USERNAME": "root",
+				"MEADOW_INTEGRATION_DB_PASSWORD": "${input.DBPassword}",
+				"MEADOW_INTEGRATION_DB_NAME": "opdb"
+			},
+			"DependsOn": [ "mysql", "ultravisor" ]
+		},
+		{
+			"Hash": "customer-mysql",
+			"Type": "docker-service",
+			"Image": "mysql:8.0",
+			"Ports": [ { "Host": "${input.CustomerMysqlPort}", "Container": 3306 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/customer-mysql/data", "Container": "/var/lib/mysql", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"MYSQL_ROOT_PASSWORD": "1234567890",
+				"MYSQL_DATABASE": "weather_stations"
+			},
+			"HealthCheck":
+			{
+				"Command": "mysqladmin ping -h localhost -uroot -p1234567890",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "customer-databeacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.CustomerBeaconPort}", "Container": 8389 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/databeacon/customer", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"DATABEACON_ULTRAVISOR_URL": "http://${component.ultravisor.host}:54321",
+				"DATABEACON_BEACON_NAME": "customer-acme-databeacon",
+				"DATABEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"DATABEACON_MAX_CONCURRENT": "3"
+			},
+			"DependsOn": [ "ultravisor", "customer-mysql" ]
+		},
+		{
+			"Hash": "dashboard-mysql",
+			"Type": "docker-service",
+			"Image": "mysql:8.0",
+			"Ports": [ { "Host": "${input.DashboardMysqlPort}", "Container": 3306 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/dashboard-mysql/data", "Container": "/var/lib/mysql", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"MYSQL_ROOT_PASSWORD": "${input.DBPassword}",
+				"MYSQL_DATABASE": "dashboard"
+			},
+			"HealthCheck":
+			{
+				"Command": "mysqladmin ping -h localhost -uroot -p${input.DBPassword}",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "dashboard-databeacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.DashboardBeaconPort}", "Container": 8389 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/databeacon/dashboard", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"DATABEACON_ULTRAVISOR_URL": "http://${component.ultravisor.host}:54321",
+				"DATABEACON_BEACON_NAME": "dashboard-databeacon",
+				"DATABEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"DATABEACON_MAX_CONCURRENT": "5"
+			},
+			"DependsOn": [ "ultravisor", "dashboard-mysql" ]
+		}
+	]
+}
