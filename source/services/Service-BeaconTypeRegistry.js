@@ -68,9 +68,7 @@ const SCANNED_MODULES =
 	'retold-facto',
 	'retold-content-system',
 	'retold-remote',
-	'ultravisor-auth-beacon',
-	'ultravisor-queue-beacon',
-	'ultravisor-manifest-beacon'
+	'ultravisor-auth-beacon'
 ];
 
 // Lab-bundled beacon types that don't live in their own npm package.
@@ -139,21 +137,15 @@ const LAB_LOCAL_BEACON_TYPES =
 	}
 ];
 
-// Beacon types that are marked deprecated in the lab UI. They still
-// work — the modules ship as the reference Provider implementation
-// for embedded deployments — but the lab's recommended path for
-// queue / manifest persistence is `retold-databeacon` plus the
-// "Persistence" assignment on the UV detail view. See the
-// persistence-via-databeacon design doc for the rationale.
-const DEPRECATED_BEACON_TYPES = new Set(
-[
-	'ultravisor-queue-beacon',
-	'ultravisor-manifest-beacon'
-]);
+// Lab-side allowlist for marking a beacon type deprecated even when its
+// own package.json stanza doesn't carry `deprecated: true`. Currently
+// empty — the per-stanza `retoldBeacon.deprecated` flag is the preferred
+// channel; this Set exists as an escape hatch for modules whose stanza
+// can't be edited (e.g. third-party packages).
+const DEPRECATED_BEACON_TYPES = new Set();
 
-// Operator-facing message shown in the beacon-create form when one
-// of the DEPRECATED_BEACON_TYPES is picked. Mirrors the rationale
-// captured in the design doc and the Session 4 plan.
+// Operator-facing message shown in the beacon-create form when a beacon
+// type is flagged deprecated (via the Set above or the package stanza).
 const LEGACY_TOOLTIP =
 	'Legacy type. New deployments should use `retold-databeacon` + the lab\'s ' +
 	'Persistence assignment on the UV detail view for queue / manifest persistence.';
