@@ -6,9 +6,21 @@
  * retold-manager's Manager-Server-Setup but trimmed for the lab's needs.
  *
  * Call signature:
- *   serverSetup({ Port, Host, DataDir, DistPath }, fCallback);
+ *   serverSetup({
+ *       Port, Host, DataDir, DistPath,
+ *       Branding,             // optional { Product, ProductVersion } — overrides Fable identity
+ *       AdditionalPresetDirs  // optional [string] — extra dirs the StackStore scans for preset JSONs
+ *   }, fCallback);
  *     fCallback(pError, pServerInfo)
  *     pServerInfo = { Fable, Orator, Core, Port, Host, DistPath }
+ *
+ * Branding lets a downstream app (e.g. headlight-ultravisor-lab) identify
+ * itself in logs and the eventual UI title bar without forking lab.js.
+ *
+ * AdditionalPresetDirs lets the same downstream app inject its own bundled
+ * stack presets into the read-only preset library so they appear in the
+ * UI alongside the lab's bundled set. See Service-StackStore docs for
+ * preset JSON shape and hash-collision behavior.
  *
  * Binds explicitly to the supplied host so the server is not reachable
  * from the local network unless the user opts in via `--host`.
@@ -61,14 +73,20 @@ function setupLabServer(pOptions, fCallback)
 	let tmpDistPath  = pOptions.DistPath;
 	let tmpPackage   = require('../../package.json');
 
+	let tmpBranding  = (pOptions.Branding && typeof pOptions.Branding === 'object') ? pOptions.Branding : {};
+	let tmpProduct        = tmpBranding.Product        || 'Ultravisor-Lab';
+	let tmpProductVersion = tmpBranding.ProductVersion || tmpPackage.version;
+
+	let tmpAdditionalPresetDirs = Array.isArray(pOptions.AdditionalPresetDirs) ? pOptions.AdditionalPresetDirs : [];
+
 	// ─────────────────────────────────────────────
 	//  Fable
 	// ─────────────────────────────────────────────
 
 	let tmpFable = new libFable(
 		{
-			Product:        'Ultravisor-Lab',
-			ProductVersion: tmpPackage.version,
+			Product:        tmpProduct,
+			ProductVersion: tmpProductVersion,
 			APIServerPort:  tmpPort,
 			LogStreams:
 			[
@@ -112,7 +130,7 @@ function setupLabServer(pOptions, fCallback)
 	// also mirrors to ${dataDir}/stacks/<Hash>.json. The store loads
 	// the read-only preset library from source/stacks/presets/*.json
 	// on first listPresets() call.
-	tmpFable.addAndInstantiateServiceType('LabStackStore',           libServiceStackStore,        { DataDir: tmpDataDir });
+	tmpFable.addAndInstantiateServiceType('LabStackStore',           libServiceStackStore,        { DataDir: tmpDataDir, AdditionalPresetDirs: tmpAdditionalPresetDirs });
 	tmpFable.addAndInstantiateServiceType('LabStackResolver',        libServiceStackResolver);
 	tmpFable.addAndInstantiateServiceType('LabStackPreflight',       libServiceStackPreflight);
 	tmpFable.addAndInstantiateServiceType('LabStackComposer',        libServiceStackComposer,     { DataDir: tmpDataDir });

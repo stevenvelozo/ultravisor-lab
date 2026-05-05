@@ -51,9 +51,50 @@ class ServiceStackStore extends libFableServiceProviderBase
 			|| libPath.resolve(__dirname, '..', '..', 'data');
 		this._MirrorDir = libPath.join(this._DataDir, 'stacks');
 
+		// Additional preset directories — supplied by downstream apps that
+		// extend the lab (e.g. headlight-ultravisor-lab) so their bundled
+		// stack templates show up in listPresets() alongside the lab's own
+		// PRESETS_DIR. Each entry is a directory containing *.json preset
+		// files that match the bundled-preset shape ({Hash, Name, Inputs,
+		// Components, ...}). Order matters: PRESETS_DIR is scanned first;
+		// extensions are appended in the order given. Hash collisions are
+		// resolved last-wins with a warning so an extension can intentionally
+		// override a bundled preset.
+		this._AdditionalPresetDirs = [];
+		let tmpDirsFromOptions = (pOptions && pOptions.AdditionalPresetDirs);
+		let tmpDirsFromSettings = (this.fable.settings && this.fable.settings.LabAdditionalPresetDirs);
+		let tmpDirs = Array.isArray(tmpDirsFromOptions) ? tmpDirsFromOptions
+			: Array.isArray(tmpDirsFromSettings) ? tmpDirsFromSettings : [];
+		for (let i = 0; i < tmpDirs.length; i++)
+		{
+			if (typeof tmpDirs[i] === 'string' && tmpDirs[i].length > 0)
+			{
+				this._AdditionalPresetDirs.push(libPath.resolve(tmpDirs[i]));
+			}
+		}
+
 		// Cached preset library — read once at boot, not re-scanned at
 		// runtime. Touch the disk if you really must to add a preset
 		// then restart the lab.
+		this._Presets = null;
+	}
+
+	/**
+	 * Register an additional preset directory at runtime. Extensions can
+	 * call this after the StackStore is instantiated to inject more
+	 * presets without restarting; safe to call before or after the first
+	 * listPresets() (the cache is invalidated either way).
+	 *
+	 * @param {string} pDir - absolute or relative directory containing *.json preset files.
+	 */
+	registerPresetDirectory(pDir)
+	{
+		if (typeof pDir !== 'string' || pDir.length === 0) return;
+		let tmpAbs = libPath.resolve(pDir);
+		if (this._AdditionalPresetDirs.indexOf(tmpAbs) === -1)
+		{
+			this._AdditionalPresetDirs.push(tmpAbs);
+		}
 		this._Presets = null;
 	}
 
@@ -77,36 +118,58 @@ class ServiceStackStore extends libFableServiceProviderBase
 	{
 		if (this._Presets) return this._Presets;
 		this._Presets = [];
+		// Bundled presets first, then each additional dir in registration
+		// order. _scanPresetDirectory pushes onto this._Presets; hash
+		// collisions log a warning and replace the earlier entry so that
+		// downstream extensions can deliberately override an upstream preset.
+		this._scanPresetDirectory(PRESETS_DIR, 'bundled');
+		for (let i = 0; i < this._AdditionalPresetDirs.length; i++)
+		{
+			this._scanPresetDirectory(this._AdditionalPresetDirs[i], 'extension');
+		}
+		return this._Presets;
+	}
+
+	_scanPresetDirectory(pDir, pSourceLabel)
+	{
 		try
 		{
-			if (!libFs.existsSync(PRESETS_DIR)) { return this._Presets; }
-			let tmpFiles = libFs.readdirSync(PRESETS_DIR)
+			if (!libFs.existsSync(pDir)) { return; }
+			let tmpFiles = libFs.readdirSync(pDir)
 				.filter((pF) => pF.endsWith('.json'))
 				.sort();
 			for (let i = 0; i < tmpFiles.length; i++)
 			{
-				let tmpPath = libPath.join(PRESETS_DIR, tmpFiles[i]);
+				let tmpPath = libPath.join(pDir, tmpFiles[i]);
 				try
 				{
 					let tmpSpec = JSON.parse(libFs.readFileSync(tmpPath, 'utf8'));
 					if (!tmpSpec.Hash || !tmpSpec.Name)
 					{
-						this.fable.log.warn(`StackStore: preset ${tmpFiles[i]} missing Hash or Name; skipping.`);
+						this.fable.log.warn(`StackStore: preset ${tmpFiles[i]} (${pSourceLabel}) missing Hash or Name; skipping.`);
 						continue;
 					}
-					this._Presets.push(tmpSpec);
+					let tmpExistingIndex = this._Presets.findIndex((pP) => pP.Hash === tmpSpec.Hash);
+					if (tmpExistingIndex >= 0)
+					{
+						this.fable.log.warn(`StackStore: preset Hash [${tmpSpec.Hash}] from ${pSourceLabel} (${tmpPath}) is overriding an earlier registration.`);
+						this._Presets[tmpExistingIndex] = tmpSpec;
+					}
+					else
+					{
+						this._Presets.push(tmpSpec);
+					}
 				}
 				catch (pErr)
 				{
-					this.fable.log.warn(`StackStore: preset ${tmpFiles[i]} failed to parse: ${pErr.message}`);
+					this.fable.log.warn(`StackStore: preset ${tmpFiles[i]} (${pSourceLabel}) failed to parse: ${pErr.message}`);
 				}
 			}
 		}
 		catch (pErr)
 		{
-			this.fable.log.warn(`StackStore: preset scan failed: ${pErr.message}`);
+			this.fable.log.warn(`StackStore: preset scan of ${pDir} (${pSourceLabel}) failed: ${pErr.message}`);
 		}
-		return this._Presets;
 	}
 
 	getPresetByHash(pHash)
