@@ -160,8 +160,7 @@
 			{
 				"ULTRAVISOR_LOG_LEVEL": "info",
 				"ULTRAVISOR_BOOTSTRAP_USER": "admin",
-				"ULTRAVISOR_BOOTSTRAP_PASSWORD": "${input.UVAdminPassword}",
-				"NODE_OPTIONS": "--max-old-space-size=4096"
+				"ULTRAVISOR_BOOTSTRAP_PASSWORD": "${input.UVAdminPassword}"
 			},
 			"HealthCheck":
 			{
