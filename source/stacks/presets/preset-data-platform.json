@@ -1,7 +1,7 @@
 {
 	"Hash": "preset-data-platform",
 	"Name": "Data Platform (Phase 0)",
-	"Description": "Topology-validating preset for the data-platform initiative (see modules/apps/retold-data-mapper/PLAN.md). Launches: ultravisor + ultravisor-auth-beacon + retold-data-mapper + 3 retold-databeacon instances (configs, lake, opdb) + meadow-integration, plus the postgres + mysql backing databases for lake and opdb. Phase 0 success criteria: stack launches cleanly, all containers reach healthy, all four beacons (auth, configs, lake, opdb) register with UV, retold-data-mapper UI loads. Beacon-to-backend connections (lake → postgres, opdb → mysql) are wired up by the operator via each beacon's web UI after launch — not auto-configured here, since the data flow comes online in Phase 1.",
+	"Description": "Topology-validating preset for the data-platform initiative (see modules/apps/retold-data-mapper/PLAN.md). Launches: ultravisor + ultravisor-auth-beacon + retold-data-mapper + 3 retold-databeacon instances (configs, lake, opdb) + retold-synth-databeacon (on-demand synthetic record source) + meadow-integration, plus the postgres + mysql backing databases for lake and opdb. Phase 0 success criteria: stack launches cleanly, all containers reach healthy, all five beacons (auth, configs, lake, opdb, synth) register with UV, retold-data-mapper UI loads. Beacon-to-backend connections (lake → postgres, opdb → mysql) are wired up by the operator via each beacon's web UI after launch — not auto-configured here, since the data flow comes online in Phase 1. The synth beacon needs no backend; it serves bundled specs (industrial-supply-v1 / customers-demo-v1) immediately on startup.",
 	"SchemaVersion": 1,
 	"Inputs":
 	{
@@ -94,6 +94,12 @@
 			"Type": "port",
 			"Default": 8394,
 			"Description": "Host port for the dashboard retold-databeacon. Backend is the dashboard-mysql container in this stack — wire the connection via the beacon's web UI after launch."
+		},
+		"SynthBeaconPort":
+		{
+			"Type": "port",
+			"Default": 8396,
+			"Description": "Host port for the retold-synth-databeacon. On-demand synthetic record generator — drop-in source for retold-data-mapper PullRecords. Backed by declarative *.json specs in the bundled image (industrial-supply-v1, customers-demo-v1)."
 		}
 	},
 	"Components":
@@ -247,6 +253,21 @@
 				"DATABEACON_MAX_CONCURRENT": "5"
 			},
 			"DependsOn": [ "ultravisor", "mysql" ]
+		},
+		{
+			"Hash": "retold-synth-databeacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-synth-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.SynthBeaconPort}", "Container": 8390 } ],
+			"Environment":
+			{
+				"SYNTHBEACON_ULTRAVISOR_URL": "http://${component.ultravisor.host}:54321",
+				"SYNTHBEACON_BEACON_NAME": "synth-databeacon",
+				"SYNTHBEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"SYNTHBEACON_MAX_CONCURRENT": "3"
+			},
+			"DependsOn": [ "ultravisor" ]
 		},
 		{
 			"Hash": "retold-data-mapper",
