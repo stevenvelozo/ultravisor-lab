@@ -94,11 +94,21 @@ class ServiceStackComposer extends libFableServiceProviderBase
 			if (tmpC && tmpC.Hash) { tmpHasHealth[tmpC.Hash] = !!(tmpC.HealthCheck && tmpC.HealthCheck.Command); }
 		}
 
+		// Wipe + recreate the per-stack file-overrides dir so removed
+		// Files entries don't linger as orphans on subsequent composes.
+		// `Files: [{Path, Content}]` on a component lets the operator stamp
+		// arbitrary in-container files at launch time without rebuilding
+		// the image — the materialized host file gets bind-mounted over
+		// the baked-in path. See _materializeFiles.
+		let tmpFilesDir = libPath.join(this.getComposeDir(tmpHash), 'files');
+		try { libFs.rmSync(tmpFilesDir, { recursive: true, force: true }); }
+		catch (pErr) { /* fresh dir below */ }
+
 		for (let i = 0; i < tmpComponents.length; i++)
 		{
 			let tmpC = tmpComponents[i];
 			if (!tmpC || !tmpC.Hash) continue;
-			tmpServices[tmpC.Hash] = this._renderService(tmpC, tmpHasHealth);
+			tmpServices[tmpC.Hash] = this._renderService(tmpC, tmpHasHealth, tmpHash);
 		}
 
 		// `name:` at the top of compose v3.9+ pins the project name so
@@ -128,7 +138,45 @@ class ServiceStackComposer extends libFableServiceProviderBase
 		};
 	}
 
-	_renderService(pComponent, pHasHealth)
+	/**
+	 * Materialize `pComponent.Files: [{Path, Content}]` to host disk
+	 * under `<workspaceDir>/files/<componentHash>/<flat-host-name>` and
+	 * return synthetic Volume entries that bind-mount each over the
+	 * in-container Path. Lets the operator stamp configs/specs/etc.
+	 * onto a baked container without rebuilding the image.
+	 *
+	 * Files always mount read-only; the container shouldn't write back
+	 * to a host-staged config file.
+	 *
+	 * Returns `[]` when the component has no Files declared.
+	 */
+	_materializeFiles(pComponent, pStackHash)
+	{
+		let tmpFiles = Array.isArray(pComponent.Files) ? pComponent.Files : [];
+		if (tmpFiles.length === 0) return [];
+
+		let tmpDir = libPath.join(this.getComposeDir(pStackHash), 'files', this._sanitizeHash(pComponent.Hash));
+		libFs.mkdirSync(tmpDir, { recursive: true });
+
+		let tmpVolumes = [];
+		for (let i = 0; i < tmpFiles.length; i++)
+		{
+			let tmpEntry = tmpFiles[i] || {};
+			let tmpPath = String(tmpEntry.Path || '').trim();
+			if (!tmpPath) continue;
+			let tmpContent = (tmpEntry.Content === undefined || tmpEntry.Content === null) ? '' : String(tmpEntry.Content);
+
+			// Encode the in-container path into a flat host filename so
+			// two Files at /a/x.json and /b/x.json don't collide.
+			let tmpHostName = tmpPath.replace(/^\/+/, '').replace(/[\/\\]/g, '_');
+			let tmpHostFile = libPath.join(tmpDir, tmpHostName);
+			libFs.writeFileSync(tmpHostFile, tmpContent, 'utf8');
+			tmpVolumes.push({ Host: tmpHostFile, Container: tmpPath, Mode: 'ro' });
+		}
+		return tmpVolumes;
+	}
+
+	_renderService(pComponent, pHasHealth, pStackHash)
 	{
 		let tmpService = {};
 
@@ -165,10 +213,14 @@ class ServiceStackComposer extends libFableServiceProviderBase
 			});
 		}
 
-		// Volumes.
-		if (Array.isArray(pComponent.Volumes) && pComponent.Volumes.length > 0)
+		// Volumes — operator-declared, plus any materialized from Files[].
+		// Files volumes are appended last so they overlay the baked image
+		// path even when an operator-declared volume targets a parent dir.
+		let tmpAllVolumes = (Array.isArray(pComponent.Volumes) ? pComponent.Volumes.slice() : [])
+			.concat(this._materializeFiles(pComponent, pStackHash));
+		if (tmpAllVolumes.length > 0)
 		{
-			tmpService.volumes = pComponent.Volumes.map(function (pV)
+			tmpService.volumes = tmpAllVolumes.map(function (pV)
 			{
 				let tmpHost = libPath.resolve(pV.Host || '.');
 				let tmpCont = pV.Container || '/mnt';

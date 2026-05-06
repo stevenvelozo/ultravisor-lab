@@ -170,7 +170,7 @@
 			},
 			"HealthCheck":
 			{
-				"Command": "wget -qO- http://localhost:54321/status || exit 1",
+				"Command": "node -e \"const h=require('http');h.get('http://localhost:54321/status',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\"",
 				"IntervalSec": 5,
 				"TimeoutSec": 3,
 				"RetriesBeforeFail": 12

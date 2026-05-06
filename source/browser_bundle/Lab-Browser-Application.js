@@ -2722,6 +2722,38 @@ class LabBrowserApplication extends libPictApplication
 			let tmpVal = tmpEl.value;
 			if (tmpVal !== undefined && tmpVal !== '') { tmpState.InputValues[tmpKey] = tmpVal; }
 		}
+		// Same pattern, different surface — pull file-override textareas
+		// back into Spec.Components[].Files[].Content. Save/Launch sends
+		// the full spec, so the new content travels naturally.
+		this._marshalEditorFiles();
+	}
+
+	_marshalEditorFiles()
+	{
+		let tmpTextareas = document.querySelectorAll('textarea[data-file-component][data-file-index]');
+		if (tmpTextareas.length === 0) return;
+		let tmpState = this.pict.AppData.Lab.Stacks;
+		if (!tmpState.EditorRecord || !tmpState.EditorRecord.Spec) return;
+		let tmpComponents = tmpState.EditorRecord.Spec.Components || [];
+		// Build a hash→component lookup once.
+		let tmpByHash = {};
+		for (let i = 0; i < tmpComponents.length; i++)
+		{
+			let tmpC = tmpComponents[i];
+			if (tmpC && tmpC.Hash) { tmpByHash[tmpC.Hash] = tmpC; }
+		}
+		for (let i = 0; i < tmpTextareas.length; i++)
+		{
+			let tmpEl = tmpTextareas[i];
+			let tmpComp = tmpEl.getAttribute('data-file-component');
+			let tmpIdx = parseInt(tmpEl.getAttribute('data-file-index'), 10);
+			if (!tmpComp || !Number.isFinite(tmpIdx)) continue;
+			let tmpComponent = tmpByHash[tmpComp];
+			if (!tmpComponent || !Array.isArray(tmpComponent.Files)) continue;
+			let tmpFile = tmpComponent.Files[tmpIdx];
+			if (!tmpFile) continue;
+			tmpFile.Content = tmpEl.value;
+		}
 	}
 }
 

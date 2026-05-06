@@ -187,6 +187,39 @@ const _ViewConfiguration =
 .lab-stack-component-row .lab-stack-component-type { padding: 2px 8px; background: #334155; border-radius: 10px; font-size: 10px; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px; }
 .lab-stack-component-row .lab-stack-component-image { color: #94a3b8; font-family: monospace; font-size: 11px; flex: 1; }
 
+/* File overrides — one editor per Component.Files[] entry. The composer
+ * materializes Content to a host file and bind-mounts it over the
+ * in-container Path on launch. Path is read-only (preset declares it);
+ * Content is editable. */
+.lab-stack-file-override
+{
+	background: #0f172a;
+	border: 1px solid #1e293b;
+	border-radius: 6px;
+	padding: 10px 14px;
+	margin: 4px 0 10px 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.lab-stack-file-override label { font-size: 11px; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+.lab-stack-file-override label code { color: #cbd5e1; background: transparent; font-family: monospace; font-size: 12px; text-transform: none; letter-spacing: 0; }
+.lab-stack-file-override textarea
+{
+	background: #020617;
+	color: #e2e8f0;
+	border: 1px solid #334155;
+	border-radius: 4px;
+	padding: 10px 12px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	min-height: 280px;
+	resize: vertical;
+	tab-size: 4;
+}
+.lab-stack-file-override textarea:focus { outline: none; border-color: #1d4ed8; }
+
 .lab-stack-actions { display: flex; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #1e293b; }
 
 /* ── Launch output (error panel) ─────────────────────────────────────── */
@@ -617,6 +650,24 @@ const _ViewConfiguration =
 	<span class="lab-stack-component-type">{~D:Record.TypeLabel~}</span>
 	<span class="lab-stack-component-image">{~D:Record.ImageOrBuild~}</span>
 	<span>{~D:Record.PortsSummary~}</span>
+</div>
+{~TS:Lab-Stacks-EditorFile-Template:Record.Files~}`
+		},
+		{
+			// One file-override editor per Component.Files[] entry. Path is
+			// read-only (preset declares which files are editable); Content
+			// is a textarea that the application marshals back into the spec
+			// on save via [data-file-component] + [data-file-index]. The
+			// composer turns each into a host bind-mount at launch time.
+			Hash: 'Lab-Stacks-EditorFile-Template',
+			Template: /*html*/`
+<div class="lab-stack-file-override">
+	<label>File override · <code>{~D:Record.Path~}</code></label>
+	<textarea
+		class="lab-stack-file-content"
+		data-file-component="{~D:Record.CompHash~}"
+		data-file-index="{~D:Record.Index~}"
+		spellcheck="false">{~D:Record.Content~}</textarea>
 </div>`
 		},
 
@@ -1001,11 +1052,28 @@ class LabStacksView extends libPictView
 			let tmpPortSummary = (Array.isArray(pC.Ports) && pC.Ports.length > 0)
 				? pC.Ports.map((pP) => (pP.Host + ':' + pP.Container)).join(', ')
 				: '';
+			// File overrides — preset declares the editable files via
+			// Component.Files: [{Path, Content}]. The composer materializes
+			// each one to a host file and bind-mounts it over the
+			// in-container Path on launch (no image rebuild).
+			let tmpFiles = (Array.isArray(pC.Files) ? pC.Files : []).map((pF, pIdx) =>
+				(
+					{
+						CompHash: _escapeAttr(pC.Hash || ''),
+						Index:    pIdx,
+						Path:     _escape(pF.Path || ''),
+						// Content goes inside a textarea: only HTML-escape
+						// the text-content special chars (< > &). Quotes
+						// don't need escaping here (no attribute context).
+						Content:  ((typeof pF.Content === 'string') ? pF.Content : '')
+							.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+					}));
 			return {
 				Hash:         _escape(pC.Hash),
 				TypeLabel:    _escape(tmpType.replace('docker-', '')),
 				ImageOrBuild: _escape(tmpImageOrBuild),
-				PortsSummary: _escape(tmpPortSummary)
+				PortsSummary: _escape(tmpPortSummary),
+				Files:        tmpFiles
 			};
 		});
 
