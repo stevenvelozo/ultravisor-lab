@@ -70,6 +70,14 @@ class ServiceStackInitializer extends libFableServiceProviderBase
 		this._ReadyTimeoutMs = (pOptions && pOptions.ReadyTimeoutMs) || DEFAULT_READY_TIMEOUT_MS;
 		this._RunTimeoutMs   = (pOptions && pOptions.RunTimeoutMs)   || DEFAULT_RUN_TIMEOUT_MS;
 		this._PollIntervalMs = (pOptions && pOptions.PollIntervalMs) || DEFAULT_POLL_INTERVAL_MS;
+
+		// Per-stack-hash set of init runs currently mid-flight. run() rejects
+		// a second concurrent call for the same hash so a double-clicked
+		// Launch (which schedules init via setImmediate) doesn't push the
+		// same operation graph twice — most beacon /connection-style endpoints
+		// are CREATE not UPSERT, and a duplicate run would leave duplicate
+		// connections behind.
+		this._RunInFlight = new Set();
 	}
 
 	// ====================================================================
@@ -78,6 +86,27 @@ class ServiceStackInitializer extends libFableServiceProviderBase
 
 	run(pStackHash, pInputValues, fCallback)
 	{
+		// Reject a second concurrent run() for the same stack. The route layer
+		// turns this into a 409 so the client can render a friendly toast.
+		if (this._RunInFlight.has(pStackHash))
+		{
+			let tmpInflight = this._buildResult(pStackHash, 'already-running', null, null, 'An init run is already in flight for this stack.');
+			return fCallback(null, tmpInflight);
+		}
+		this._RunInFlight.add(pStackHash);
+
+		// Wrap fCallback so every exit path clears the in-flight marker.
+		let tmpDoneOnce = false;
+		let tmpSelf = this;
+		let tmpDone = (pErr, pResult) =>
+		{
+			if (tmpDoneOnce) return;
+			tmpDoneOnce = true;
+			tmpSelf._RunInFlight.delete(pStackHash);
+			fCallback(pErr, pResult);
+		};
+		fCallback = tmpDone;
+
 		let tmpStore     = this._svc('LabStackStore');
 		let tmpResolver  = this._svc('LabStackResolver');
 		let tmpOpStore   = this._svc('LabOperationStore');

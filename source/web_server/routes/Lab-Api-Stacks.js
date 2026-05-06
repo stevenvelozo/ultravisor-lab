@@ -218,6 +218,16 @@ module.exports = function registerStackRoutes(pCore)
 					pRes.send(500, { Error: pErr.message });
 					return pNext();
 				}
+				// 409 conflict for a double-clicked Launch — the lifecycle
+				// rejected because an up() is already in flight for this hash.
+				// The client uses the status code (and the Status field) to
+				// render a friendly "Already launching..." toast without
+				// kicking off a duplicate background init.
+				if (pResult && pResult.Status === 'already-launching')
+				{
+					pRes.send(409, { Status: 'already-launching', Error: 'A launch is already in progress for this stack.' });
+					return pNext();
+				}
 				// Lifecycle.up succeeded — containers are starting / running.
 				// If the spec carries an InitOperation, kick the initializer
 				// off in the background so the response returns promptly.
@@ -285,6 +295,14 @@ module.exports = function registerStackRoutes(pCore)
 				if (pErr)
 				{
 					pRes.send(500, { Error: pErr.message, Init: pResult || null });
+					return pNext();
+				}
+				// 409 conflict — the initializer rejected because a run() is
+				// already in flight (e.g. background init from a prior up()
+				// hasn't finished yet, and the operator hit Re-run init).
+				if (pResult && pResult.Phase === 'already-running')
+				{
+					pRes.send(409, { Init: pResult, Error: 'An init run is already in progress for this stack.' });
 					return pNext();
 				}
 				pRes.send(pResult);

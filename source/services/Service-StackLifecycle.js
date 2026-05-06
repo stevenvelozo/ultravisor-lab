@@ -57,6 +57,13 @@ class ServiceStackLifecycle extends libFableServiceProviderBase
 		this._ComposeArgsPrefix = [];  // ['compose'] for v2, [] for v1
 		this._ComposeVersion = null;
 		this._ComposeProbed = false;
+
+		// Per-stack-hash set of launches currently mid-flight. up() rejects a
+		// second concurrent call for the same hash so a double-clicked Launch
+		// button doesn't spawn parallel `docker compose --build` runs (which
+		// race the layer cache) and parallel init operations (which can create
+		// duplicate connections in beacons whose endpoints aren't idempotent).
+		this._UpInFlight = new Set();
 	}
 
 	// ====================================================================
@@ -156,6 +163,30 @@ class ServiceStackLifecycle extends libFableServiceProviderBase
 	up(pHash, pInputValues, fCallback)
 	{
 		let tmpSelf = this;
+
+		// Reject a second concurrent up() for the same stack. The route layer
+		// turns this into a 409 so the client can render a friendly toast.
+		if (this._UpInFlight.has(pHash))
+		{
+			return fCallback(null, { Status: 'already-launching' });
+		}
+		this._UpInFlight.add(pHash);
+
+		// Wrap fCallback so every exit path clears the in-flight marker.
+		// The original callback has at least seven exits below (probe error,
+		// missing services, stack-not-found, preflight crash, preflight block,
+		// mkdir failure, compose failure, compose success); guard once and
+		// reuse instead of sprinkling cleanup at each return.
+		let tmpDoneOnce = false;
+		let tmpDone = (pErr, pResult) =>
+		{
+			if (tmpDoneOnce) return;
+			tmpDoneOnce = true;
+			tmpSelf._UpInFlight.delete(pHash);
+			fCallback(pErr, pResult);
+		};
+		fCallback = tmpDone;
+
 		this._probeCompose(function (pProbeErr)
 		{
 			if (pProbeErr) return fCallback(pProbeErr);

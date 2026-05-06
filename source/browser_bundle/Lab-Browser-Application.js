@@ -141,7 +141,8 @@ class LabBrowserApplication extends libPictApplication
 				LastPreflight:    null,         // { Hash, Report } most recent preflight
 				LastStatus:       null,         // { Hash, Status } most recent status poll
 				LastYaml:         null,         // { Hash, YAML, Source }
-				LastLaunchResult: null          // { Hash, Result } last upStack response (incl. RawOutput on failure)
+				LastLaunchResult: null,         // { Hash, Result } last upStack response (incl. RawOutput on failure)
+				LaunchingStacks:  {}            // { [hash]: true } while a launchStack call is in flight, so the Launch button can be disabled immediately on click rather than waiting for Status='starting' to round-trip
 			}
 		};
 		return super.onBeforeInitializeAsync(fCallback);
@@ -2199,6 +2200,28 @@ class LabBrowserApplication extends libPictApplication
 	launchStack(pHash)
 	{
 		let tmpState = this.pict.AppData.Lab.Stacks;
+
+		// Guard against double-clicking Launch / Save & Launch. Without this,
+		// the second click spawns a parallel `compose up --build` (which races
+		// the layer cache) and a parallel init-op POST (which created
+		// duplicate beacon connections in non-idempotent endpoints). The
+		// server has its own 409 guard; this one is for UX so the button
+		// disables instantly rather than waiting for a Status='starting'
+		// round-trip.
+		if (!tmpState.LaunchingStacks) { tmpState.LaunchingStacks = {}; }
+		if (tmpState.LaunchingStacks[pHash])
+		{
+			this._toast('Already launching this stack — please wait.', 'info', { duration: 3000 });
+			return;
+		}
+		tmpState.LaunchingStacks[pHash] = true;
+		this.pict.views['Lab-Stacks'].render();
+
+		let clearLaunching = () =>
+		{
+			delete tmpState.LaunchingStacks[pHash];
+		};
+
 		this._marshalEditorInputs();
 		let tmpEditing = !!(tmpState.EditorRecord && tmpState.EditorRecord.Hash === pHash);
 
@@ -2212,7 +2235,22 @@ class LabBrowserApplication extends libPictApplication
 			this.openStackDetail(pHash);
 			this.pict.providers.LabApi.upStack(pHash, tmpState.InputValues, (pErr, pResult) =>
 			{
-				if (pErr) { this._toastError('Launch failed: ' + pErr.message); return; }
+				clearLaunching();
+				if (pErr)
+				{
+					// Server-side 409 conflict (already-launching) — friendly toast,
+					// don't render error styling. Otherwise treat as a real failure.
+					if (/already.*launching/i.test(pErr.message || ''))
+					{
+						this._toast('Already launching this stack — please wait.', 'info', { duration: 3000 });
+					}
+					else
+					{
+						this._toastError('Launch failed: ' + pErr.message);
+					}
+					this.pict.views['Lab-Stacks'].render();
+					return;
+				}
 				// Always persist the latest launch result so the editor can
 				// surface the full preflight + raw compose output on failure.
 				tmpState.LastLaunchResult = { Hash: pHash, Result: pResult || {} };
@@ -2254,7 +2292,13 @@ class LabBrowserApplication extends libPictApplication
 			this.pict.providers.LabApi.saveStack(
 				tmpState.EditorRecord.Spec, tmpState.InputValues, (pErr, pResult) =>
 				{
-					if (pErr) { this._toastError('Save failed before launch: ' + pErr.message); return; }
+					if (pErr)
+					{
+						clearLaunching();
+						this._toastError('Save failed before launch: ' + pErr.message);
+						this.pict.views['Lab-Stacks'].render();
+						return;
+					}
 					if (pResult && pResult.Stack) { tmpState.EditorRecord = pResult.Stack; }
 					proceedWithLaunch();
 				});

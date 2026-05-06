@@ -591,7 +591,7 @@ const _ViewConfiguration =
 	<div class="lab-stack-actions">
 		<a class="lab-btn secondary" href="#/stacks/{~D:Record.HashEnc~}/preflight">Run preflight</a>
 		<a class="lab-btn" href="#/stacks/{~D:Record.HashEnc~}/save">Save</a>
-		<a class="lab-btn success" href="#/stacks/{~D:Record.HashEnc~}/launch">Save &amp; Launch</a>
+		<a class="lab-btn success {~D:Record.LaunchDisabled~}" href="#/stacks/{~D:Record.HashEnc~}/launch">{~D:Record.LaunchLabel~}</a>
 	</div>
 </div>`
 		},
@@ -668,7 +668,7 @@ const _ViewConfiguration =
 		<div class="lab-stack-detail-actions">
 			<a class="lab-btn small secondary" href="#/stacks/{~D:Record.HashEnc~}/edit">Edit</a>
 			<a class="lab-btn small secondary" href="#/stacks/{~D:Record.HashEnc~}/refresh-status">Refresh</a>
-			<a class="lab-btn small success {~D:Record.UpDisabled~}" href="#/stacks/{~D:Record.HashEnc~}/launch">Launch</a>
+			<a class="lab-btn small success {~D:Record.UpDisabled~}" href="#/stacks/{~D:Record.HashEnc~}/launch">{~D:Record.UpLabel~}</a>
 			<a class="lab-btn small danger {~D:Record.DownDisabled~}" href="#/stacks/{~D:Record.HashEnc~}/down">Teardown</a>
 		</div>
 	</div>
@@ -1027,6 +1027,7 @@ class LabStacksView extends libPictView
 			}]
 			: [];
 
+		let tmpLaunching = !!(pState.LaunchingStacks && pState.LaunchingStacks[tmpEd.Hash]);
 		return {
 			Name:           _escape(tmpSpec.Name || tmpEd.Hash),
 			Description:    _escape(tmpSpec.Description || ''),
@@ -1034,7 +1035,9 @@ class LabStacksView extends libPictView
 			Inputs:         tmpInputs,
 			Components:     tmpComponents,
 			PreflightSlot:  tmpPreflightSlot,
-			LaunchOutputSlot: tmpLaunchSlot
+			LaunchOutputSlot: tmpLaunchSlot,
+			LaunchDisabled: tmpLaunching ? 'disabled' : '',
+			LaunchLabel:    tmpLaunching ? 'Launching…' : 'Save &amp; Launch'
 		};
 	}
 
@@ -1086,7 +1089,10 @@ class LabStacksView extends libPictView
 			InitSlot:       tmpHasInit ? [_buildInitRecord(tmpD.Hash, tmpInit)] : [],
 			YamlText:       _escape(tmpYaml ? tmpYaml.YAML : '(YAML not loaded yet — Refresh to load)'),
 			YamlSource:     _escape(tmpYaml ? tmpYaml.Source : ''),
-			UpDisabled:     (tmpStatusValue === 'running' || tmpStatusValue === 'starting') ? 'disabled' : '',
+			UpDisabled:     (!!(pState.LaunchingStacks && pState.LaunchingStacks[tmpD.Hash])
+								|| tmpStatusValue === 'running'
+								|| tmpStatusValue === 'starting') ? 'disabled' : '',
+			UpLabel:        (pState.LaunchingStacks && pState.LaunchingStacks[tmpD.Hash]) ? 'Launching…' : 'Launch',
 			DownDisabled:   (tmpStatusValue === 'stopped' || tmpStatusValue === 'stopping') ? 'disabled' : ''
 		};
 	}

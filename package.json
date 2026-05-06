@@ -1,6 +1,6 @@
 {
 	"name": "ultravisor-lab",
-	"version": "0.0.15",
+	"version": "0.0.16",
 	"description": "Web-based orchestration and monitoring for dockerized DB engines, retold-databeacons, Ultravisor, and Facto instances",
 	"main": "lab.js",
 	"bin": {
@@ -44,10 +44,10 @@
 		"pict": "^1.0.365",
 		"pict-application": "^1.0.33",
 		"pict-router": "^1.0.9",
-		"pict-section-modal": "^0.0.5",
+		"pict-section-modal": "^0.0.6",
 		"pict-view": "^1.0.68",
-		"retold-databeacon": "^1.0.0",
-		"ultravisor": "^1.3.4",
+		"retold-databeacon": "^1.0.1",
+		"ultravisor": "^1.3.7",
 		"ultravisor-beacon": "^0.0.14"
 	},
 	"devDependencies": {
