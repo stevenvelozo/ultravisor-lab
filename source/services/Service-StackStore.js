@@ -31,6 +31,7 @@
 const libPath = require('path');
 const libFs = require('fs');
 const libCrypto = require('crypto');
+const libChildProcess = require('child_process');
 const libFableServiceProviderBase = require('fable-serviceproviderbase');
 
 const PRESETS_DIR = libPath.resolve(__dirname, '..', 'stacks', 'presets');
@@ -340,13 +341,17 @@ class ServiceStackStore extends libFableServiceProviderBase
 		let tmpStore = this._stateStore();
 		if (!tmpStore) return 0;
 		let tmpExisting = this.getByHash(pHash);
-		if (!tmpExisting) return 0;
-		let tmpDeleted = tmpStore.remove(TABLE_NAME, ID_COLUMN, tmpExisting[ID_COLUMN]);
+		// Always run mirror cleanup, even when no SQLite row exists. This makes
+		// `remove(hash)` self-healing: if a prior crash left a workspace dir
+		// with no row, calling DELETE on that hash still cleans the orphan.
+		// Cleanup runs first because it's idempotent and safe to repeat.
 		try { this._removeMirror(pHash); }
 		catch (pErr)
 		{
 			this.fable.log.warn(`StackStore: mirror delete failed for ${pHash}: ${pErr.message}`);
 		}
+		if (!tmpExisting) return 0;
+		let tmpDeleted = tmpStore.remove(TABLE_NAME, ID_COLUMN, tmpExisting[ID_COLUMN]);
 		this._recordEvent(tmpExisting,
 			{
 				EventType: 'stack-removed',
@@ -444,6 +449,78 @@ class ServiceStackStore extends libFableServiceProviderBase
 		if (libFs.existsSync(tmpPath))
 		{
 			libFs.unlinkSync(tmpPath);
+		}
+		// The lifecycle service drops compose files (and may add logs / state
+		// manifests later) into a per-stack workspace dir at
+		// `<MirrorDir>/<sanitized-hash>/`. Archive any top-level files into
+		// `<MirrorDir>/_archive/` before nuking the dir, so an operator can
+		// inspect what was running. Subdirectories are deliberately skipped —
+		// they would only contain mounted data volumes that the operator
+		// owns separately.
+		this._archiveAndRemoveWorkspace(pHash);
+	}
+
+	/**
+	 * Workspace path = `<MirrorDir>/<sanitized-hash>/`. Lifecycle writes
+	 * `docker-compose.yml` here; future versions may also drop logs or
+	 * manifests. Returns the absolute path even if the dir doesn't exist.
+	 */
+	_workspacePath(pHash)
+	{
+		return libPath.join(this._MirrorDir, this._sanitizeHash(pHash));
+	}
+
+	_archiveDir()
+	{
+		return libPath.join(this._MirrorDir, '_archive');
+	}
+
+	_archiveAndRemoveWorkspace(pHash)
+	{
+		let tmpWorkspace = this._workspacePath(pHash);
+		if (!libFs.existsSync(tmpWorkspace)) return;
+		try
+		{
+			let tmpStat = libFs.statSync(tmpWorkspace);
+			if (!tmpStat.isDirectory()) return;
+		}
+		catch (pErr) { return; }
+
+		// Top-level files only — skip subdirectories (data volumes etc.).
+		let tmpEntries = [];
+		try { tmpEntries = libFs.readdirSync(tmpWorkspace, { withFileTypes: true }); }
+		catch (pErr) { return; }
+		let tmpFiles = tmpEntries
+			.filter((pE) => pE.isFile())
+			.map((pE) => pE.name);
+
+		if (tmpFiles.length > 0)
+		{
+			try
+			{
+				let tmpArchiveDir = this._archiveDir();
+				if (!libFs.existsSync(tmpArchiveDir))
+				{
+					libFs.mkdirSync(tmpArchiveDir, { recursive: true });
+				}
+				let tmpStamp = new Date().toISOString().replace(/[:.]/g, '-');
+				let tmpArchivePath = libPath.join(tmpArchiveDir,
+					`${this._sanitizeHash(pHash)}-${tmpStamp}.tar.gz`);
+				let tmpArgs = ['-czf', tmpArchivePath, '-C', tmpWorkspace].concat(tmpFiles);
+				libChildProcess.execFileSync('tar', tmpArgs,
+					{ stdio: ['ignore', 'ignore', 'pipe'], timeout: 30000 });
+				this.fable.log.info(`StackStore: archived workspace for ${pHash} → ${tmpArchivePath}`);
+			}
+			catch (pErr)
+			{
+				this.fable.log.warn(`StackStore: archive failed for ${pHash}: ${pErr.message}`);
+			}
+		}
+
+		try { libFs.rmSync(tmpWorkspace, { recursive: true, force: true }); }
+		catch (pErr)
+		{
+			this.fable.log.warn(`StackStore: workspace rm failed for ${pHash}: ${pErr.message}`);
 		}
 	}
 

@@ -357,6 +357,14 @@ class LabApiProvider extends libFableServiceProviderBase
 		return _request('DELETE', '/api/lab/stacks/' + encodeURIComponent(pHash), null, fCallback);
 	}
 
+	// Same DELETE with `?force=1` — server skips the best-effort
+	// `docker compose down` (which can hang up to 30 min when the stack is
+	// wedged). Containers become the operator's problem; the UI must warn.
+	forceRemoveStack(pHash, fCallback)
+	{
+		return _request('DELETE', '/api/lab/stacks/' + encodeURIComponent(pHash) + '?force=1', null, fCallback);
+	}
+
 	preflightStack(pHash, pInputValues, fCallback)
 	{
 		return _request('POST',

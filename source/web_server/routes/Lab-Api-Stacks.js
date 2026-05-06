@@ -11,6 +11,7 @@
  *   POST   /api/lab/stacks                           -- upsert by Hash
  *   POST   /api/lab/stacks/clone-preset/:presetHash  -- materialize a preset clone (no save)
  *   DELETE /api/lab/stacks/:hash                     -- hard delete + remove file mirror
+ *                                                       (?force=1 skips compose-down)
  *   POST   /api/lab/stacks/:hash/preflight           -- run preflight against {InputValues}
  *   POST   /api/lab/stacks/:hash/up                  -- preflight + compose + up -d
  *   POST   /api/lab/stacks/:hash/down                -- compose down
@@ -152,15 +153,25 @@ module.exports = function registerStackRoutes(pCore)
 	tmpOrator.serviceServer.doDel('/api/lab/stacks/:hash',
 		(pReq, pRes, pNext) =>
 		{
-			// Best-effort: try to bring the stack down before deleting,
-			// in case the operator forgot. Ignore down-failures since
-			// the user has already asked us to remove the row.
-			tmpLifecycle.down(pReq.params.hash, () =>
+			// `?force=1` short-circuits the best-effort compose-down. Use it
+			// when the stack is in a wedged state (compose hangs, containers
+			// vanished, etc.) and the operator just wants the row gone — they
+			// take responsibility for cleaning up any remaining containers via
+			// `docker ps` / `docker rm` themselves.
+			let tmpForce = !!(pReq.query && (pReq.query.force === '1' || pReq.query.force === 'true'));
+			let tmpHash = pReq.params.hash;
+
+			let removeRow = () =>
 			{
-				let tmpDeleted = tmpStore.remove(pReq.params.hash);
-				pRes.send({ Deleted: tmpDeleted });
+				let tmpDeleted = tmpStore.remove(tmpHash);
+				pRes.send({ Deleted: tmpDeleted, Forced: tmpForce });
 				return pNext();
-			});
+			};
+
+			if (tmpForce) return removeRow();
+
+			// Default best-effort: try compose-down first, ignore failures.
+			tmpLifecycle.down(tmpHash, removeRow);
 		});
 
 	// ── Preflight ──────────────────────────────────────────────────────

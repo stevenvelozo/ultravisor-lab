@@ -2248,6 +2248,27 @@ class LabBrowserApplication extends libPictApplication
 			});
 	}
 
+	// Skip the best-effort compose-down — used when the stack is wedged
+	// (status='starting' with no containers, compose hangs, etc.) and the
+	// regular Remove times out. Operator owns leftover container cleanup.
+	forceRemoveStack(pHash)
+	{
+		this._modal().confirm('Force-remove this stack? '
+			+ 'The lab will NOT stop running containers — you may need to clean them up with `docker ps` and `docker rm` yourself. '
+			+ 'Workspace files (e.g. docker-compose.yml) will be archived to data/stacks/_archive/ before deletion.',
+			{ confirmLabel: 'Force Remove', dangerous: true })
+			.then((pOk) =>
+			{
+				if (!pOk) return;
+				this.pict.providers.LabApi.forceRemoveStack(pHash, (pErr) =>
+				{
+					if (pErr) { this._toastError('Force-remove failed: ' + pErr.message); return; }
+					this._toastSuccess('Stack force-removed');
+					this.openStacks();
+				});
+			});
+	}
+
 	refreshStackDetail(pHash)
 	{
 		this._loadStackStatus(pHash, () => {

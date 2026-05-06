@@ -103,6 +103,24 @@ const _ViewConfiguration =
 .lab-btn.success { background: #166534; border-color: #166534; }
 .lab-btn.success:hover { background: #14532d; }
 .lab-btn.small { padding: 4px 10px; font-size: 12px; }
+/* "Force" remove — subordinate to the regular Remove button. Slimmer,
+ * outlined, faded so the operator only reaches for it when the normal
+ * Remove fails. */
+.lab-btn-force
+{
+	padding: 4px 6px !important;
+	font-size: 11px !important;
+	background: transparent !important;
+	color: rgba(239, 68, 68, 0.85) !important;
+	border: 1px solid rgba(239, 68, 68, 0.5) !important;
+	letter-spacing: 0.4px;
+	text-transform: uppercase;
+}
+.lab-btn-force:hover
+{
+	background: rgba(239, 68, 68, 0.12) !important;
+	color: #fca5a5 !important;
+}
 .lab-btn.disabled { opacity: 0.4; pointer-events: none; }
 
 .lab-preset-grid
@@ -507,6 +525,7 @@ const _ViewConfiguration =
 		<a class="lab-btn small" href="#/stacks/{~D:Record.HashEnc~}">Detail</a>
 		<a class="lab-btn small secondary" href="#/stacks/{~D:Record.HashEnc~}/edit">Edit</a>
 		<a class="lab-btn small danger" href="#/stacks/{~D:Record.HashEnc~}/remove">Remove</a>
+		<a class="lab-btn small danger lab-btn-force" href="#/stacks/{~D:Record.HashEnc~}/force-remove" title="Skip compose-down — use when the stack is wedged and the regular Remove hangs.">Force</a>
 	</div>
 </div>`
 		},

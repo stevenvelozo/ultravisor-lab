@@ -38,6 +38,7 @@ const libFs = require('fs');
 const libFable = require('fable');
 const libOrator = require('orator');
 const libOratorServiceServerRestify = require('orator-serviceserver-restify');
+const libRestify = require('restify');
 
 const libServiceStateStore         = require('../services/Service-StateStore.js');
 const libServiceDockerManager      = require('../services/Service-DockerManager.js');
@@ -226,6 +227,11 @@ function setupLabServer(pOptions, fCallback)
 							if (pInitErr) { return fCallback(pInitErr); }
 
 							tmpOrator.serviceServer.server.use(tmpOrator.serviceServer.bodyParser());
+							// Restify ships with a `req.query` *function* by default that
+							// returns the raw query string. Routes (e.g. /stacks DELETE
+							// `?force=1`, /stacks/:hash/compose-yaml `?inputs=`) treat it
+							// as a parsed object, so register the plugin to make that real.
+							tmpOrator.serviceServer.server.use(libRestify.plugins.queryParser({ mapParams: false }));
 							tmpOrator.serviceServer.server.use(
 								(pReq, pRes, pNext) =>
 								{

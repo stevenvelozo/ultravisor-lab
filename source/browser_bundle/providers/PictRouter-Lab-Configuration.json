@@ -73,6 +73,7 @@
 		{ "path": "/stacks/:hash/launch",                 "template": "{~LV:Pict.PictApplication.launchStack(Record.data.hash)~}" },
 		{ "path": "/stacks/:hash/down",                   "template": "{~LV:Pict.PictApplication.teardownStack(Record.data.hash)~}" },
 		{ "path": "/stacks/:hash/remove",                 "template": "{~LV:Pict.PictApplication.removeStack(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/force-remove",           "template": "{~LV:Pict.PictApplication.forceRemoveStack(Record.data.hash)~}" },
 		{ "path": "/stacks/:hash/refresh-status",         "template": "{~LV:Pict.PictApplication.refreshStackDetail(Record.data.hash)~}" },
 		{ "path": "/stacks/:hash/init/run",               "template": "{~LV:Pict.PictApplication.runStackInitAction(Record.data.hash)~}" },
 		{ "path": "/stacks/:hash/yaml/download",          "template": "{~LV:Pict.PictApplication.downloadStackYaml(Record.data.hash)~}" },
