@@ -8,8 +8,9 @@
  * Call signature:
  *   serverSetup({
  *       Port, Host, DataDir, DistPath,
- *       Branding,             // optional { Product, ProductVersion } — overrides Fable identity
- *       AdditionalPresetDirs  // optional [string] — extra dirs the StackStore scans for preset JSONs
+ *       Branding,                // optional { Product, ProductVersion } — overrides Fable identity
+ *       AdditionalPresetDirs,    // optional [string] — extra dirs the StackStore scans for preset JSONs
+ *       AdditionalOperationDirs  // optional [string] — extra dirs the OperationStore scans for init operation JSONs
  *   }, fCallback);
  *     fCallback(pError, pServerInfo)
  *     pServerInfo = { Fable, Orator, Core, Port, Host, DistPath }
@@ -21,6 +22,10 @@
  * stack presets into the read-only preset library so they appear in the
  * UI alongside the lab's bundled set. See Service-StackStore docs for
  * preset JSON shape and hash-collision behavior.
+ *
+ * AdditionalOperationDirs is the same idea for init operation graphs —
+ * downstream apps drop *.json operation files there and Service-StackInitializer
+ * looks them up by Hash when running a stack's InitOperation.
  *
  * Binds explicitly to the supplied host so the server is not reachable
  * from the local network unless the user opts in via `--host`.
@@ -53,6 +58,8 @@ const libServiceStackResolver        = require('../services/Service-StackResolve
 const libServiceStackPreflight       = require('../services/Service-StackPreflight.js');
 const libServiceStackComposer        = require('../services/Service-StackComposer.js');
 const libServiceStackLifecycle       = require('../services/Service-StackLifecycle.js');
+const libServiceOperationStore       = require('../services/Service-OperationStore.js');
+const libServiceStackInitializer     = require('../services/Service-StackInitializer.js');
 
 const libRoutesSystem          = require('./routes/Lab-Api-System.js');
 const libRoutesEntities        = require('./routes/Lab-Api-Entities.js');
@@ -77,7 +84,8 @@ function setupLabServer(pOptions, fCallback)
 	let tmpProduct        = tmpBranding.Product        || 'Ultravisor-Lab';
 	let tmpProductVersion = tmpBranding.ProductVersion || tmpPackage.version;
 
-	let tmpAdditionalPresetDirs = Array.isArray(pOptions.AdditionalPresetDirs) ? pOptions.AdditionalPresetDirs : [];
+	let tmpAdditionalPresetDirs    = Array.isArray(pOptions.AdditionalPresetDirs)    ? pOptions.AdditionalPresetDirs    : [];
+	let tmpAdditionalOperationDirs = Array.isArray(pOptions.AdditionalOperationDirs) ? pOptions.AdditionalOperationDirs : [];
 
 	// ─────────────────────────────────────────────
 	//  Fable
@@ -150,6 +158,13 @@ function setupLabServer(pOptions, fCallback)
 	_addAndInstantiate('LabStackComposer',          libServiceStackComposer,          { DataDir: tmpDataDir });
 	_addAndInstantiate('LabStackLifecycle',         libServiceStackLifecycle);
 
+	// Operation library + initializer. The OperationStore loads init op
+	// graphs from AdditionalOperationDirs (no bundled set today; downstream
+	// apps own their init flows). StackInitializer pushes the operation
+	// into the stack's running ultravisor and polls the resulting run.
+	_addAndInstantiate('LabOperationStore',         libServiceOperationStore,         { AdditionalOperationDirs: tmpAdditionalOperationDirs });
+	_addAndInstantiate('LabStackInitializer',       libServiceStackInitializer,       { DataDir: tmpDataDir });
+
 	tmpFable.LabStateStore.initialize(
 		(pStateErr) =>
 		{
@@ -196,6 +211,8 @@ function setupLabServer(pOptions, fCallback)
 						StackPreflight:       tmpFable.LabStackPreflight,
 						StackComposer:        tmpFable.LabStackComposer,
 						StackLifecycle:       tmpFable.LabStackLifecycle,
+						OperationStore:       tmpFable.LabOperationStore,
+						StackInitializer:     tmpFable.LabStackInitializer,
 						Package:              tmpPackage
 					};
 

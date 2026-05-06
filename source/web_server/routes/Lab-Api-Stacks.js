@@ -22,12 +22,14 @@
 
 module.exports = function registerStackRoutes(pCore)
 {
-	let tmpOrator     = pCore.Orator;
-	let tmpStore      = pCore.StackStore;
-	let tmpResolver   = pCore.StackResolver;
-	let tmpPreflight  = pCore.StackPreflight;
-	let tmpComposer   = pCore.StackComposer;
-	let tmpLifecycle  = pCore.StackLifecycle;
+	let tmpOrator      = pCore.Orator;
+	let tmpStore       = pCore.StackStore;
+	let tmpResolver    = pCore.StackResolver;
+	let tmpPreflight   = pCore.StackPreflight;
+	let tmpComposer    = pCore.StackComposer;
+	let tmpLifecycle   = pCore.StackLifecycle;
+	let tmpOpStore     = pCore.OperationStore;
+	let tmpInitializer = pCore.StackInitializer;
 
 	// ── Preset library ─────────────────────────────────────────────────
 
@@ -197,16 +199,126 @@ module.exports = function registerStackRoutes(pCore)
 		(pReq, pRes, pNext) =>
 		{
 			let tmpInputs = (pReq.body && pReq.body.InputValues) || {};
-			tmpLifecycle.up(pReq.params.hash, tmpInputs, (pErr, pResult) =>
+			let tmpStackHash = pReq.params.hash;
+			tmpLifecycle.up(tmpStackHash, tmpInputs, (pErr, pResult) =>
 			{
 				if (pErr)
 				{
 					pRes.send(500, { Error: pErr.message });
 					return pNext();
 				}
-				pRes.send(pResult || { Status: 'unknown' });
+				// Lifecycle.up succeeded — containers are starting / running.
+				// If the spec carries an InitOperation, kick the initializer
+				// off in the background so the response returns promptly.
+				// The init result is queryable at /api/lab/stacks/:hash/init.
+				let tmpReply = pResult || { Status: 'unknown' };
+				let tmpStack = tmpStore.getByHash(tmpStackHash);
+				let tmpHasInit = tmpStack && tmpStack.Spec && tmpStack.Spec.InitOperation;
+				if (tmpHasInit && tmpInitializer)
+				{
+					tmpReply.Init = { Phase: 'queued' };
+					setImmediate(() =>
+					{
+						tmpInitializer.run(tmpStackHash, tmpInputs, (pInitErr, pInitResult) =>
+						{
+							if (pInitErr)
+							{
+								// Already persisted by the initializer; just log.
+								if (pCore.Fable && pCore.Fable.log)
+								{
+									pCore.Fable.log.warn(`Lab-Api-Stacks: stack [${tmpStackHash}] init returned error — ${pInitErr.message}`);
+								}
+							}
+						});
+					});
+				}
+				pRes.send(tmpReply);
 				return pNext();
 			});
+		});
+
+	// Init result for a stack — returns the persisted init-state.json (if
+	// any). Phase ∈ { skipped, queued, running, completed, failed, error }.
+	tmpOrator.serviceServer.doGet('/api/lab/stacks/:hash/init',
+		(pReq, pRes, pNext) =>
+		{
+			if (!tmpInitializer)
+			{
+				pRes.send(501, { Error: 'StackInitializer not available.' });
+				return pNext();
+			}
+			let tmpResult = tmpInitializer.getResult(pReq.params.hash);
+			if (!tmpResult)
+			{
+				pRes.send({ StackHash: pReq.params.hash, Phase: 'never-run' });
+				return pNext();
+			}
+			pRes.send(tmpResult);
+			return pNext();
+		});
+
+	// Manual re-run of init — useful when a stack came up but init failed
+	// transiently (e.g. the auth-beacon UV wasn't ready yet) and the
+	// operator wants to retry without bouncing the whole stack.
+	tmpOrator.serviceServer.doPost('/api/lab/stacks/:hash/init/run',
+		(pReq, pRes, pNext) =>
+		{
+			if (!tmpInitializer)
+			{
+				pRes.send(501, { Error: 'StackInitializer not available.' });
+				return pNext();
+			}
+			let tmpInputs = (pReq.body && pReq.body.InputValues) || null;
+			tmpInitializer.run(pReq.params.hash, tmpInputs, (pErr, pResult) =>
+			{
+				if (pErr)
+				{
+					pRes.send(500, { Error: pErr.message, Init: pResult || null });
+					return pNext();
+				}
+				pRes.send(pResult);
+				return pNext();
+			});
+		});
+
+	// Operation library — list everything Service-OperationStore has loaded
+	// (bundled + AdditionalOperationDirs from setupLabServer).
+	tmpOrator.serviceServer.doGet('/api/lab/operations',
+		(pReq, pRes, pNext) =>
+		{
+			if (!tmpOpStore)
+			{
+				pRes.send({ Operations: [] });
+				return pNext();
+			}
+			let tmpAll = tmpOpStore.listOperations();
+			let tmpSummary = tmpAll.map((pO) => (
+				{
+					Hash:        pO.Hash,
+					Name:        pO.Name || '',
+					Description: pO.Description || '',
+					NodeCount:   (pO.Graph && Array.isArray(pO.Graph.Nodes)) ? pO.Graph.Nodes.length : 0
+				}));
+			pRes.send({ Operations: tmpSummary });
+			return pNext();
+		});
+
+	tmpOrator.serviceServer.doGet('/api/lab/operations/:hash',
+		(pReq, pRes, pNext) =>
+		{
+			if (!tmpOpStore)
+			{
+				pRes.send(404, { Error: 'OperationStore not available.' });
+				return pNext();
+			}
+			let tmpOp = tmpOpStore.getByHash(pReq.params.hash);
+			if (!tmpOp)
+			{
+				pRes.send(404, { Error: `Operation [${pReq.params.hash}] not found.` });
+				return pNext();
+			}
+			pRes.send(tmpOp);
+			return pNext();
 		});
 
 	tmpOrator.serviceServer.doPost('/api/lab/stacks/:hash/down',
