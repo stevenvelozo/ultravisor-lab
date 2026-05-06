@@ -1,0 +1,69 @@
+# Override .gitignore for npm publish.
+#
+# The repo's .gitignore excludes `dist` (line 105) so the built browser
+# bundle in web/dist/ doesn't pollute commits. But npm falls back to
+# .gitignore when no .npmignore is present, which stripped web/dist/ from
+# every published tarball — consumers ended up with no served JS bundle
+# and the lab UI failed to load. This file is the explicit "publish this
+# layout" list and re-includes the bundle.
+#
+# Mirrors the spirit of .gitignore (test scratch, secrets, OS noise) but
+# leaves `web/dist/` and any other built artifact alone.
+
+# Build / package plumbing
+node_modules/
+package-lock.json
+.npmrc
+.yarn/
+.pnp.*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Local dev state — never useful to consumers
+data/
+.data/
+.ultravisor.json
+debug/
+debug/testenv
+
+# Logs / runtime scratch
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+pids/
+*.pid
+*.seed
+*.pid.lock
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Test scratch directories — created at suite-setup time, wiped on teardown.
+.test_*/
+test/.test_*/
+
+# Coverage
+coverage/
+*.lcov
+.nyc_output
+
+# Quackage build leftovers
+.babelrc
+.browserslistrc
+.browserslistrc-BACKUP
+.gulpfile-quackage.js
+.gulpfile-quackage-config.json
+*.quackage.bak
+
+# Docs build artifact (the source markdown/HTML stays)
+docs/.vitepress/dist/
+.vuepress/dist/
+
+# NOTE: web/dist/ is intentionally NOT excluded — it's the built browser
+# bundle the lab serves at runtime. The build-bundle script (`npm run
+# build-bundle`) regenerates it before publish.
