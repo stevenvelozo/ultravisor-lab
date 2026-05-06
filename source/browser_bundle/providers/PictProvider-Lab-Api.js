@@ -57,6 +57,13 @@ class LabApiProvider extends libFableServiceProviderBase
 		return _request('GET', '/api/lab/status', null, fCallback);
 	}
 
+	// Branding for the running lab. Used at boot to set the document title
+	// and nav h1; null DisplayName / LogoURL mean "use the upstream defaults".
+	getBranding(fCallback)
+	{
+		return _request('GET', '/api/lab/branding', null, fCallback);
+	}
+
 	getEvents(pLimit, fCallback)
 	{
 		let tmpPath = '/api/lab/events';

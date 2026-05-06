@@ -153,7 +153,7 @@ const _ViewConfiguration =
 			</div>
 			<div>
 				<strong>Server</strong><br>
-				Ultravisor-Lab v{~D:AppData.Lab.Status.Version~} at {~D:AppData.Lab.Computed.Overview.ServerTimeLabel~}
+				{~D:AppData.Lab.Branding.DisplayName~} v{~D:AppData.Lab.Status.Version~} at {~D:AppData.Lab.Computed.Overview.ServerTimeLabel~}
 			</div>
 		</div>
 	</div>

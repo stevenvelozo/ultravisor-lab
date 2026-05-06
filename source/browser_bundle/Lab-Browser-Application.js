@@ -70,6 +70,16 @@ class LabBrowserApplication extends libPictApplication
 		this.pict.AppData.Lab =
 		{
 			ActiveView: 'Overview',
+			// Branding seeded with the upstream defaults so the nav h1
+			// renders correctly during the brief window between view
+			// mount and the /api/lab/branding fetch resolving. Replaced
+			// at boot when an operator has supplied custom branding.
+			Branding:
+			{
+				DisplayName: 'Ultravisor Lab',
+				LogoURL:     null,
+				LogoHTML:    ''
+			},
 			Status:
 			{
 				Product:    'Ultravisor-Lab',
@@ -363,7 +373,7 @@ class LabBrowserApplication extends libPictApplication
 	refreshAll(fCallback)
 	{
 		let tmpApi = this.pict.providers.LabApi;
-		let tmpPending = 9;  // status, events, engines, ultravisors, beacons, jobs, queue runs, queue snapshot, op-exercise runs
+		let tmpPending = 10;  // branding, status, events, engines, ultravisors, beacons, jobs, queue runs, queue snapshot, op-exercise runs
 		let tmpDone = () =>
 		{
 			tmpPending--;
@@ -387,6 +397,36 @@ class LabBrowserApplication extends libPictApplication
 		tmpApi.getStatus((pErr, pStatus) =>
 			{
 				if (!pErr && pStatus) { this.pict.AppData.Lab.Status = pStatus; }
+				tmpDone();
+			});
+
+		tmpApi.getBranding((pErr, pBranding) =>
+			{
+				if (!pErr && pBranding)
+				{
+					// Apply operator-supplied DisplayName / LogoURL only when
+					// they're set; otherwise keep the upstream defaults seeded
+					// in onBeforeInitializeAsync. LogoHTML is computed here so
+					// the nav template can insert it verbatim with no inline
+					// conditional in the Pict template syntax.
+					let tmpAppData = this.pict.AppData.Lab.Branding;
+					if (typeof pBranding.DisplayName === 'string' && pBranding.DisplayName.length > 0)
+					{
+						tmpAppData.DisplayName = pBranding.DisplayName;
+						try { document.title = pBranding.DisplayName; } catch (e) { /* non-DOM env */ }
+					}
+					if (typeof pBranding.LogoURL === 'string' && pBranding.LogoURL.length > 0)
+					{
+						tmpAppData.LogoURL  = pBranding.LogoURL;
+						// Build the inline <img> tag once. Escaping the URL
+						// value because it may be a data: URL the operator
+						// supplied — never a quoted-attribute injection risk
+						// in practice, but keeping the discipline.
+						let tmpSafeURL = String(pBranding.LogoURL).replace(/"/g, '&quot;');
+						let tmpAlt = (tmpAppData.DisplayName || '').replace(/"/g, '&quot;');
+						tmpAppData.LogoHTML = `<img class="lab-header-logo" src="${tmpSafeURL}" alt="${tmpAlt}" />`;
+					}
+				}
 				tmpDone();
 			});
 

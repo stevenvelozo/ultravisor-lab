@@ -15,6 +15,13 @@ module.exports = function registerSystemRoutes(pCore)
 	let tmpReconc     = pCore.Reconciler;
 	let tmpLifecycle  = pCore.Lifecycle;
 	let tmpPackage    = pCore.Package;
+	let tmpBranding   = pCore.Branding ||
+		{
+			Product:        'Ultravisor-Lab',
+			ProductVersion: tmpPackage.version,
+			DisplayName:    null,
+			LogoURL:        null
+		};
 
 	// Quick ping.  Scripts use this for readiness probing.
 	tmpOrator.serviceServer.doGet('/api/lab/health',
@@ -26,6 +33,18 @@ module.exports = function registerSystemRoutes(pCore)
 					Version:    tmpPackage.version,
 					ServerTime: new Date().toISOString()
 				});
+			return pNext();
+		});
+
+	// Branding for the browser bundle. Returns the operator-supplied
+	// Branding (passed to setupLabServer) verbatim. DisplayName and
+	// LogoURL are null when no branding was supplied — the bundle
+	// treats null as "fall back to the upstream defaults" so vanilla
+	// ultravisor-lab still renders as 'Ultravisor Lab' with no logo.
+	tmpOrator.serviceServer.doGet('/api/lab/branding',
+		(pReq, pRes, pNext) =>
+		{
+			pRes.send(tmpBranding);
 			return pNext();
 		});
 

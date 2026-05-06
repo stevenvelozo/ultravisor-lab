@@ -32,6 +32,15 @@ const _ViewConfiguration =
 	border-bottom: 2px solid #1e293b;
 }
 .lab-header h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.4px; }
+.lab-header .lab-header-logo
+{
+	height: 24px;
+	width: auto;
+	display: inline-block;
+	vertical-align: middle;
+	margin-right: 8px;
+	flex-shrink: 0;
+}
 .lab-header .lab-header-version { font-size: 12px; opacity: 0.6; margin-left: -8px; }
 .lab-header .lab-header-spacer { flex: 1; }
 .lab-header .lab-docker-badge
@@ -187,7 +196,7 @@ const _ViewConfiguration =
 			Hash: 'Lab-Navigation-Main-Template',
 			Template: /*html*/`
 <div class="lab-header">
-	<h1>Ultravisor Lab</h1>
+	{~D:AppData.Lab.Branding.LogoHTML~}<h1>{~D:AppData.Lab.Branding.DisplayName~}</h1>
 	<span class="lab-header-version">v{~D:AppData.Lab.Status.Version~}</span>
 
 	<details class="lab-nav-hamburger">

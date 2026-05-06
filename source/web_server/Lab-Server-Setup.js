@@ -85,6 +85,18 @@ function setupLabServer(pOptions, fCallback)
 	let tmpProduct        = tmpBranding.Product        || 'Ultravisor-Lab';
 	let tmpProductVersion = tmpBranding.ProductVersion || tmpPackage.version;
 
+	// Resolved branding the routes / browser bundle consume. Kept verbatim
+	// (DisplayName / LogoURL stay null when the operator didn't supply them
+	// so the bundle can fall back to its hardcoded "Ultravisor Lab" defaults
+	// — keeps the upstream-without-branding UX identical).
+	let tmpResolvedBranding =
+		{
+			Product:        tmpProduct,
+			ProductVersion: tmpProductVersion,
+			DisplayName:    (typeof tmpBranding.DisplayName === 'string' && tmpBranding.DisplayName.length > 0) ? tmpBranding.DisplayName : null,
+			LogoURL:        (typeof tmpBranding.LogoURL === 'string' && tmpBranding.LogoURL.length > 0) ? tmpBranding.LogoURL : null
+		};
+
 	let tmpAdditionalPresetDirs    = Array.isArray(pOptions.AdditionalPresetDirs)    ? pOptions.AdditionalPresetDirs    : [];
 	let tmpAdditionalOperationDirs = Array.isArray(pOptions.AdditionalOperationDirs) ? pOptions.AdditionalOperationDirs : [];
 
@@ -214,7 +226,8 @@ function setupLabServer(pOptions, fCallback)
 						StackLifecycle:       tmpFable.LabStackLifecycle,
 						OperationStore:       tmpFable.LabOperationStore,
 						StackInitializer:     tmpFable.LabStackInitializer,
-						Package:              tmpPackage
+						Package:              tmpPackage,
+						Branding:             tmpResolvedBranding
 					};
 
 					// ─────────────────────────────────────────────
