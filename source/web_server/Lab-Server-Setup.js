@@ -14,10 +14,10 @@
  *     fCallback(pError, pServerInfo)
  *     pServerInfo = { Fable, Orator, Core, Port, Host, DistPath }
  *
- * Branding lets a downstream app (e.g. headlight-ultravisor-lab) identify
- * itself in logs and the eventual UI title bar without forking lab.js.
+ * Branding lets a downstream app identify itself in logs and the
+ * eventual UI title bar without forking lab.js.
  *
- * AdditionalPresetDirs lets the same downstream app inject its own bundled
+ * AdditionalPresetDirs lets a downstream app inject its own bundled
  * stack presets into the read-only preset library so they appear in the
  * UI alongside the lab's bundled set. See Service-StackStore docs for
  * preset JSON shape and hash-collision behavior.
@@ -111,30 +111,44 @@ function setupLabServer(pOptions, fCallback)
 	//  Lab services
 	// ─────────────────────────────────────────────
 
-	tmpFable.addAndInstantiateServiceType('LabStateStore',         libServiceStateStore,        { DataDir: tmpDataDir });
-	tmpFable.addAndInstantiateServiceType('LabDockerManager',      libServiceDockerManager);
-	tmpFable.addAndInstantiateServiceType('LabProcessSupervisor',  libServiceProcessSupervisor, { DataDir: tmpDataDir });
-	tmpFable.addAndInstantiateServiceType('LabReconcileLoop',      libServiceReconcileLoop);
-	tmpFable.addAndInstantiateServiceType('LabPortAllocator',      libServicePortAllocator);
-	tmpFable.addAndInstantiateServiceType('LabDBEngineManager',    libServiceDBEngineManager);
-	tmpFable.addAndInstantiateServiceType('LabUltravisorManager',  libServiceUltravisorManager);
-	tmpFable.addAndInstantiateServiceType('LabBeaconTypeRegistry', libServiceBeaconTypeRegistry);
-	tmpFable.addAndInstantiateServiceType('LabBeaconContainerManager', libServiceBeaconContainerManager);
-	tmpFable.addAndInstantiateServiceType('LabBeaconManager',      libServiceBeaconManager);
-	tmpFable.addAndInstantiateServiceType('LabSeedDatasetManager',   libServiceSeedDatasetManager);
-	tmpFable.addAndInstantiateServiceType('LabBeaconExerciseManager', libServiceBeaconExerciseManager);
-	tmpFable.addAndInstantiateServiceType('LabOperationExerciseManager', libServiceOperationExerciseManager);
-	tmpFable.addAndInstantiateServiceType('LabLifecycle',            libServiceLabLifecycle);
+	// Helper: addAndInstantiateServiceType in fable currently takes only
+	// (type, class) and silently drops any third options arg — calls like
+	// addAndInstantiateServiceType('LabStateStore', libX, { DataDir: ... })
+	// would never see DataDir, leaving every consumer at the service's
+	// hardcoded default path. The explicit two-step form below threads
+	// pOptions all the way to the constructor.
+	let _addAndInstantiate = (pType, pClass, pOptions) =>
+	{
+		tmpFable.addServiceType(pType, pClass);
+		return tmpFable.instantiateServiceProvider(pType, pOptions || {}, `${pType}-Default`);
+	};
+
+	_addAndInstantiate('LabStateStore',             libServiceStateStore,             { DataDir: tmpDataDir });
+	_addAndInstantiate('LabDockerManager',          libServiceDockerManager);
+	_addAndInstantiate('LabProcessSupervisor',      libServiceProcessSupervisor,      { DataDir: tmpDataDir });
+	_addAndInstantiate('LabReconcileLoop',          libServiceReconcileLoop);
+	_addAndInstantiate('LabPortAllocator',          libServicePortAllocator);
+	_addAndInstantiate('LabDBEngineManager',        libServiceDBEngineManager);
+	_addAndInstantiate('LabUltravisorManager',      libServiceUltravisorManager);
+	_addAndInstantiate('LabBeaconTypeRegistry',     libServiceBeaconTypeRegistry);
+	_addAndInstantiate('LabBeaconContainerManager', libServiceBeaconContainerManager);
+	_addAndInstantiate('LabBeaconManager',          libServiceBeaconManager);
+	_addAndInstantiate('LabSeedDatasetManager',     libServiceSeedDatasetManager);
+	_addAndInstantiate('LabBeaconExerciseManager',  libServiceBeaconExerciseManager);
+	_addAndInstantiate('LabOperationExerciseManager', libServiceOperationExerciseManager);
+	_addAndInstantiate('LabLifecycle',              libServiceLabLifecycle);
 
 	// Phase 8 — Stacks. SQLite is canonical (Stack table); every save
 	// also mirrors to ${dataDir}/stacks/<Hash>.json. The store loads
 	// the read-only preset library from source/stacks/presets/*.json
-	// on first listPresets() call.
-	tmpFable.addAndInstantiateServiceType('LabStackStore',           libServiceStackStore,        { DataDir: tmpDataDir, AdditionalPresetDirs: tmpAdditionalPresetDirs });
-	tmpFable.addAndInstantiateServiceType('LabStackResolver',        libServiceStackResolver);
-	tmpFable.addAndInstantiateServiceType('LabStackPreflight',       libServiceStackPreflight);
-	tmpFable.addAndInstantiateServiceType('LabStackComposer',        libServiceStackComposer,     { DataDir: tmpDataDir });
-	tmpFable.addAndInstantiateServiceType('LabStackLifecycle',       libServiceStackLifecycle);
+	// on first listPresets() call, and any AdditionalPresetDirs supplied
+	// to setupLabServer() are scanned after the bundled set so downstream
+	// apps can ship their own preset libraries.
+	_addAndInstantiate('LabStackStore',             libServiceStackStore,             { DataDir: tmpDataDir, AdditionalPresetDirs: tmpAdditionalPresetDirs });
+	_addAndInstantiate('LabStackResolver',          libServiceStackResolver);
+	_addAndInstantiate('LabStackPreflight',         libServiceStackPreflight);
+	_addAndInstantiate('LabStackComposer',          libServiceStackComposer,          { DataDir: tmpDataDir });
+	_addAndInstantiate('LabStackLifecycle',         libServiceStackLifecycle);
 
 	tmpFable.LabStateStore.initialize(
 		(pStateErr) =>

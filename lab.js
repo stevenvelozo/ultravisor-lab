@@ -121,37 +121,58 @@ process.on('SIGINT',  _gracefulShutdown);
 process.on('SIGTERM', _gracefulShutdown);
 
 // ─────────────────────────────────────────────
-//  Main
+//  Library exports
 // ─────────────────────────────────────────────
+//
+// Downstream code that wants to embed the lab (e.g. retold-data-mapper, or
+// any other app extending ultravisor-lab) does
+// `require('ultravisor-lab').setupLabServer({...})`. Re-exporting
+// setupLabServer from here means consumers don't need to reach into the
+// package's internal source tree to get a stable handle.
+module.exports = { setupLabServer: libLabServerSetup };
 
-const _args = parseArgs(process.argv.slice(2));
+// ─────────────────────────────────────────────
+//  CLI entry — gated on `require.main === module`
+// ─────────────────────────────────────────────
+//
+// The CLI side effects below MUST be gated. When this file is `require()`d
+// rather than executed directly (e.g. as the package main from a downstream
+// app), running them spawns a phantom lab on the default port + data dir
+// in the consumer's process. Until this gate landed, that phantom call
+// silently overrode --data-dir passed to setupLabServer because the
+// side-effect call connected SQLite at the default path before the
+// consumer's call could.
+if (require.main === module)
+{
+	const _args = parseArgs(process.argv.slice(2));
 
-libLabServerSetup(
-	{
-		Port:     _args.Port,
-		Host:     _args.Host,
-		DataDir:  libPath.resolve(__dirname, 'data')
-	},
-	(pError, pServerInfo) =>
-	{
-		if (pError)
+	libLabServerSetup(
 		{
-			console.error('Ultravisor-Lab failed to start:', pError.message || pError);
-			process.exit(1);
-		}
-
-		_ServerInfo = pServerInfo;
-
-		let tmpUrl = `http://${pServerInfo.Host}:${pServerInfo.Port}/`;
-		console.log('');
-		console.log('  Ultravisor Lab');
-		console.log('  ' + tmpUrl);
-		console.log('  data dir: ' + libPath.resolve(__dirname, 'data'));
-		console.log('  Ctrl-C to stop.');
-		console.log('');
-
-		if (_args.Open)
+			Port:     _args.Port,
+			Host:     _args.Host,
+			DataDir:  libPath.resolve(__dirname, 'data')
+		},
+		(pError, pServerInfo) =>
 		{
-			openBrowser(tmpUrl);
-		}
-	});
+			if (pError)
+			{
+				console.error('Ultravisor-Lab failed to start:', pError.message || pError);
+				process.exit(1);
+			}
+
+			_ServerInfo = pServerInfo;
+
+			let tmpUrl = `http://${pServerInfo.Host}:${pServerInfo.Port}/`;
+			console.log('');
+			console.log('  Ultravisor Lab');
+			console.log('  ' + tmpUrl);
+			console.log('  data dir: ' + libPath.resolve(__dirname, 'data'));
+			console.log('  Ctrl-C to stop.');
+			console.log('');
+
+			if (_args.Open)
+			{
+				openBrowser(tmpUrl);
+			}
+		});
+}

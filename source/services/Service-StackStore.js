@@ -52,7 +52,7 @@ class ServiceStackStore extends libFableServiceProviderBase
 		this._MirrorDir = libPath.join(this._DataDir, 'stacks');
 
 		// Additional preset directories — supplied by downstream apps that
-		// extend the lab (e.g. headlight-ultravisor-lab) so their bundled
+		// extend the lab so their bundled
 		// stack templates show up in listPresets() alongside the lab's own
 		// PRESETS_DIR. Each entry is a directory containing *.json preset
 		// files that match the bundled-preset shape ({Hash, Name, Inputs,
