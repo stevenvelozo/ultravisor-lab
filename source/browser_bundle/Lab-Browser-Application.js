@@ -2160,47 +2160,67 @@ class LabBrowserApplication extends libPictApplication
 	{
 		let tmpState = this.pict.AppData.Lab.Stacks;
 		this._marshalEditorInputs();
-		// Persist the inputs we're about to launch with so the editor
-		// remembers them on next visit (the button is "Save & Launch").
-		// Skip when EditorRecord is missing — e.g. launch fired from
-		// the detail view, where we don't have the spec in hand.
-		if (tmpState.EditorRecord && tmpState.EditorRecord.Hash === pHash)
+		let tmpEditing = !!(tmpState.EditorRecord && tmpState.EditorRecord.Hash === pHash);
+
+		// upStack is blocking — for builds it can run for many minutes. Fire
+		// it but immediately forward to the detail view so the operator can
+		// watch components come up via the existing status polling rather
+		// than staring at the editor.
+		let proceedWithLaunch = () =>
 		{
-			this.pict.providers.LabApi.saveStack(
-				tmpState.EditorRecord.Spec, tmpState.InputValues, () => { /* fire-and-forget */ });
-		}
-		this._toast('Launching stack...', 'info', { duration: 2000 });
-		this.pict.providers.LabApi.upStack(pHash, tmpState.InputValues, (pErr, pResult) =>
-		{
-			if (pErr) { this._toastError('Launch failed: ' + pErr.message); return; }
-			// Always persist the latest launch result so the editor can
-			// surface the full preflight + raw compose output on failure.
-			tmpState.LastLaunchResult = { Hash: pHash, Result: pResult || {} };
-			if (pResult && pResult.PreflightReport)
-			{
-				tmpState.LastPreflight = { Hash: pHash, Report: pResult.PreflightReport };
-			}
-			if (pResult && pResult.Status === 'preflight-blocked')
-			{
-				this._toastError('Preflight blocked launch — see report below');
-				this.pict.views['Lab-Stacks'].render();
-				return;
-			}
-			if (pResult && pResult.Status === 'error')
-			{
-				let tmpSummary = this._summarizeRawOutput(pResult.RawOutput) || 'see launch output below';
-				this._toastError('Launch failed: ' + tmpSummary);
-				this.pict.views['Lab-Stacks'].render();
-				// Refresh the events list so the matching stack-launch-failed
-				// row shows up without the user hitting Refresh.
-				this.refreshAll(() => {});
-				return;
-			}
-			this._toastSuccess('Stack ' + (pResult ? pResult.Status : 'launched'));
-			this.refreshAll(() => {});
-			// Switch to detail view for live status.
+			this._toast('Launching stack...', 'info', { duration: 2000 });
 			this.openStackDetail(pHash);
-		});
+			this.pict.providers.LabApi.upStack(pHash, tmpState.InputValues, (pErr, pResult) =>
+			{
+				if (pErr) { this._toastError('Launch failed: ' + pErr.message); return; }
+				// Always persist the latest launch result so the editor can
+				// surface the full preflight + raw compose output on failure.
+				tmpState.LastLaunchResult = { Hash: pHash, Result: pResult || {} };
+				if (pResult && pResult.PreflightReport)
+				{
+					tmpState.LastPreflight = { Hash: pHash, Report: pResult.PreflightReport };
+				}
+				if (pResult && pResult.Status === 'preflight-blocked')
+				{
+					this._toastError('Preflight blocked launch — open the editor for the full report');
+					this.pict.views['Lab-Stacks'].render();
+					return;
+				}
+				if (pResult && pResult.Status === 'error')
+				{
+					let tmpSummary = this._summarizeRawOutput(pResult.RawOutput) || 'see launch output';
+					this._toastError('Launch failed: ' + tmpSummary);
+					this.pict.views['Lab-Stacks'].render();
+					// Refresh the events list so the matching stack-launch-failed
+					// row shows up without the user hitting Refresh.
+					this.refreshAll(() => {});
+					return;
+				}
+				this._toastSuccess('Stack ' + (pResult ? pResult.Status : 'launched'));
+				this.refreshAll(() => {});
+				// Re-render detail so the final status pill + component table
+				// reflect the post-compose state.
+				if (typeof this.refreshStackDetail === 'function')
+				{
+					this.refreshStackDetail(pHash);
+				}
+			});
+		};
+
+		if (tmpEditing)
+		{
+			// Synchronous save first so the launched compose uses the
+			// current editor contents, not whatever was last persisted.
+			this.pict.providers.LabApi.saveStack(
+				tmpState.EditorRecord.Spec, tmpState.InputValues, (pErr, pResult) =>
+				{
+					if (pErr) { this._toastError('Save failed before launch: ' + pErr.message); return; }
+					if (pResult && pResult.Stack) { tmpState.EditorRecord = pResult.Stack; }
+					proceedWithLaunch();
+				});
+			return;
+		}
+		proceedWithLaunch();
 	}
 
 	_summarizeRawOutput(pRaw)
