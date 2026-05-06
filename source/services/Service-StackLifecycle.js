@@ -44,6 +44,12 @@ const libFableServiceProviderBase = require('fable-serviceproviderbase');
 // Subsequent ups hit the docker layer cache and finish in seconds.
 // 30 minutes is the upper bound for an honest first-time build.
 const COMPOSE_TIMEOUT_MS_DEFAULT = 1800000;
+
+// Stale-lock TTL on _UpInFlight. A live up() can run for many minutes
+// (multi-arch builds, slow image pulls). 30 min is generous enough to
+// never trip on a real launch but tight enough that an uncaught
+// exception doesn't strand the lock for the lab's whole lifetime.
+const UP_LOCK_TTL_MS = 30 * 60 * 1000;
 const STATUS_TIMEOUT_MS = 10000;
 
 class ServiceStackLifecycle extends libFableServiceProviderBase
@@ -58,12 +64,31 @@ class ServiceStackLifecycle extends libFableServiceProviderBase
 		this._ComposeVersion = null;
 		this._ComposeProbed = false;
 
-		// Per-stack-hash set of launches currently mid-flight. up() rejects a
-		// second concurrent call for the same hash so a double-clicked Launch
-		// button doesn't spawn parallel `docker compose --build` runs (which
-		// race the layer cache) and parallel init operations (which can create
+		// Per-stack-hash map of launches currently mid-flight. Value is the
+		// epoch-ms when the lock was acquired. up() rejects a second
+		// concurrent call for the same hash so a double-clicked Launch
+		// doesn't spawn parallel `docker compose --build` runs (which race
+		// the layer cache) and parallel init operations (which can create
 		// duplicate connections in beacons whose endpoints aren't idempotent).
-		this._UpInFlight = new Set();
+		//
+		// The lock is auto-released after UP_LOCK_TTL_MS — covers a slow
+		// build but rejects a permanently-stuck lock from an uncaught
+		// exception or a wedged subprocess. clearLaunchLock() (and the
+		// /api/lab/stacks/:hash/clear-launch-lock route) is the manual
+		// escape hatch.
+		this._UpInFlight = new Map();
+	}
+
+	clearLaunchLock(pHash)
+	{
+		return this._UpInFlight.delete(pHash);
+	}
+
+	getLaunchLockState(pHash)
+	{
+		let tmpSince = this._UpInFlight.get(pHash);
+		if (tmpSince === undefined) return null;
+		return { Hash: pHash, AcquiredAt: tmpSince, HeldMs: Date.now() - tmpSince };
 	}
 
 	// ====================================================================
@@ -164,13 +189,27 @@ class ServiceStackLifecycle extends libFableServiceProviderBase
 	{
 		let tmpSelf = this;
 
+		// Sweep stale locks before checking. Any lock older than
+		// UP_LOCK_TTL_MS is from a previous up() that crashed without
+		// releasing — release it now so legitimate retries don't 409
+		// forever. Logged so we notice if it's happening repeatedly.
+		let tmpNowSweep = Date.now();
+		for (let [tmpStaleHash, tmpAcquiredAt] of this._UpInFlight)
+		{
+			if (tmpNowSweep - tmpAcquiredAt > UP_LOCK_TTL_MS)
+			{
+				this.fable.log.warn(`StackLifecycle.up: releasing stale in-flight lock for [${tmpStaleHash}] (held ${Math.round((tmpNowSweep - tmpAcquiredAt) / 1000)}s — likely a crashed callback)`);
+				this._UpInFlight.delete(tmpStaleHash);
+			}
+		}
+
 		// Reject a second concurrent up() for the same stack. The route layer
 		// turns this into a 409 so the client can render a friendly toast.
 		if (this._UpInFlight.has(pHash))
 		{
 			return fCallback(null, { Status: 'already-launching' });
 		}
-		this._UpInFlight.add(pHash);
+		this._UpInFlight.set(pHash, tmpNowSweep);
 
 		// Wrap fCallback so every exit path clears the in-flight marker.
 		// The original callback has at least seven exits below (probe error,
@@ -213,9 +252,27 @@ class ServiceStackLifecycle extends libFableServiceProviderBase
 					Message:   `Launching stack "${tmpRecord.Name || tmpRecord.Hash}"`
 				});
 
-			let tmpResolved = tmpResolver.resolve(tmpRecord.Spec, pInputValues || {});
-			tmpPreflight.run(tmpResolved, function (pPfErr, pReport)
+			// Defensive: any synchronous throw inside resolver/preflight/etc.
+			// would otherwise bypass tmpDone, leaving the in-flight lock set
+			// for the lab's lifetime. Wrap so an uncaught error releases the
+			// lock and bubbles a clean 500 to the client.
+			let tmpResolved;
+			try { tmpResolved = tmpResolver.resolve(tmpRecord.Spec, pInputValues || {}); }
+			catch (pResolveErr)
 			{
+				tmpSelf._recordEvent(tmpRecord,
+					{
+						EventType: 'stack-launch-failed',
+						Severity:  'error',
+						Message:   `Resolver crashed: ${pResolveErr.message}`
+					});
+				return fCallback(pResolveErr);
+			}
+
+			try
+			{
+				tmpPreflight.run(tmpResolved, function (pPfErr, pReport)
+				{
 				if (pPfErr)
 				{
 					tmpSelf._recordEvent(tmpRecord,
@@ -315,6 +372,22 @@ class ServiceStackLifecycle extends libFableServiceProviderBase
 						});
 					});
 			});
+			}
+			catch (pPreflightSyncErr)
+			{
+				// preflight.run threw before its callback fired (e.g. bad
+				// arg). Without this catch the throw would escape past
+				// tmpDone, leaving the in-flight lock held forever.
+				// (A callback that never fires for OTHER reasons is handled
+				// by the TTL sweep at the start of the NEXT up() call.)
+				tmpSelf._recordEvent(tmpRecord,
+					{
+						EventType: 'stack-launch-failed',
+						Severity:  'error',
+						Message:   `Preflight invocation crashed: ${pPreflightSyncErr.message}`
+					});
+				return fCallback(pPreflightSyncErr);
+			}
 		});
 	}
 

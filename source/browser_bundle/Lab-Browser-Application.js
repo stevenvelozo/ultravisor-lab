@@ -2310,8 +2310,22 @@ class LabBrowserApplication extends libPictApplication
 		tmpState.LaunchingStacks[pHash] = true;
 		this.pict.views['Lab-Stacks'].render();
 
+		// Watchdog: if upStack's callback never fires (server hang,
+		// network drop, lab crash mid-launch), the LaunchingStacks
+		// marker would otherwise pin the button to "Launching…" until
+		// the page reloads. Auto-clear after 35 min — comfortably past
+		// the server's 30-min in-flight TTL — and tell the operator.
+		let tmpWatchdog = setTimeout(() =>
+		{
+			if (!tmpState.LaunchingStacks[pHash]) return;
+			delete tmpState.LaunchingStacks[pHash];
+			this._toastError('Launch watchdog: no response after 35 min — UI cleared. Check the lab logs; you may need POST /api/lab/stacks/' + encodeURIComponent(pHash) + '/clear-launch-lock if the server lock is still held.');
+			this.pict.views['Lab-Stacks'].render();
+		}, 35 * 60 * 1000);
+
 		let clearLaunching = () =>
 		{
+			clearTimeout(tmpWatchdog);
 			delete tmpState.LaunchingStacks[pHash];
 		};
 

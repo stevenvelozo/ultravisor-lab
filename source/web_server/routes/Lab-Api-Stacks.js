@@ -211,8 +211,26 @@ module.exports = function registerStackRoutes(pCore)
 		{
 			let tmpInputs = (pReq.body && pReq.body.InputValues) || {};
 			let tmpStackHash = pReq.params.hash;
+
+			// If the client disconnects (curl timeout, browser navigated
+			// away, etc.) before lifecycle.up's callback fires, release
+			// the in-flight lock so the next /up call doesn't 409. The
+			// background work continues (we can't cancel docker-compose),
+			// but the lock-release lets the user retry.
+			let tmpResponded = false;
+			pReq.on('close', () =>
+			{
+				if (tmpResponded) return;
+				tmpLifecycle.clearLaunchLock(tmpStackHash);
+				if (pCore.Fable && pCore.Fable.log)
+				{
+					pCore.Fable.log.warn(`Lab-Api-Stacks: client disconnected mid-up for [${tmpStackHash}] — released in-flight lock`);
+				}
+			});
+
 			tmpLifecycle.up(tmpStackHash, tmpInputs, (pErr, pResult) =>
 			{
+				tmpResponded = true;
 				if (pErr)
 				{
 					pRes.send(500, { Error: pErr.message });
@@ -275,6 +293,27 @@ module.exports = function registerStackRoutes(pCore)
 				return pNext();
 			}
 			pRes.send(tmpResult);
+			return pNext();
+		});
+
+	// Force-release the in-flight launch lock for a stack. The lock
+	// auto-clears on (a) successful up() completion, (b) client
+	// disconnect mid-up, and (c) UP_LOCK_TTL_MS elapsed at the next up()
+	// call's stale-sweep. This is the operator escape hatch for the rare
+	// case where none of those fire (e.g. an uncaught exception that
+	// somehow bypasses the wrappers, plus no one issues a follow-up
+	// up()). Returns whether a lock was actually held + how long.
+	tmpOrator.serviceServer.doPost('/api/lab/stacks/:hash/clear-launch-lock',
+		(pReq, pRes, pNext) =>
+		{
+			let tmpHash = pReq.params.hash;
+			let tmpState = tmpLifecycle.getLaunchLockState(tmpHash);
+			let tmpReleased = tmpLifecycle.clearLaunchLock(tmpHash);
+			pRes.send(
+			{
+				Released: tmpReleased,
+				PriorState: tmpState
+			});
 			return pNext();
 		});
 
