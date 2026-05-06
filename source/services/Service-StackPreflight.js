@@ -263,6 +263,20 @@ class ServiceStackPreflight extends libFableServiceProviderBase
 				Message: `${tmpAbs} exists and is empty (will be used as-is)`
 			});
 		}
+		else if (pMode === 'ro')
+		{
+			// Read-only mount — the host path is intentionally pre-populated
+			// (typically a source tree being mounted into a one-shot script
+			// runner). "Wipe manually" is the wrong advice here; downgrade to
+			// info and use accurate copy.
+			pItems.push({
+				Path: pPath,
+				Severity: 'info',
+				Code: 'folder.has-files-ro',
+				Message: `${tmpAbs} mounted read-only (${tmpEntries.length} entr${tmpEntries.length === 1 ? 'y' : 'ies'} — source tree, not container state)`,
+				Detail: { AbsolutePath: tmpAbs, EntryCount: tmpEntries.length, Mode: pMode }
+			});
+		}
 		else
 		{
 			pItems.push({
