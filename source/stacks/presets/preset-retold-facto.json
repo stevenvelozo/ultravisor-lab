@@ -14,7 +14,7 @@
 		"MonorepoRoot":
 		{
 			"Type": "folder",
-			"Default": "${HOME}/Code/retold",
+			"Default": "${env.RETOLD_MONOREPO_ROOT}",
 			"Description": "Path to your retold monorepo checkout. Ultravisor + retold-databeacon + meadow-integration are built from MonorepoRoot/modules/... at launch time."
 		},
 		"UVAdminPassword":

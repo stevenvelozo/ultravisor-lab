@@ -14,7 +14,7 @@
 		"MonorepoRoot":
 		{
 			"Type": "folder",
-			"Default": "${HOME}/Code/retold",
+			"Default": "${env.RETOLD_MONOREPO_ROOT}",
 			"Description": "Path to your retold monorepo checkout. retold-labs is built from MonorepoRoot/modules/apps/retold-labs at launch time."
 		},
 		"ModelCacheRoot":

@@ -11,7 +11,7 @@
 		},
 		"MonorepoRoot": {
 			"Type": "folder",
-			"Default": "${HOME}/Code/retold",
+			"Default": "${env.RETOLD_MONOREPO_ROOT}",
 			"Description": "Path to your retold monorepo checkout. All retold-* images are built from MonorepoRoot/modules/... at launch."
 		},
 		"UVAdminPassword": {

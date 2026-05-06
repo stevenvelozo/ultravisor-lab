@@ -13,9 +13,43 @@
 'use strict';
 
 const libPath = require('path');
+const libFS = require('fs');
 const libChildProcess = require('child_process');
 
 const libLabServerSetup = require('./source/web_server/Lab-Server-Setup.js');
+
+// ─────────────────────────────────────────────
+//  Monorepo root auto-detection
+// ─────────────────────────────────────────────
+//
+// Bundled presets reference the user's retold checkout via
+// `${env.RETOLD_MONOREPO_ROOT}` so the same preset works regardless of
+// where the user puts their code (we used to hard-code `${HOME}/Code/retold`
+// and break anyone who checks out elsewhere). If the env var isn't already
+// set, we try to derive it:
+//   1. If lab.js itself is running from inside a retold checkout
+//      (Retold-Modules-Manifest.json sits four levels up), use that root.
+//   2. Otherwise fall back to `${HOME}/Code/retold` so we don't regress
+//      anyone whose layout matched the old default.
+// An explicit env var always wins.
+function _autodetectRetoldRoot()
+{
+	let tmpCandidate = libPath.resolve(__dirname, '..', '..', '..');
+	try
+	{
+		if (libFS.existsSync(libPath.join(tmpCandidate, 'Retold-Modules-Manifest.json')))
+		{
+			return tmpCandidate;
+		}
+	}
+	catch (pError) { /* fall through */ }
+	return null;
+}
+if (!process.env.RETOLD_MONOREPO_ROOT)
+{
+	process.env.RETOLD_MONOREPO_ROOT = _autodetectRetoldRoot()
+		|| libPath.join(process.env.HOME || process.env.USERPROFILE || '.', 'Code', 'retold');
+}
 
 // ─────────────────────────────────────────────
 //  argv
