@@ -74,6 +74,8 @@
 		{ "path": "/stacks/:hash/down",                   "template": "{~LV:Pict.PictApplication.teardownStack(Record.data.hash)~}" },
 		{ "path": "/stacks/:hash/remove",                 "template": "{~LV:Pict.PictApplication.removeStack(Record.data.hash)~}" },
 		{ "path": "/stacks/:hash/refresh-status",         "template": "{~LV:Pict.PictApplication.refreshStackDetail(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/init/run",               "template": "{~LV:Pict.PictApplication.runStackInitAction(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/yaml/download",          "template": "{~LV:Pict.PictApplication.downloadStackYaml(Record.data.hash)~}" },
 		{ "path": "/stack-modal/sql/:hash/:component/:port", "template": "{~LV:Pict.PictApplication.openStackSQLModal(Record.data.hash, Record.data.component, Record.data.port)~}" },
 		{ "path": "/stack-modal/copy/:value",             "template": "{~LV:Pict.PictApplication.copyStackModalValue(Record.data.value)~}" },
 		{ "path": "/stack-modal/toggle-password",         "template": "{~LV:Pict.PictApplication.toggleStackModalPassword()~}" }

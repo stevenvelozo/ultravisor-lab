@@ -387,6 +387,46 @@ class LabApiProvider extends libFableServiceProviderBase
 			'/api/lab/stacks/' + encodeURIComponent(pHash) + '/compose-yaml',
 			null, fCallback);
 	}
+
+	// ── Stack Init (Phase 8.5 — InitOperation lifecycle) ────────────────
+	// Stacks that declare `InitOperation` in their spec get a follow-on
+	// initialization step automatically after Lifecycle.up: the
+	// StackInitializer pushes the named operation graph into the stack's
+	// running ultravisor, kicks it off, and polls the manifest. These
+	// methods surface that pipeline to the UI.
+
+	getStackInit(pHash, fCallback)
+	{
+		return _request('GET',
+			'/api/lab/stacks/' + encodeURIComponent(pHash) + '/init',
+			null, fCallback);
+	}
+
+	runStackInit(pHash, pInputValues, fCallback)
+	{
+		let tmpBody = {};
+		if (pInputValues) { tmpBody.InputValues = pInputValues; }
+		return _request('POST',
+			'/api/lab/stacks/' + encodeURIComponent(pHash) + '/init/run',
+			tmpBody, fCallback);
+	}
+
+	// ── Operation Library ──────────────────────────────────────────────
+	// Surfaces the OperationStore's bundled + AdditionalOperationDirs
+	// catalog. Today only used to "view manifest" links from the Init
+	// panel, but the same endpoints back any future op-browser UI.
+
+	listOperations(fCallback)
+	{
+		return _request('GET', '/api/lab/operations', null, fCallback);
+	}
+
+	getOperation(pHash, fCallback)
+	{
+		return _request('GET',
+			'/api/lab/operations/' + encodeURIComponent(pHash),
+			null, fCallback);
+	}
 }
 
 module.exports = LabApiProvider;

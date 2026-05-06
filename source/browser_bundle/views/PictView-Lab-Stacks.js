@@ -407,6 +407,58 @@ const _ViewConfiguration =
 
 .lab-stack-back-link { display: inline-block; margin-bottom: 12px; color: #64748b; text-decoration: none; font-size: 12px; }
 .lab-stack-back-link:hover { color: #cbd5e1; }
+
+/* ── Init panel ─────────────────────────────────────────────────────────
+   Surfaces the StackInitializer's persisted result for stacks that declare
+   InitOperation. Phase pill color tracks the upstream phase enum.        */
+.lab-stack-init-card
+{
+	background: #0f172a;
+	border: 1px solid #1e293b;
+	border-radius: 6px;
+	padding: 14px 16px;
+	margin-bottom: 4px;
+}
+.lab-stack-init-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.lab-stack-init-header .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: 600; }
+.lab-stack-init-header .actions { margin-left: auto; display: flex; gap: 6px; }
+.lab-stack-init-phase
+{
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 10px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	background: #1e293b;
+	color: #cbd5e1;
+}
+.lab-stack-init-phase.phase-completed { background: rgba(34, 197, 94, 0.15);  color: #86efac; border: 1px solid rgba(34, 197, 94, 0.4); }
+.lab-stack-init-phase.phase-running   { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); }
+.lab-stack-init-phase.phase-queued    { background: rgba(168, 85, 247, 0.15); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.4); }
+.lab-stack-init-phase.phase-failed    { background: rgba(239, 68, 68, 0.15);  color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+.lab-stack-init-phase.phase-error     { background: rgba(239, 68, 68, 0.15);  color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+.lab-stack-init-phase.phase-skipped   { background: rgba(100, 116, 139, 0.2); color: #94a3b8; }
+.lab-stack-init-phase.phase-never-run { background: rgba(100, 116, 139, 0.2); color: #94a3b8; }
+.lab-stack-init-fields
+{
+	display: grid;
+	grid-template-columns: 110px 1fr;
+	row-gap: 4px;
+	column-gap: 12px;
+	font-size: 12px;
+	color: #cbd5e1;
+}
+.lab-stack-init-fields .k { color: #64748b; font-weight: 500; }
+.lab-stack-init-fields .v { font-family: monospace; color: #e2e8f0; word-break: break-all; }
+.lab-stack-init-message { margin-top: 8px; font-size: 12px; color: #94a3b8; font-style: italic; }
+.lab-stack-init-message.error { color: #fca5a5; font-style: normal; }
+
+/* docker-compose.yml header (title + Download button) */
+.lab-yaml-header { display: flex; align-items: center; gap: 8px; margin: 24px 0 8px 0; }
+.lab-yaml-header .lab-stack-section-title { margin: 0; flex: 1; }
 `,
 
 	Templates:
@@ -608,9 +660,36 @@ const _ViewConfiguration =
 		{~TS:Lab-Stacks-DetailComponent-Template:Record.Components~}
 	</div>
 
-	<div class="lab-stack-section-title">docker-compose.yml</div>
+	{~TS:Lab-Stacks-DetailInit-Template:Record.InitSlot~}
+
+	<div class="lab-yaml-header">
+		<div class="lab-stack-section-title">docker-compose.yml</div>
+		<a class="lab-btn small secondary" href="#/stacks/{~D:Record.HashEnc~}/yaml/download">Download YAML</a>
+	</div>
 	<div class="lab-yaml-source">{~D:Record.YamlSource~}</div>
 	<div class="lab-yaml-preview">{~D:Record.YamlText~}</div>
+</div>`
+		},
+		{
+			Hash: 'Lab-Stacks-DetailInit-Template',
+			Template: /*html*/`
+<div class="lab-stack-section-title" style="margin:24px 0 8px 0;">Stack initialization</div>
+<div class="lab-stack-init-card">
+	<div class="lab-stack-init-header">
+		<span class="label">Phase</span>
+		<span class="lab-stack-init-phase phase-{~D:Record.PhaseClass~}">{~D:Record.Phase~}</span>
+		<div class="actions">
+			<a class="lab-btn small" href="#/stacks/{~D:Record.StackHashEnc~}/init/run">Re-run init</a>
+			{~D:Record.ManifestLinkHTML~}
+		</div>
+	</div>
+	<div class="lab-stack-init-fields">
+		<div class="k">Operation</div><div class="v">{~D:Record.OperationHash~}</div>
+		<div class="k">Run</div><div class="v">{~D:Record.RunHash~}</div>
+		<div class="k">Started</div><div class="v">{~D:Record.StartedAt~}</div>
+		<div class="k">Completed</div><div class="v">{~D:Record.CompletedAt~}</div>
+	</div>
+	<div class="lab-stack-init-message {~D:Record.MessageClass~}">{~D:Record.Message~}</div>
 </div>`
 		},
 		{
@@ -971,6 +1050,13 @@ class LabStacksView extends libPictView
 		let tmpYaml = pState.LastYaml && pState.LastYaml.Hash === tmpD.Hash
 			? pState.LastYaml : null;
 
+		// InitSlot — single-element-array conditional. Only stacks with
+		// `InitOperation` declared in their spec get the panel; other
+		// stacks see no init UI at all (the StackInitializer would skip
+		// them anyway). The data shape is built by _buildInitRecord.
+		let tmpInit = (pState.LastInit && pState.LastInit.Hash === tmpD.Hash) ? pState.LastInit.Result : null;
+		let tmpHasInit = !!(tmpSpec.InitOperation && tmpSpec.InitOperation.OperationHash);
+
 		return {
 			Name:           _escape(tmpSpec.Name || tmpD.Hash),
 			HashEnc:        encodeURIComponent(tmpD.Hash),
@@ -978,12 +1064,47 @@ class LabStacksView extends libPictView
 			StatusClass:    _statusClass(tmpStatusValue),
 			Components:     tmpComponents,
 			NoComponentsSlot: tmpComponents.length === 0 ? [{}] : [],
+			InitSlot:       tmpHasInit ? [_buildInitRecord(tmpD.Hash, tmpInit)] : [],
 			YamlText:       _escape(tmpYaml ? tmpYaml.YAML : '(YAML not loaded yet — Refresh to load)'),
 			YamlSource:     _escape(tmpYaml ? tmpYaml.Source : ''),
 			UpDisabled:     (tmpStatusValue === 'running' || tmpStatusValue === 'starting') ? 'disabled' : '',
 			DownDisabled:   (tmpStatusValue === 'stopped' || tmpStatusValue === 'stopping') ? 'disabled' : ''
 		};
 	}
+}
+
+function _buildInitRecord(pStackHash, pResult)
+{
+	// pResult is the persisted init-state.json shape:
+	//   { StackHash, Phase, OperationHash, RunHash, Message, StartedAt, CompletedAt, Manifest }
+	// or null when the API hasn't returned yet, or { Phase: 'never-run' } if the
+	// stack has never been launched. Either way we render the same panel — the
+	// fields fill in once data arrives.
+	let tmpPhase = (pResult && pResult.Phase) || 'never-run';
+	let tmpRunHash = (pResult && pResult.RunHash) || '';
+	let tmpManifestLinkHTML = '';
+	if (tmpRunHash)
+	{
+		// Manifest is on the stack's UV, not the lab. Most stacks publish
+		// the UV on the host port the operator picked; without a deterministic
+		// way to reach it from here we surface the run hash so curious
+		// operators can find the manifest themselves. A future iteration
+		// can stash the UltravisorURL alongside the init result and link
+		// directly into the UV's manifest viewer.
+		tmpManifestLinkHTML = '<span class="lab-btn small secondary" style="cursor:default;opacity:0.7;" title="Run hash on the stack&apos;s ultravisor — open /Manifest/' + _escapeAttr(tmpRunHash) + ' on its API for the full manifest.">View manifest</span>';
+	}
+	return {
+		StackHashEnc:    encodeURIComponent(pStackHash),
+		Phase:           _escape(tmpPhase),
+		PhaseClass:      _escape(tmpPhase),
+		OperationHash:   _escape((pResult && pResult.OperationHash) || '—'),
+		RunHash:         _escape(tmpRunHash || '—'),
+		StartedAt:       _escape((pResult && pResult.StartedAt) || '—'),
+		CompletedAt:     _escape((pResult && pResult.CompletedAt) || '—'),
+		Message:         _escape((pResult && pResult.Message) || ''),
+		MessageClass:    (tmpPhase === 'failed' || tmpPhase === 'error') ? 'error' : '',
+		ManifestLinkHTML: tmpManifestLinkHTML
+	};
 }
 
 function _buildPreflightRecord(pReport)

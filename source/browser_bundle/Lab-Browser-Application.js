@@ -2098,10 +2098,12 @@ class LabBrowserApplication extends libPictApplication
 			let tmpState = this.pict.AppData.Lab.Stacks;
 			tmpState.Screen = 'detail';
 			tmpState.DetailRecord = tmpRecord;
-			// Fire two parallel refreshes — status + YAML.
+			// Fan out parallel refreshes — status + YAML + init result.
 			this._loadStackStatus(pHash, () => {
 				this._loadStackYaml(pHash, () => {
-					this.setActiveView('Stacks');
+					this._loadStackInit(pHash, () => {
+						this.setActiveView('Stacks');
+					});
 				});
 			});
 		});
@@ -2250,9 +2252,65 @@ class LabBrowserApplication extends libPictApplication
 	{
 		this._loadStackStatus(pHash, () => {
 			this._loadStackYaml(pHash, () => {
-				this.pict.views['Lab-Stacks'].render();
-				this._toast('Refreshed', 'info', { duration: 1500 });
+				this._loadStackInit(pHash, () => {
+					this.pict.views['Lab-Stacks'].render();
+					this._toast('Refreshed', 'info', { duration: 1500 });
+				});
 			});
+		});
+	}
+
+	// ── Init operation ───────────────────────────────────────────────────
+	// Triggered by the "Re-run init" button on the stack detail. Pushes a
+	// fresh run of the stack's InitOperation to its ultravisor and reloads
+	// the persisted result on completion.
+
+	runStackInitAction(pHash)
+	{
+		this._toast('Re-running init...', 'info', { duration: 2000 });
+		this.pict.providers.LabApi.runStackInit(pHash, null, (pErr, pResult) =>
+		{
+			if (pErr)
+			{
+				this._toastError('Init re-run failed: ' + pErr.message);
+				this._loadStackInit(pHash, () => { this.pict.views['Lab-Stacks'].render(); });
+				return;
+			}
+			let tmpPhase = (pResult && pResult.Phase) || 'unknown';
+			if (tmpPhase === 'completed')      { this._toastSuccess('Init completed.'); }
+			else if (tmpPhase === 'skipped')   { this._toast('Init skipped: no InitOperation declared.', 'info'); }
+			else                                { this._toastError('Init ' + tmpPhase + ' — see panel.'); }
+			this._loadStackInit(pHash, () => { this.pict.views['Lab-Stacks'].render(); });
+		});
+	}
+
+	// ── docker-compose.yml download ──────────────────────────────────────
+	// Fetches the saved/preview YAML from the API and triggers a browser
+	// download. Useful for grabbing the rendered compose file to deploy
+	// the stack outside the lab (the lab's own UI uses YAML for viewing
+	// only).
+
+	downloadStackYaml(pHash)
+	{
+		this.pict.providers.LabApi.getStackComposeYaml(pHash, (pErr, pResult) =>
+		{
+			if (pErr) { this._toastError('Download failed: ' + pErr.message); return; }
+			let tmpYaml = (pResult && pResult.YAML) || '';
+			if (!tmpYaml) { this._toastError('No YAML to download.'); return; }
+			try
+			{
+				let tmpBlob = new Blob([tmpYaml], { type: 'text/yaml' });
+				let tmpURL = URL.createObjectURL(tmpBlob);
+				let tmpA = document.createElement('a');
+				tmpA.href = tmpURL;
+				tmpA.download = 'docker-compose-' + pHash + '.yml';
+				document.body.appendChild(tmpA);
+				tmpA.click();
+				document.body.removeChild(tmpA);
+				setTimeout(() => URL.revokeObjectURL(tmpURL), 1000);
+				this._toast('Downloaded ' + tmpA.download, 'success', { duration: 2500 });
+			}
+			catch (pBlobErr) { this._toastError('Download failed: ' + pBlobErr.message); }
 		});
 	}
 
@@ -2506,6 +2564,18 @@ class LabBrowserApplication extends libPictApplication
 				this.pict.AppData.Lab.Stacks.LastYaml = {
 					Hash: pHash, YAML: pResult.YAML || '', Source: pResult.Source || ''
 				};
+			}
+			return fCallback();
+		});
+	}
+
+	_loadStackInit(pHash, fCallback)
+	{
+		this.pict.providers.LabApi.getStackInit(pHash, (pErr, pResult) =>
+		{
+			if (!pErr && pResult)
+			{
+				this.pict.AppData.Lab.Stacks.LastInit = { Hash: pHash, Result: pResult };
 			}
 			return fCallback();
 		});
