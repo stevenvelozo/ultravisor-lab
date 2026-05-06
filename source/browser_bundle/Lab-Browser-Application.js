@@ -206,20 +206,38 @@ class LabBrowserApplication extends libPictApplication
 	// dispatch directly to the matching handler.
 	//
 	// Only stateful destination patterns get replayed:
-	//   /view/<slug>   — view switches
-	//   /stacks/<hash> — stack detail
-	// Action routes (start/stop/remove, form toggles, modal triggers,
-	// /system/teardown, etc.) are deliberately NOT replayed because
-	// re-firing them on reload would re-execute the action.
+	//   /view/<slug>          — view switches
+	//   /stacks/<hash>        — stack detail
+	//   /stacks/<hash>/watch  — stack detail with auto-poll re-armed
+	// Other /stacks/<hash>/<action> URLs (launch, save, remove, …) fall
+	// back to the bare detail view rather than home, so a reload of an
+	// action URL doesn't drop the operator out of context. The action
+	// itself is NOT re-fired on reload — re-firing /launch would kick off
+	// another build, /remove would re-prompt to delete, etc.
 	_honorInitialURL()
 	{
 		let tmpHash = (typeof window !== 'undefined' && window.location) ? window.location.hash : '';
 		if (!tmpHash || tmpHash === '#' || tmpHash === '#/') return;
 
+		// /stacks/<hash>/watch — re-arm the polling loop on reload.
+		let tmpWatchMatch = /^#\/stacks\/([A-Za-z0-9_-]+)\/watch$/.exec(tmpHash);
+		if (tmpWatchMatch && typeof this.watchStackDetail === 'function')
+		{
+			this.watchStackDetail(tmpWatchMatch[1]);
+			return;
+		}
+		// /stacks/<hash> — bare detail.
 		let tmpStackMatch = /^#\/stacks\/([A-Za-z0-9_-]+)$/.exec(tmpHash);
 		if (tmpStackMatch && typeof this.openStackDetail === 'function')
 		{
 			this.openStackDetail(tmpStackMatch[1]);
+			return;
+		}
+		// /stacks/<hash>/<anything-else> — fall back to bare detail.
+		let tmpStackActionMatch = /^#\/stacks\/([A-Za-z0-9_-]+)\/[A-Za-z0-9_-]+/.exec(tmpHash);
+		if (tmpStackActionMatch && typeof this.openStackDetail === 'function')
+		{
+			this.openStackDetail(tmpStackActionMatch[1]);
 			return;
 		}
 
@@ -2131,6 +2149,10 @@ class LabBrowserApplication extends libPictApplication
 
 	openStackDetail(pHash)
 	{
+		// Stop any active /watch polling — entering detail view by direct
+		// navigation means the operator isn't in the launching-flow loop
+		// anymore (the regular Refresh button still works on demand).
+		this._stopStackWatch();
 		this.pict.providers.LabApi.getStack(pHash, (pErr, pResult) =>
 		{
 			if (pErr) { this._toastError('Load failed: ' + pErr.message); return; }
@@ -2148,6 +2170,77 @@ class LabBrowserApplication extends libPictApplication
 				});
 			});
 		});
+	}
+
+	/**
+	 * Detail view + auto-poll. Navigated to by launchStack so the operator
+	 * sees container progress in real time without manually clicking
+	 * Refresh while compose is still building.
+	 *
+	 * Polls /api/lab/stacks/:hash/status every 4s; re-renders the view
+	 * each tick. Auto-stops on:
+	 *   - Phase reaches a terminal state (running, error, stopped, unhealthy)
+	 *   - Operator navigates away (Screen != 'detail' or DetailRecord.Hash changes)
+	 *   - 10 minute hard timeout (safety net so a stuck stack doesn't poll forever)
+	 *
+	 * Reloading #/stacks/:hash/watch re-arms the polling — useful if
+	 * the operator closes the tab and comes back to a still-launching
+	 * stack.
+	 */
+	watchStackDetail(pHash)
+	{
+		// openStackDetail itself stops any existing watch — set a fresh
+		// timer right after it kicks off the initial load.
+		this.openStackDetail(pHash);
+
+		let tmpStartedAt = Date.now();
+		let tmpMaxMs = 10 * 60 * 1000;
+		let tmpTerminal = { running: 1, error: 1, stopped: 1, unhealthy: 1, 'preset-blocked': 1 };
+
+		this._StackWatch = { Hash: pHash, StartedAt: tmpStartedAt, IntervalID: null };
+		let tmpIntervalID = setInterval(() =>
+		{
+			let tmpState = this.pict.AppData.Lab.Stacks;
+			let tmpDetail = tmpState && tmpState.DetailRecord;
+
+			// Bail out cleanly if the operator navigated away.
+			if (!tmpState || tmpState.Screen !== 'detail' || !tmpDetail || tmpDetail.Hash !== pHash)
+			{
+				this._stopStackWatch();
+				return;
+			}
+			// Hard timeout — protects against a wedged stack polling forever.
+			if (Date.now() - tmpStartedAt > tmpMaxMs)
+			{
+				this._stopStackWatch();
+				this._toast('Watch stopped (10-min timeout). Hit Refresh to check again.', 'warning', { duration: 4000 });
+				return;
+			}
+
+			this._loadStackStatus(pHash, () =>
+			{
+				let tmpStatus = tmpState.LastStatus && tmpState.LastStatus.Hash === pHash ? tmpState.LastStatus.Status : null;
+				this.pict.views['Lab-Stacks'].render();
+				if (tmpStatus && tmpStatus.Phase && tmpTerminal[tmpStatus.Phase])
+				{
+					this._stopStackWatch();
+					if (tmpStatus.Phase === 'running')
+					{
+						this._toast('Stack running.', 'success', { duration: 2500 });
+					}
+				}
+			});
+		}, 4000);
+		this._StackWatch.IntervalID = tmpIntervalID;
+	}
+
+	_stopStackWatch()
+	{
+		if (this._StackWatch && this._StackWatch.IntervalID)
+		{
+			clearInterval(this._StackWatch.IntervalID);
+		}
+		this._StackWatch = null;
 	}
 
 	cloneStackPreset(pPresetHash)
@@ -2226,13 +2319,14 @@ class LabBrowserApplication extends libPictApplication
 		let tmpEditing = !!(tmpState.EditorRecord && tmpState.EditorRecord.Hash === pHash);
 
 		// upStack is blocking — for builds it can run for many minutes. Fire
-		// it but immediately forward to the detail view so the operator can
-		// watch components come up via the existing status polling rather
-		// than staring at the editor.
+		// it but immediately forward to the detail view (in /watch mode so
+		// the page auto-polls /status as containers come up) instead of
+		// pinning the operator on the editor screen.
 		let proceedWithLaunch = () =>
 		{
 			this._toast('Launching stack...', 'info', { duration: 2000 });
-			this.openStackDetail(pHash);
+			// navigateTo updates the URL bar so a reload re-arms the watch.
+			this.navigateTo('/stacks/' + encodeURIComponent(pHash) + '/watch');
 			this.pict.providers.LabApi.upStack(pHash, tmpState.InputValues, (pErr, pResult) =>
 			{
 				clearLaunching();

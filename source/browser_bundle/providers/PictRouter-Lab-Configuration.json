@@ -67,6 +67,7 @@
 		{ "path": "/stack-form/new",                      "template": "{~LV:Pict.PictApplication.openPresetChooser()~}" },
 		{ "path": "/stack-form/clone-preset/:presetHash", "template": "{~LV:Pict.PictApplication.cloneStackPreset(Record.data.presetHash)~}" },
 		{ "path": "/stacks/:hash",                        "template": "{~LV:Pict.PictApplication.openStackDetail(Record.data.hash)~}" },
+		{ "path": "/stacks/:hash/watch",                  "template": "{~LV:Pict.PictApplication.watchStackDetail(Record.data.hash)~}" },
 		{ "path": "/stacks/:hash/edit",                   "template": "{~LV:Pict.PictApplication.openStackEditor(Record.data.hash)~}" },
 		{ "path": "/stacks/:hash/save",                   "template": "{~LV:Pict.PictApplication.saveStackFromEditor(Record.data.hash)~}" },
 		{ "path": "/stacks/:hash/preflight",              "template": "{~LV:Pict.PictApplication.runStackPreflight(Record.data.hash)~}" },
