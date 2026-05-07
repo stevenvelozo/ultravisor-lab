@@ -2307,6 +2307,18 @@ class LabBrowserApplication extends libPictApplication
 			this._toast('Already launching this stack — please wait.', 'info', { duration: 3000 });
 			return;
 		}
+
+		// Marshal BEFORE flipping LaunchingStacks + re-rendering. The
+		// render rebuilds the editor template from AppData, which would
+		// overwrite every <input> and <textarea> the user typed into with
+		// stale template output (the template renders Record.Value /
+		// Record.Content from AppData, which marshal hasn't updated yet).
+		// Marshal would then read the just-wiped DOM and write the OLD
+		// values back into AppData — silently dropping the user's edits.
+		// Order matters: capture user input first, mutate state second.
+		this._marshalEditorInputs();
+		let tmpEditing = !!(tmpState.EditorRecord && tmpState.EditorRecord.Hash === pHash);
+
 		tmpState.LaunchingStacks[pHash] = true;
 		this.pict.views['Lab-Stacks'].render();
 
@@ -2328,9 +2340,6 @@ class LabBrowserApplication extends libPictApplication
 			clearTimeout(tmpWatchdog);
 			delete tmpState.LaunchingStacks[pHash];
 		};
-
-		this._marshalEditorInputs();
-		let tmpEditing = !!(tmpState.EditorRecord && tmpState.EditorRecord.Hash === pHash);
 
 		// upStack is blocking — for builds it can run for many minutes. Fire
 		// it but immediately forward to the detail view (in /watch mode so

@@ -155,6 +155,35 @@ process.on('SIGINT',  _gracefulShutdown);
 process.on('SIGTERM', _gracefulShutdown);
 
 // ─────────────────────────────────────────────
+//  Crash logging
+// ─────────────────────────────────────────────
+//
+// Without these, any unhandled async throw (reconciler tick, docker
+// inspect callback, event-write, init runner, etc.) silently exits the
+// node process with nothing printed and nothing persisted. The user
+// then sees the symptom -- UI stuck on "Launching...", lab unreachable
+// -- with no signal as to what went wrong. Capture the stack trace to
+// data/crash-<timestamp>.log so the next reproduction is debuggable.
+//
+// We exit (rather than swallow) because Node's contract on
+// uncaughtException is "the process is in an undefined state". Limping
+// on after that risks corrupted DB writes or zombie state that's
+// strictly worse than a visible crash with a logfile next to it.
+function _logFatal(pKind, pErr)
+{
+	let tmpStamp = new Date().toISOString().replace(/[:.]/g, '-');
+	let tmpDir   = libPath.resolve(__dirname, 'data');
+	let tmpFile  = libPath.join(tmpDir, `crash-${tmpStamp}.log`);
+	let tmpStack = (pErr && pErr.stack) ? pErr.stack : String(pErr);
+	let tmpBody  = `[lab crash]\nKind: ${pKind}\nWhen: ${new Date().toISOString()}\nPID:  ${process.pid}\nNode: ${process.version}\n\n${tmpStack}\n`;
+	try { libFS.mkdirSync(tmpDir, { recursive: true }); } catch (pIgn) { /* ignore */ }
+	try { libFS.writeFileSync(tmpFile, tmpBody); } catch (pIgn) { /* ignore */ }
+	try { process.stderr.write(`\n${tmpBody}\n[lab] crash log: ${tmpFile}\n`); } catch (pIgn) { /* ignore */ }
+}
+process.on('uncaughtException',  (pErr) => { _logFatal('uncaughtException',  pErr); process.exit(70); });
+process.on('unhandledRejection', (pErr) => { _logFatal('unhandledRejection', pErr); process.exit(70); });
+
+// ─────────────────────────────────────────────
 //  Library exports
 // ─────────────────────────────────────────────
 //

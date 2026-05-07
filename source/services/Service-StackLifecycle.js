@@ -216,13 +216,21 @@ class ServiceStackLifecycle extends libFableServiceProviderBase
 		// missing services, stack-not-found, preflight crash, preflight block,
 		// mkdir failure, compose failure, compose success); guard once and
 		// reuse instead of sprinkling cleanup at each return.
+		//
+		// Capture the original callback FIRST. If we just close over `fCallback`
+		// and then reassign `fCallback = tmpDone`, tmpDone recursively calls
+		// itself instead of the caller's callback — the second entry hits
+		// the tmpDoneOnce guard and returns silently, leaving the route
+		// handler waiting on a response that will never come (UI stuck on
+		// "Launching..." until the client-side 35-min watchdog).
+		let tmpOriginalCallback = fCallback;
 		let tmpDoneOnce = false;
 		let tmpDone = (pErr, pResult) =>
 		{
 			if (tmpDoneOnce) return;
 			tmpDoneOnce = true;
 			tmpSelf._UpInFlight.delete(pHash);
-			fCallback(pErr, pResult);
+			tmpOriginalCallback(pErr, pResult);
 		};
 		fCallback = tmpDone;
 
