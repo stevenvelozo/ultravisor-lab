@@ -34,7 +34,7 @@ code
 
 .lab-boot-error
 {
-	color: #b91c1c;
+	color: var(--theme-color-status-error, #b91c1c);
 }
 
 /* Log viewer modal -- shared across Beacon + DBEngine + (eventual) Ultravisor

@@ -30,7 +30,7 @@ const _ViewConfiguration =
 {
 	width: 100%;
 	border-collapse: collapse;
-	background: #fff;
+	background: var(--theme-color-background-panel, #fff);
 	border: 1px solid #e2e8f0;
 	border-radius: 8px;
 	overflow: hidden;
@@ -46,11 +46,11 @@ const _ViewConfiguration =
 .lab-events th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; }
 .lab-events tr:last-child td { border-bottom: none; }
 .lab-events .sev-info    { color: #1e40af; }
-.lab-events .sev-warning { color: #b45309; }
-.lab-events .sev-error   { color: #b91c1c; }
+.lab-events .sev-warning { color: var(--theme-color-status-warning, #b45309); }
+.lab-events .sev-error   { color: var(--theme-color-status-error, #b91c1c); }
 .lab-events-log-link
 {
-	color: #1d4ed8;
+	color: var(--theme-color-brand-primary-hover, #1d4ed8);
 	text-decoration: none;
 	border-bottom: 1px dashed #93c5fd;
 }

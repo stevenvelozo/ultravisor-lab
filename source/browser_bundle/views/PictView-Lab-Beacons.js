@@ -56,7 +56,7 @@ const _ViewConfiguration =
 
 .lab-beacons-form
 {
-	background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 18px;
+	background: var(--theme-color-background-panel, #fff); border: 1px solid #cbd5e1; border-radius: 8px; padding: 18px;
 	display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 	gap: 12px 16px; align-items: end;
 }
@@ -70,7 +70,7 @@ const _ViewConfiguration =
 .lab-beacons-form input, .lab-beacons-form select
 {
 	font-family: inherit; font-size: 14px; padding: 7px 10px;
-	border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #0f172a;
+	border: 1px solid #cbd5e1; border-radius: 6px; background: var(--theme-color-background-panel, #fff); color: #0f172a;
 	box-sizing: border-box; height: 36px; line-height: 1.2;
 }
 .lab-beacons-form .full-width { grid-column: 1 / -1; }
@@ -93,7 +93,7 @@ const _ViewConfiguration =
 	color: #78350f;
 }
 .lab-beacons-form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
-.lab-beacons-form-error { grid-column: 1 / -1; color: #b91c1c; font-size: 13px; }
+.lab-beacons-form-error { grid-column: 1 / -1; color: var(--theme-color-status-error, #b91c1c); font-size: 13px; }
 
 .lab-beacons-advanced
 {
@@ -105,7 +105,7 @@ const _ViewConfiguration =
 	cursor: pointer; color: #475569; font-weight: 500;
 	padding: 4px 0; user-select: none;
 }
-.lab-beacons-advanced summary:hover { color: #1d4ed8; }
+.lab-beacons-advanced summary:hover { color: var(--theme-color-brand-primary-hover, #1d4ed8); }
 .lab-beacons-advanced[open] summary { color: #0f172a; }
 .lab-beacons-advanced-body
 {
@@ -140,7 +140,7 @@ const _ViewConfiguration =
 
 .lab-beacon-card
 {
-	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px;
+	background: var(--theme-color-background-panel, #fff); border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px;
 	display: flex; flex-direction: column; gap: 8px;
 }
 .lab-beacon-card-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -158,7 +158,7 @@ const _ViewConfiguration =
 .lab-beacon-status.running     { background: #dcfce7; color: #166534; }
 .lab-beacon-status.starting    { background: #fef9c3; color: #854d0e; }
 .lab-beacon-status.provisioning { background: #fef3c7; color: #92400e; }
-.lab-beacon-status.failed      { background: #fee2e2; color: #991b1b; }
+.lab-beacon-status.failed      { background: #fee2e2; color: var(--theme-color-status-error, #991b1b); }
 .lab-beacon-status-detail
 {
 	font-size: 12px; color: #475569; font-style: italic;
@@ -196,7 +196,7 @@ const _ViewConfiguration =
 .lab-chip:hover { background: #e2e8f0; color: #0f172a; }
 .lab-chip.active
 {
-	background: #1d4ed8; color: #fff; border-color: #1d4ed8;
+	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-background-panel, #fff); border-color: var(--theme-color-brand-primary-hover, #1d4ed8);
 	cursor: default; pointer-events: none;
 }
 `,

@@ -29,7 +29,7 @@ const _ViewConfiguration =
 
 .lab-seeds-targets
 {
-	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px;
+	background: var(--theme-color-background-panel, #fff); border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px;
 	display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 20px;
 	align-items: start;
 }
@@ -42,7 +42,7 @@ const _ViewConfiguration =
 .lab-seeds-targets input, .lab-seeds-targets select
 {
 	font-family: inherit; font-size: 14px; padding: 7px 10px;
-	border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #0f172a;
+	border: 1px solid #cbd5e1; border-radius: 6px; background: var(--theme-color-background-panel, #fff); color: #0f172a;
 	box-sizing: border-box; height: 36px; line-height: 1.2;
 }
 
@@ -50,7 +50,7 @@ const _ViewConfiguration =
 
 .lab-seed-card
 {
-	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px;
+	background: var(--theme-color-background-panel, #fff); border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px;
 	display: flex; flex-direction: column; gap: 10px;
 }
 .lab-seed-card h3 { margin: 0; font-size: 15px; color: #0f172a; }
@@ -86,12 +86,12 @@ const _ViewConfiguration =
 .lab-seeds-empty
 {
 	padding: 32px 20px; text-align: center; color: #64748b;
-	background: #fff; border: 1px dashed #cbd5e1; border-radius: 8px;
+	background: var(--theme-color-background-panel, #fff); border: 1px dashed #cbd5e1; border-radius: 8px;
 }
 
 .lab-jobs-block
 {
-	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;
+	background: var(--theme-color-background-panel, #fff); border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;
 }
 .lab-jobs-block h3
 {
@@ -108,13 +108,13 @@ const _ViewConfiguration =
 .lab-jobs-block tr:last-child td { border-bottom: none; }
 .lab-jobs-block .status-running  { color: #92400e; font-weight: 600; }
 .lab-jobs-block .status-complete { color: #166534; font-weight: 600; }
-.lab-jobs-block .status-failed   { color: #991b1b; font-weight: 600; }
+.lab-jobs-block .status-failed   { color: var(--theme-color-status-error, #991b1b); font-weight: 600; }
 .lab-jobs-block .status-submitting,
 .lab-jobs-block .status-timed-out { color: #64748b; font-weight: 600; }
 
 .lab-btn
 {
-	background: #1d4ed8; color: #fff; border: 1px solid #1d4ed8;
+	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-background-panel, #fff); border: 1px solid var(--theme-color-brand-primary-hover, #1d4ed8);
 	border-radius: 6px; padding: 6px 14px; font-size: 13px;
 	font-weight: 500; cursor: pointer;
 }

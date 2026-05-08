@@ -49,7 +49,7 @@ const _ViewConfiguration =
 	border-radius: 12px;
 	font-size: 12px;
 	font-weight: 600;
-	background: #991b1b;
+	background: var(--theme-color-status-error, #991b1b);
 	color: #fecaca;
 }
 .lab-header .lab-docker-badge.ok { background: #166534; color: #bbf7d0; }
@@ -69,7 +69,7 @@ const _ViewConfiguration =
 }
 .lab-header a.lab-nav-tab:hover,
 .lab-header a.lab-refresh-button:hover { border-color: #64748b; color: #f8fafc; }
-.lab-header a.lab-nav-tab.active { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.lab-header a.lab-nav-tab.active { background: var(--theme-color-brand-primary-hover, #1d4ed8); border-color: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-background-panel, #fff); }
 .lab-header .lab-refresh-button { margin-left: auto; }
 
 .lab-header .lab-nav-inline
@@ -137,8 +137,8 @@ const _ViewConfiguration =
 }
 .lab-header .lab-nav-dropdown a.active
 {
-	background: #1d4ed8;
-	color: #fff;
+	background: var(--theme-color-brand-primary-hover, #1d4ed8);
+	color: var(--theme-color-background-panel, #fff);
 }
 
 /* Hover-tooltip menus (Services ▾, Experiments ▾) styled to match the
@@ -179,8 +179,8 @@ const _ViewConfiguration =
 }
 .lab-nav-menu a.active
 {
-	background: #1d4ed8;
-	color: #fff;
+	background: var(--theme-color-brand-primary-hover, #1d4ed8);
+	color: var(--theme-color-background-panel, #fff);
 }
 
 @media (max-width: 960px)

@@ -29,7 +29,7 @@ const _ViewConfiguration =
 
 .lab-opex-targets
 {
-	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px;
+	background: var(--theme-color-background-panel, #fff); border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px;
 	display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 20px;
 	align-items: start;
 }
@@ -42,14 +42,14 @@ const _ViewConfiguration =
 .lab-opex-targets select
 {
 	font-family: inherit; font-size: 14px; padding: 7px 10px;
-	border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #0f172a;
+	border: 1px solid #cbd5e1; border-radius: 6px; background: var(--theme-color-background-panel, #fff); color: #0f172a;
 	box-sizing: border-box; height: 36px; line-height: 1.2;
 }
 
 .lab-opex-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
 .lab-opex-card
 {
-	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px;
+	background: var(--theme-color-background-panel, #fff); border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px;
 	display: flex; flex-direction: column; gap: 10px;
 }
 .lab-opex-card h3 { margin: 0; font-size: 15px; color: #0f172a; }
@@ -70,10 +70,10 @@ const _ViewConfiguration =
 .lab-opex-empty
 {
 	padding: 32px 20px; text-align: center; color: #64748b;
-	background: #fff; border: 1px dashed #cbd5e1; border-radius: 8px;
+	background: var(--theme-color-background-panel, #fff); border: 1px dashed #cbd5e1; border-radius: 8px;
 }
 
-.lab-opex-active-block { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+.lab-opex-active-block { background: var(--theme-color-background-panel, #fff); border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
 .lab-opex-active-block h3
 {
 	margin: 0; padding: 12px 18px; background: #f8fafc;
@@ -89,7 +89,7 @@ const _ViewConfiguration =
 .lab-opex-active-block tr:last-child td { border-bottom: none; }
 .lab-opex-active-empty { padding: 12px 18px; text-align: center; color: #64748b; font-size: 12px; }
 
-.lab-opex-runs-block { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+.lab-opex-runs-block { background: var(--theme-color-background-panel, #fff); border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
 .lab-opex-runs-block h3
 {
 	margin: 0; padding: 12px 18px; background: #f8fafc;
@@ -110,11 +110,11 @@ const _ViewConfiguration =
 }
 .lab-opex-runs-block .pill.complete           { background: #dcfce7; color: #166534; }
 .lab-opex-runs-block .pill.failed-assertions  { background: #fef3c7; color: #92400e; }
-.lab-opex-runs-block .pill.failed             { background: #fee2e2; color: #991b1b; }
+.lab-opex-runs-block .pill.failed             { background: #fee2e2; color: var(--theme-color-status-error, #991b1b); }
 .lab-opex-runs-block .pill.timed-out          { background: #fef3c7; color: #92400e; }
 .lab-opex-runs-block .pill.canceled           { background: #e2e8f0; color: #475569; }
 .lab-opex-runs-block .pill.running            { background: #dbeafe; color: #1e40af; }
-.lab-opex-runs-block .pill.stalled            { background: #fef3c7; color: #b45309; }
+.lab-opex-runs-block .pill.stalled            { background: #fef3c7; color: var(--theme-color-status-warning, #b45309); }
 .lab-opex-runs-block .lab-opex-verdicts
 {
 	font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px;
@@ -126,9 +126,9 @@ const _ViewConfiguration =
 	display: flex; gap: 8px; align-items: center; padding: 2px 0;
 }
 .lab-opex-runs-block .lab-opex-verdict-row.pass::before { content: '\\2713'; color: #166534; font-weight: 700; }
-.lab-opex-runs-block .lab-opex-verdict-row.fail::before { content: '\\2717'; color: #991b1b; font-weight: 700; }
+.lab-opex-runs-block .lab-opex-verdict-row.fail::before { content: '\\2717'; color: var(--theme-color-status-error, #991b1b); font-weight: 700; }
 
-.lab-btn { background: #1d4ed8; color: #fff; border: 1px solid #1d4ed8; border-radius: 6px; padding: 6px 14px; font-size: 13px; font-weight: 500; cursor: pointer; }
+.lab-btn { background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-background-panel, #fff); border: 1px solid var(--theme-color-brand-primary-hover, #1d4ed8); border-radius: 6px; padding: 6px 14px; font-size: 13px; font-weight: 500; cursor: pointer; }
 a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .lab-btn:hover { background: #1e40af; border-color: #1e40af; }
 .lab-btn.secondary { background: transparent; color: #0f172a; border-color: #cbd5e1; }

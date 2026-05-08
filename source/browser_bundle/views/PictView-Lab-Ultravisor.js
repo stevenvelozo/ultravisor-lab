@@ -31,7 +31,7 @@ const _ViewConfiguration =
 
 .lab-uv-form
 {
-	background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 18px;
+	background: var(--theme-color-background-panel, #fff); border: 1px solid #cbd5e1; border-radius: 8px; padding: 18px;
 	display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 	gap: 12px 16px; align-items: start;
 }
@@ -44,11 +44,11 @@ const _ViewConfiguration =
 .lab-uv-form input, .lab-uv-form select
 {
 	font-family: inherit; font-size: 14px; padding: 7px 10px;
-	border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #0f172a;
+	border: 1px solid #cbd5e1; border-radius: 6px; background: var(--theme-color-background-panel, #fff); color: #0f172a;
 	box-sizing: border-box; height: 36px; line-height: 1.2;
 }
 .lab-uv-form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
-.lab-uv-form-error { grid-column: 1 / -1; color: #b91c1c; font-size: 13px; }
+.lab-uv-form-error { grid-column: 1 / -1; color: var(--theme-color-status-error, #b91c1c); font-size: 13px; }
 .lab-uv-form-checkbox
 {
 	flex-direction: row;
@@ -59,11 +59,11 @@ const _ViewConfiguration =
 	font-weight: 500;
 	color: #0f172a;
 }
-.lab-uv-form-checkbox input { accent-color: #1d4ed8; }
+.lab-uv-form-checkbox input { accent-color: var(--theme-color-brand-primary-hover, #1d4ed8); }
 
 .lab-uv-card
 {
-	background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px;
+	background: var(--theme-color-background-panel, #fff); border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px;
 	display: flex; flex-direction: column; gap: 12px;
 }
 .lab-uv-card-header { display: flex; align-items: center; gap: 12px; }
@@ -78,7 +78,7 @@ const _ViewConfiguration =
 .lab-uv-status.provisioning,
 .lab-uv-status.starting,
 .lab-uv-status.stopping      { background: #fef3c7; color: #92400e; }
-.lab-uv-status.failed        { background: #fee2e2; color: #991b1b; }
+.lab-uv-status.failed        { background: #fee2e2; color: var(--theme-color-status-error, #991b1b); }
 
 .lab-uv-actions { margin-left: auto; display: flex; gap: 8px; }
 .lab-uv-details
@@ -92,7 +92,7 @@ const _ViewConfiguration =
 	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
 	color: #64748b; font-weight: 600; margin-bottom: 2px;
 }
-.lab-uv-detail-value a { color: #1d4ed8; text-decoration: none; }
+.lab-uv-detail-value a { color: var(--theme-color-brand-primary-hover, #1d4ed8); text-decoration: none; }
 .lab-uv-detail-value a:hover { text-decoration: underline; }
 .lab-uv-status-detail { font-size: 12px; color: #92400e; font-style: italic; }
 
@@ -133,17 +133,17 @@ const _ViewConfiguration =
 .lab-uv-persistence-pill.waiting-for-beacon { background: #fef3c7; color: #92400e; }
 .lab-uv-persistence-pill.bootstrapping      { background: #dbeafe; color: #1e40af; }
 .lab-uv-persistence-pill.bootstrapped       { background: #dcfce7; color: #166534; }
-.lab-uv-persistence-pill.error              { background: #fee2e2; color: #991b1b; cursor: help; }
+.lab-uv-persistence-pill.error              { background: #fee2e2; color: var(--theme-color-status-error, #991b1b); cursor: help; }
 
 .lab-uv-empty
 {
 	padding: 32px 20px; text-align: center; color: #64748b;
-	background: #fff; border: 1px dashed #cbd5e1; border-radius: 8px;
+	background: var(--theme-color-background-panel, #fff); border: 1px dashed #cbd5e1; border-radius: 8px;
 }
 
 .lab-btn
 {
-	background: #1d4ed8; color: #fff; border: 1px solid #1d4ed8;
+	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-background-panel, #fff); border: 1px solid var(--theme-color-brand-primary-hover, #1d4ed8);
 	border-radius: 6px; padding: 6px 14px; font-size: 13px;
 	font-weight: 500; cursor: pointer;
 }
@@ -151,7 +151,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 .lab-btn:hover { background: #1e40af; border-color: #1e40af; }
 .lab-btn.secondary { background: transparent; color: #0f172a; border-color: #cbd5e1; }
 .lab-btn.secondary:hover { background: #f1f5f9; border-color: #94a3b8; }
-.lab-btn.danger { background: transparent; color: #b91c1c; border-color: #fecaca; }
+.lab-btn.danger { background: transparent; color: var(--theme-color-status-error, #b91c1c); border-color: #fecaca; }
 .lab-btn.danger:hover { background: #fef2f2; border-color: #f87171; }
 .lab-btn.small { padding: 4px 10px; font-size: 12px; }
 .lab-btn:disabled,

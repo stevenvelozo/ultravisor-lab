@@ -32,7 +32,7 @@ const _ViewConfiguration =
 }
 .lab-card
 {
-	background: #fff;
+	background: var(--theme-color-background-panel, #fff);
 	border: 1px solid #e2e8f0;
 	border-radius: 8px;
 	padding: 16px 18px;
@@ -69,12 +69,12 @@ const _ViewConfiguration =
 	gap: 16px;
 }
 .lab-danger .lab-danger-text { color: #7f1d1d; font-size: 13px; line-height: 1.5; }
-.lab-danger .lab-danger-text strong { display: block; color: #991b1b; font-size: 13px; margin-bottom: 2px; }
+.lab-danger .lab-danger-text strong { display: block; color: var(--theme-color-status-error, #991b1b); font-size: 13px; margin-bottom: 2px; }
 .lab-danger a.lab-danger-btn
 {
-	background: #991b1b;
-	color: #fff;
-	border: 1px solid #991b1b;
+	background: var(--theme-color-status-error, #991b1b);
+	color: var(--theme-color-background-panel, #fff);
+	border: 1px solid var(--theme-color-status-error, #991b1b);
 	border-radius: 6px;
 	padding: 8px 14px;
 	font-size: 13px;
@@ -92,7 +92,7 @@ const _ViewConfiguration =
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
-	color: #991b1b;
+	color: var(--theme-color-status-error, #991b1b);
 	font-size: 13px;
 	font-weight: 500;
 	font-style: italic;
@@ -104,7 +104,7 @@ const _ViewConfiguration =
 	width: 12px;
 	height: 12px;
 	border: 2px solid rgba(153, 27, 27, 0.25);
-	border-top-color: #991b1b;
+	border-top-color: var(--theme-color-status-error, #991b1b);
 	border-radius: 50%;
 	animation: lab-spin 0.8s linear infinite;
 }
