@@ -46,9 +46,9 @@
 		"pict-router": "^1.0.9",
 		"pict-section-modal": "^0.0.6",
 		"pict-view": "^1.0.68",
-		"retold-databeacon": "^1.0.1",
-		"ultravisor": "^1.3.7",
-		"ultravisor-beacon": "^0.0.14"
+		"retold-databeacon": "^1.0.3",
+		"ultravisor": "^1.3.9",
+		"ultravisor-beacon": "^0.0.15"
 	},
 	"devDependencies": {
 		"gulp": "^4.0.2",
