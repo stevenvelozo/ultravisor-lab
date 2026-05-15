@@ -27,24 +27,24 @@ const _ViewConfiguration =
 	CSS: /*css*/`
 .lab-uv { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
 .lab-uv-toolbar { display: flex; align-items: center; justify-content: space-between; }
-.lab-uv-toolbar h2 { margin: 0; font-size: 16px; color: #0f172a; }
+.lab-uv-toolbar h2 { margin: 0; font-size: 16px; color: var(--theme-color-text-primary, #0f172a); }
 
 .lab-uv-form
 {
-	background: var(--theme-color-background-panel, #fff); border: 1px solid #cbd5e1; border-radius: 8px; padding: 18px;
+	background: var(--theme-color-background-panel, #ffffff); border: 1px solid var(--theme-color-border-strong, #cbd5e1); border-radius: 8px; padding: 18px;
 	display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 	gap: 12px 16px; align-items: start;
 }
 .lab-uv-form label
 {
 	display: flex; flex-direction: column; gap: 4px;
-	font-size: 12px; font-weight: 600; color: #475569;
+	font-size: 12px; font-weight: 600; color: var(--theme-color-text-secondary, #475569);
 	text-transform: uppercase; letter-spacing: 0.3px;
 }
 .lab-uv-form input, .lab-uv-form select
 {
 	font-family: inherit; font-size: 14px; padding: 7px 10px;
-	border: 1px solid #cbd5e1; border-radius: 6px; background: var(--theme-color-background-panel, #fff); color: #0f172a;
+	border: 1px solid var(--theme-color-border-strong, #cbd5e1); border-radius: 6px; background: var(--theme-color-background-panel, #ffffff); color: var(--theme-color-text-primary, #0f172a);
 	box-sizing: border-box; height: 36px; line-height: 1.2;
 }
 .lab-uv-form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
@@ -57,44 +57,44 @@ const _ViewConfiguration =
 	text-transform: none;
 	letter-spacing: normal;
 	font-weight: 500;
-	color: #0f172a;
+	color: var(--theme-color-text-primary, #0f172a);
 }
 .lab-uv-form-checkbox input { accent-color: var(--theme-color-brand-primary-hover, #1d4ed8); }
 
 .lab-uv-card
 {
-	background: var(--theme-color-background-panel, #fff); border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px;
+	background: var(--theme-color-background-panel, #ffffff); border: 1px solid var(--theme-color-border-default, #e2e8f0); border-radius: 8px; padding: 16px 18px;
 	display: flex; flex-direction: column; gap: 12px;
 }
 .lab-uv-card-header { display: flex; align-items: center; gap: 12px; }
-.lab-uv-card-header h3 { margin: 0; font-size: 15px; color: #0f172a; }
+.lab-uv-card-header h3 { margin: 0; font-size: 15px; color: var(--theme-color-text-primary, #0f172a); }
 .lab-uv-status
 {
 	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
 	padding: 2px 8px; border-radius: 10px; font-weight: 600;
 }
-.lab-uv-status.running       { background: #dcfce7; color: #166534; }
-.lab-uv-status.stopped       { background: #e2e8f0; color: #475569; }
+.lab-uv-status.running       { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-status-success, #166534); }
+.lab-uv-status.stopped       { background: var(--theme-color-border-default, #e2e8f0); color: var(--theme-color-text-secondary, #475569); }
 .lab-uv-status.provisioning,
 .lab-uv-status.starting,
-.lab-uv-status.stopping      { background: #fef3c7; color: #92400e; }
-.lab-uv-status.failed        { background: #fee2e2; color: var(--theme-color-status-error, #991b1b); }
+.lab-uv-status.stopping      { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-status-warning, #92400e); }
+.lab-uv-status.failed        { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-status-error, #991b1b); }
 
 .lab-uv-actions { margin-left: auto; display: flex; gap: 8px; }
 .lab-uv-details
 {
 	display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 	gap: 8px 20px;
-	background: #f8fafc; padding: 10px 14px; border-radius: 6px; font-size: 13px;
+	background: var(--theme-color-background-secondary, #f8fafc); padding: 10px 14px; border-radius: 6px; font-size: 13px;
 }
 .lab-uv-details .label
 {
 	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
-	color: #64748b; font-weight: 600; margin-bottom: 2px;
+	color: var(--theme-color-text-muted, #64748b); font-weight: 600; margin-bottom: 2px;
 }
 .lab-uv-detail-value a { color: var(--theme-color-brand-primary-hover, #1d4ed8); text-decoration: none; }
 .lab-uv-detail-value a:hover { text-decoration: underline; }
-.lab-uv-status-detail { font-size: 12px; color: #92400e; font-style: italic; }
+.lab-uv-status-detail { font-size: 12px; color: var(--theme-color-status-warning, #92400e); font-style: italic; }
 
 /* Secure-mode chrome — badge sits next to the running/stopped pill, the
    actions row sits below the status detail and only renders when the UV
@@ -103,56 +103,56 @@ const _ViewConfiguration =
 {
 	font-size: 11px; padding: 2px 8px; border-radius: 10px;
 	font-weight: 600; letter-spacing: 0.3px;
-	background: #fef3c7; color: #92400e;
-	border: 1px solid #fde68a;
+	background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-status-warning, #92400e);
+	border: 1px solid var(--theme-color-status-warning, #fde68a);
 }
 .lab-uv-secure-badge.bootstrapped
 {
-	background: #dcfce7; color: #166534; border-color: #86efac;
+	background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-status-success, #166534); border-color: var(--theme-color-status-success, #86efac);
 }
 .lab-uv-security-actions
 {
 	display: flex; align-items: center; gap: 12px;
 	padding: 10px 14px; border-radius: 6px;
-	background: #fffbeb; border: 1px solid #fde68a;
+	background: var(--theme-color-status-warning, #fffbeb); border: 1px solid var(--theme-color-status-warning, #fde68a);
 }
-.lab-uv-security-hint { flex: 1; font-size: 12px; color: #78350f; }
+.lab-uv-security-hint { flex: 1; font-size: 12px; color: var(--theme-color-status-warning, #78350f); }
 
 .lab-uv-persistence-row
 {
 	display: flex; align-items: center; gap: 12px;
 	padding: 10px 14px; border-radius: 6px;
-	background: #f8fafc; border: 1px solid #e2e8f0;
+	background: var(--theme-color-background-secondary, #f8fafc); border: 1px solid var(--theme-color-border-default, #e2e8f0);
 }
 .lab-uv-persistence-pill
 {
 	font-size: 11px; padding: 2px 8px; border-radius: 10px;
 	white-space: nowrap; font-weight: 500;
 }
-.lab-uv-persistence-pill.unassigned         { background: #e2e8f0; color: #475569; }
-.lab-uv-persistence-pill.waiting-for-beacon { background: #fef3c7; color: #92400e; }
-.lab-uv-persistence-pill.bootstrapping      { background: #dbeafe; color: #1e40af; }
-.lab-uv-persistence-pill.bootstrapped       { background: #dcfce7; color: #166534; }
-.lab-uv-persistence-pill.error              { background: #fee2e2; color: var(--theme-color-status-error, #991b1b); cursor: help; }
+.lab-uv-persistence-pill.unassigned         { background: var(--theme-color-border-default, #e2e8f0); color: var(--theme-color-text-secondary, #475569); }
+.lab-uv-persistence-pill.waiting-for-beacon { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-status-warning, #92400e); }
+.lab-uv-persistence-pill.bootstrapping      { background: var(--theme-color-selection-background, #dbeafe); color: var(--theme-color-brand-primary-hover, #1e40af); }
+.lab-uv-persistence-pill.bootstrapped       { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-status-success, #166534); }
+.lab-uv-persistence-pill.error              { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-status-error, #991b1b); cursor: help; }
 
 .lab-uv-empty
 {
-	padding: 32px 20px; text-align: center; color: #64748b;
-	background: var(--theme-color-background-panel, #fff); border: 1px dashed #cbd5e1; border-radius: 8px;
+	padding: 32px 20px; text-align: center; color: var(--theme-color-text-muted, #64748b);
+	background: var(--theme-color-background-panel, #ffffff); border: 1px dashed var(--theme-color-border-strong, #cbd5e1); border-radius: 8px;
 }
 
 .lab-btn
 {
-	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-background-panel, #fff); border: 1px solid var(--theme-color-brand-primary-hover, #1d4ed8);
+	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-background-panel, #ffffff); border: 1px solid var(--theme-color-brand-primary-hover, #1d4ed8);
 	border-radius: 6px; padding: 6px 14px; font-size: 13px;
 	font-weight: 500; cursor: pointer;
 }
 a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
-.lab-btn:hover { background: #1e40af; border-color: #1e40af; }
-.lab-btn.secondary { background: transparent; color: #0f172a; border-color: #cbd5e1; }
-.lab-btn.secondary:hover { background: #f1f5f9; border-color: #94a3b8; }
-.lab-btn.danger { background: transparent; color: var(--theme-color-status-error, #b91c1c); border-color: #fecaca; }
-.lab-btn.danger:hover { background: #fef2f2; border-color: #f87171; }
+.lab-btn:hover { background: var(--theme-color-brand-primary-hover, #1e40af); border-color: var(--theme-color-brand-primary-hover, #1e40af); }
+.lab-btn.secondary { background: transparent; color: var(--theme-color-text-primary, #0f172a); border-color: var(--theme-color-border-strong, #cbd5e1); }
+.lab-btn.secondary:hover { background: var(--theme-color-background-primary, #f1f5f9); border-color: var(--theme-color-text-muted, #94a3b8); }
+.lab-btn.danger { background: transparent; color: var(--theme-color-status-error, #b91c1c); border-color: var(--theme-color-status-error, #fecaca); }
+.lab-btn.danger:hover { background: var(--theme-color-status-error, #fef2f2); border-color: var(--theme-color-status-error, #f87171); }
 .lab-btn.small { padding: 4px 10px; font-size: 12px; }
 .lab-btn:disabled,
 .lab-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
@@ -290,7 +290,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 		},
 		{
 			Hash: 'Lab-Ultravisor-BeaconSummaryNone-Template',
-			Template: /*html*/`<span style="color:#64748b;">none</span>`
+			Template: /*html*/`<span style="color:var(--theme-color-text-muted, #64748b);">none</span>`
 		},
 		{
 			// One per paired beacon. Each record carries either a Link

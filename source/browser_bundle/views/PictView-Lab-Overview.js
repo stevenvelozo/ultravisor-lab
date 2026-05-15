@@ -32,27 +32,27 @@ const _ViewConfiguration =
 }
 .lab-card
 {
-	background: var(--theme-color-background-panel, #fff);
-	border: 1px solid #e2e8f0;
+	background: var(--theme-color-background-panel, #ffffff);
+	border: 1px solid var(--theme-color-border-default, #e2e8f0);
 	border-radius: 8px;
 	padding: 16px 18px;
 	box-shadow: 0 1px 2px rgba(15,23,42,0.04);
 }
-.lab-card h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #475569; letter-spacing: 0.3px; text-transform: uppercase; }
-.lab-card .lab-card-value { font-size: 28px; font-weight: 600; color: #0f172a; }
-.lab-card .lab-card-sub   { font-size: 12px; color: #64748b; margin-top: 6px; }
+.lab-card h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--theme-color-text-secondary, #475569); letter-spacing: 0.3px; text-transform: uppercase; }
+.lab-card .lab-card-value { font-size: 28px; font-weight: 600; color: var(--theme-color-text-primary, #0f172a); }
+.lab-card .lab-card-sub   { font-size: 12px; color: var(--theme-color-text-muted, #64748b); margin-top: 6px; }
 .lab-meta
 {
 	margin-top: 24px;
 	padding: 14px 18px;
-	background: #f8fafc;
-	border: 1px solid #e2e8f0;
+	background: var(--theme-color-background-secondary, #f8fafc);
+	border: 1px solid var(--theme-color-border-default, #e2e8f0);
 	border-radius: 8px;
-	color: #334155;
+	color: var(--theme-color-text-secondary, #334155);
 	font-size: 13px;
 	line-height: 1.55;
 }
-.lab-meta strong { color: #0f172a; }
+.lab-meta strong { color: var(--theme-color-text-primary, #0f172a); }
 .lab-meta .lab-meta-row { display: flex; gap: 24px; }
 .lab-meta .lab-meta-row > div { flex: 1; }
 
@@ -60,20 +60,22 @@ const _ViewConfiguration =
 {
 	margin-top: 20px;
 	padding: 14px 18px;
-	background: #fef2f2;
-	border: 1px solid #fecaca;
+	/* Background uses a subtle panel tint (not status-error itself)
+	   so the danger-text inside stays readable across all themes. */
+	background: var(--theme-color-background-panel, #fef2f2);
+	border: 1px solid var(--theme-color-status-error, #fecaca);
 	border-radius: 8px;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 16px;
 }
-.lab-danger .lab-danger-text { color: #7f1d1d; font-size: 13px; line-height: 1.5; }
+.lab-danger .lab-danger-text { color: var(--theme-color-status-error, #7f1d1d); font-size: 13px; line-height: 1.5; }
 .lab-danger .lab-danger-text strong { display: block; color: var(--theme-color-status-error, #991b1b); font-size: 13px; margin-bottom: 2px; }
 .lab-danger a.lab-danger-btn
 {
 	background: var(--theme-color-status-error, #991b1b);
-	color: var(--theme-color-background-panel, #fff);
+	color: var(--theme-color-text-on-brand, #fff);
 	border: 1px solid var(--theme-color-status-error, #991b1b);
 	border-radius: 6px;
 	padding: 8px 14px;
@@ -86,7 +88,7 @@ const _ViewConfiguration =
 	align-items: center;
 	justify-content: center;
 }
-.lab-danger a.lab-danger-btn:hover { background: #7f1d1d; border-color: #7f1d1d; }
+.lab-danger a.lab-danger-btn:hover { background: var(--theme-color-status-error, #7f1d1d); border-color: var(--theme-color-status-error, #7f1d1d); }
 .lab-danger .lab-danger-progress
 {
 	display: inline-flex;

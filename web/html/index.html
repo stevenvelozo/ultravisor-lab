@@ -4,6 +4,12 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Ultravisor Lab</title>
+
+	<!-- Favicons generated at build time via `npm run brand` (pict-section-theme-brand) -->
+	<link rel="icon" type="image/svg+xml" href="favicons/favicon.svg">
+	<link rel="icon" type="image/svg+xml" href="favicons/favicon-light.svg" media="(prefers-color-scheme: light)">
+	<link rel="icon" type="image/svg+xml" href="favicons/favicon-dark.svg" media="(prefers-color-scheme: dark)">
+
 	<link rel="stylesheet" href="css/ultravisor-lab.css">
 
 	<!-- Pict dynamic CSS container -- view CSS is injected here at runtime -->
@@ -12,8 +18,7 @@
 	<script src="js/pict.min.js"></script>
 </head>
 <body>
-	<div id="Lab-Navigation-Container"></div>
-	<div id="Lab-Content-Container">
+	<div id="Lab-Application-Container">
 		<div class="lab-boot-placeholder">Loading Ultravisor Lab...</div>
 	</div>
 
@@ -33,7 +38,7 @@
 			{
 				if (typeof window.UltravisorLab !== 'function')
 				{
-					document.getElementById('Lab-Content-Container').innerHTML =
+					document.getElementById('Lab-Application-Container').innerHTML =
 						'<div class="lab-boot-error">Browser bundle failed to load. Run <code>npm run build-bundle</code> in the ultravisor-lab directory.</div>';
 					return;
 				}
@@ -46,7 +51,7 @@
 						if (pError)
 						{
 							console.error('Ultravisor-Lab failed to initialize:', pError);
-							document.getElementById('Lab-Content-Container').innerHTML =
+							document.getElementById('Lab-Application-Container').innerHTML =
 								'<div class="lab-boot-error">Failed to initialize: ' + (pError.message || pError) + '</div>';
 						}
 					});

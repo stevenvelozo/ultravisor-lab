@@ -20,11 +20,25 @@
 const libPictApplication = require('pict-application');
 const libPictRouter = require('pict-router');
 const libPictSectionModal = require('pict-section-modal');
+const libPictSectionTheme = require('pict-section-theme');
 const libChance = require('chance');
 
 const libApiProvider        = require('./providers/PictProvider-Lab-Api.js');
 const libRouterConfig       = require('./providers/PictRouter-Lab-Configuration.json');
-const libNavigationView     = require('./views/PictView-Lab-Navigation.js');
+
+// Brand block — precomputed by `npm run brand` from the Branding entry in
+// Retold-Modules-Manifest.json. Drives the Theme-Brand-Mark wordmark in
+// the topbar and the --brand-color-* CSS variables themes reference.
+const libUltravisorLabBrand = require('./UltravisorLab-Brand.js');
+
+// Chrome views — shell + slot views the Theme-TopBar plugs into.
+const libLayoutView         = require('./views/PictView-Lab-Navigation.js');
+const libTopBarNavView      = require('./views/PictView-Lab-TopBar-Nav.js');
+const libTopBarUserView     = require('./views/PictView-Lab-TopBar-User.js');
+const libSidebarView        = require('./views/PictView-Lab-Sidebar.js');
+const libSettingsPanelView  = require('./views/PictView-Lab-SettingsPanel.js');
+
+// Feature views — rendered into #Lab-Content-Container by setActiveView.
 const libOverviewView       = require('./views/PictView-Lab-Overview.js');
 const libEventsView         = require('./views/PictView-Lab-Events.js');
 const libDBEnginesView      = require('./views/PictView-Lab-DBEngines.js');
@@ -48,7 +62,51 @@ class LabBrowserApplication extends libPictApplication
 		this.pict.addProvider('LabApi',     libApiProvider.default_configuration, libApiProvider);
 		this.pict.addProvider('PictRouter', libRouterConfig,                      libPictRouter);
 
-		this.pict.addView('Lab-Navigation',   libNavigationView.default_configuration,   libNavigationView);
+		// Modal section — registered under two hashes:
+		//   - 'Pict-Section-Modal' is the canonical hash Theme-Section
+		//     looks up when building its shell + topbar chrome.
+		//   - 'Modal' is the legacy hash existing call sites (toast / confirm
+		//     helpers) use; we keep it as an alias so they keep working.
+		this.pict.addView('Pict-Section-Modal', libPictSectionModal.default_configuration, libPictSectionModal);
+		this.pict.addView('Modal',              {},                                        libPictSectionModal);
+
+		// Chrome views — registered BEFORE Theme-Section so the
+		// provider's _bootstrap can resolve the TopBar slot views by
+		// hash. The Lab-Layout view stays at the old 'Lab-Navigation'
+		// destination address; existing code that flipped the active
+		// view via setActiveView now calls Lab-Layout.renderChrome()
+		// instead.
+		this.pict.addView('Lab-Layout',        libLayoutView.default_configuration,        libLayoutView);
+		this.pict.addView('Lab-TopBar-Nav',    libTopBarNavView.default_configuration,     libTopBarNavView);
+		this.pict.addView('Lab-TopBar-User',   libTopBarUserView.default_configuration,    libTopBarUserView);
+		this.pict.addView('Lab-Sidebar',       libSidebarView.default_configuration,       libSidebarView);
+		this.pict.addView('Lab-SettingsPanel', libSettingsPanelView.default_configuration, libSettingsPanelView);
+
+		// Theme-Section — registers the runtime theme provider, the
+		// bundled theme catalog, persistence (localStorage scope
+		// `pict-section-theme:<hostname>`), the BrandMark / Picker /
+		// ModeToggle / ScaleSelect / TopBar views, and the apply pipeline.
+		// `ApplyDefault` picks the bundled ultravisor-professional-light
+		// palette so the lab boots into a coherent themed look; users
+		// switch via the gear-button-driven settings panel.
+		// 'Button' is intentionally omitted from Views — the gear opens
+		// the settings panel which hosts the controls, so we don't need
+		// a duplicate Theme-Button popover in the topbar.
+		this.pict.addProvider('Theme-Section',
+		{
+			ApplyDefault: 'ultravisor-professional-light',
+			DefaultMode:  'system',
+			DefaultScale: 1.0,
+			Brand:        libUltravisorLabBrand,
+			Views: ['Picker', 'ModeToggle', 'ScaleSelect', 'BrandMark', 'TopBar'],
+			ViewOptions:
+			{
+				// Height MUST match the topbar panel's Size in Lab-Layout._buildShell.
+				TopBar: { NavView: 'Lab-TopBar-Nav', UserView: 'Lab-TopBar-User', Height: 48 }
+			}
+		}, libPictSectionTheme);
+
+		// Feature views — rendered into #Lab-Content-Container by setActiveView.
 		this.pict.addView('Lab-Overview',     libOverviewView.default_configuration,     libOverviewView);
 		this.pict.addView('Lab-DBEngines',    libDBEnginesView.default_configuration,    libDBEnginesView);
 		this.pict.addView('Lab-Ultravisor',   libUltravisorView.default_configuration,   libUltravisorView);
@@ -59,9 +117,6 @@ class LabBrowserApplication extends libPictApplication
 		this.pict.addView('Lab-Stacks',       libStacksView.default_configuration,       libStacksView);
 		this.pict.addView('Lab-Events',       libEventsView.default_configuration,       libEventsView);
 
-		// Modal + toast toolkit: replaces window.alert/confirm app-wide.
-		this.pict.addView('Modal',            {},                                        libPictSectionModal);
-
 		this._pollTimer = null;
 	}
 
@@ -70,13 +125,15 @@ class LabBrowserApplication extends libPictApplication
 		this.pict.AppData.Lab =
 		{
 			ActiveView: 'Overview',
-			// Branding seeded with the upstream defaults so the nav h1
-			// renders correctly during the brief window between view
-			// mount and the /api/lab/branding fetch resolving. Replaced
-			// at boot when an operator has supplied custom branding.
+			// Branding seeded from the precomputed brand block (built at
+			// `npm run brand` time from the manifest's Branding entry).
+			// The Theme-TopBar's BrandMark slot reads the same block via
+			// libUltravisorLabBrand, so this AppData copy is just for
+			// any feature views that still want to read the display name.
 			Branding:
 			{
-				DisplayName: 'Ultravisor Lab',
+				DisplayName: libUltravisorLabBrand.Name || 'Ultravisor Lab',
+				Tagline:     libUltravisorLabBrand.Tagline || '',
 				LogoURL:     null,
 				LogoHTML:    ''
 			},
@@ -150,6 +207,13 @@ class LabBrowserApplication extends libPictApplication
 
 	onAfterInitializeAsync(fCallback)
 	{
+		// Render the layout shell first — this builds the topbar /
+		// sidebar / settings / center panels and creates the
+		// #Lab-Content-Container destination that feature views render
+		// into. Subsequent refreshAll + setActiveView calls expect the
+		// shell to exist.
+		this.pict.views['Lab-Layout'].render();
+
 		this._bootstrapEngineTypes(
 			() =>
 			{
@@ -217,7 +281,13 @@ class LabBrowserApplication extends libPictApplication
 	_honorInitialURL()
 	{
 		let tmpHash = (typeof window !== 'undefined' && window.location) ? window.location.hash : '';
-		if (!tmpHash || tmpHash === '#' || tmpHash === '#/') return;
+		if (!tmpHash || tmpHash === '#' || tmpHash === '#/')
+		{
+			// Fresh page load with no deep-link — mount the default view
+			// so the center workspace isn't blank on first paint.
+			this.setActiveView('Overview');
+			return;
+		}
 
 		// /stacks/<hash>/watch — re-arm the polling loop on reload.
 		let tmpWatchMatch = /^#\/stacks\/([A-Za-z0-9_-]+)\/watch$/.exec(tmpHash);
@@ -324,7 +394,14 @@ class LabBrowserApplication extends libPictApplication
 	setActiveView(pViewName)
 	{
 		this.pict.AppData.Lab.ActiveView = pViewName;
-		this.pict.views['Lab-Navigation'].render();
+		// Refresh chrome (sidebar active-class + topbar context label
+		// + docker badge). The shell itself is data-free; only the
+		// slot views need re-rendering.
+		let tmpLayout = this.pict.views['Lab-Layout'];
+		if (tmpLayout && typeof tmpLayout.renderChrome === 'function')
+		{
+			tmpLayout.renderChrome();
+		}
 		this._mountActive();
 	}
 
@@ -406,7 +483,11 @@ class LabBrowserApplication extends libPictApplication
 					this._applyBeaconExerciseTargetDefaults();
 					this._applyOperationExerciseTargetDefaults();
 					this._refreshActiveList();
-					this.pict.views['Lab-Navigation'].render();
+					let tmpLayout = this.pict.views['Lab-Layout'];
+					if (tmpLayout && typeof tmpLayout.renderChrome === 'function')
+					{
+						tmpLayout.renderChrome();
+					}
 					this._pumpPersistencePollers();
 					return fCallback();
 				});

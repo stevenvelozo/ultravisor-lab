@@ -25,9 +25,16 @@ module.exports.default_configuration =
 {
 	Name:                       'Ultravisor-Lab',
 	Hash:                       'UltravisorLab',
-	MainViewportViewIdentifier: 'Lab-Navigation',
+	MainViewportViewIdentifier: 'Lab-Layout',
 	AutoLoginAfterInitialize:   true,
-	AutoLoadDataAfterLogin:     true
+	AutoLoadDataAfterLogin:     true,
+	// The layout view owns a pict-section-modal shell whose DOM is built
+	// in onAfterRender. Auto-rendering the layout multiple times during
+	// the initialize lifecycle would re-write the template HTML and wipe
+	// the shell. The application calls render() explicitly once at the
+	// top of onAfterInitializeAsync; suppress auto-renders here.
+	AutoRenderMainViewportViewAfterInitialize: false,
+	AutoRenderViewsAfterInitialize:            false
 };
 
 module.exports.pict_configuration =

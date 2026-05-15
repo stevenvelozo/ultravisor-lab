@@ -25,13 +25,13 @@ const _ViewConfiguration =
 
 	CSS: /*css*/`
 .lab-events { padding: 20px; }
-.lab-events h2 { margin: 0 0 14px; font-size: 16px; color: #0f172a; }
+.lab-events h2 { margin: 0 0 14px; font-size: 16px; color: var(--theme-color-text-primary, #0f172a); }
 .lab-events table
 {
 	width: 100%;
 	border-collapse: collapse;
-	background: var(--theme-color-background-panel, #fff);
-	border: 1px solid #e2e8f0;
+	background: var(--theme-color-background-panel, #ffffff);
+	border: 1px solid var(--theme-color-border-default, #e2e8f0);
 	border-radius: 8px;
 	overflow: hidden;
 	font-size: 13px;
@@ -40,26 +40,26 @@ const _ViewConfiguration =
 {
 	padding: 10px 14px;
 	text-align: left;
-	border-bottom: 1px solid #f1f5f9;
+	border-bottom: 1px solid var(--theme-color-background-primary, #f1f5f9);
 	vertical-align: top;
 }
-.lab-events th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; }
+.lab-events th { background: var(--theme-color-background-secondary, #f8fafc); color: var(--theme-color-text-secondary, #475569); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; }
 .lab-events tr:last-child td { border-bottom: none; }
-.lab-events .sev-info    { color: #1e40af; }
+.lab-events .sev-info    { color: var(--theme-color-brand-primary-hover, #1e40af); }
 .lab-events .sev-warning { color: var(--theme-color-status-warning, #b45309); }
 .lab-events .sev-error   { color: var(--theme-color-status-error, #b91c1c); }
 .lab-events-log-link
 {
 	color: var(--theme-color-brand-primary-hover, #1d4ed8);
 	text-decoration: none;
-	border-bottom: 1px dashed #93c5fd;
+	border-bottom: 1px dashed var(--theme-color-brand-primary, #93c5fd);
 }
-.lab-events-log-link:hover { color: #1e40af; border-bottom-color: #1e40af; }
+.lab-events-log-link:hover { color: var(--theme-color-brand-primary-hover, #1e40af); border-bottom-color: var(--theme-color-brand-primary-hover, #1e40af); }
 .lab-events .lab-events-empty
 {
 	padding: 40px;
 	text-align: center;
-	color: #64748b;
+	color: var(--theme-color-text-muted, #64748b);
 	font-size: 13px;
 }
 `,
