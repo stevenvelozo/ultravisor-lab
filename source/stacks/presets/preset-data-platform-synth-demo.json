@@ -346,7 +346,7 @@
 				"DATA_MAPPER_MAX_INMEMORY_ROWS": "3500000",
 				"UltravisorBeaconWebSocketMaxPayloadMB": "768",
 				"UltravisorBeaconWorkItemTimeoutMs": "1800000",
-				"RETOLD_DATA_MAPPER_BOOTSTRAP_CONNECTIONS": "[{\"BeaconName\":\"lake-databeacon\",\"ConnectionName\":\"lake-main\",\"Type\":\"PostgreSQL\",\"Config\":{\"Server\":\"postgres\",\"Port\":5432,\"Database\":\"lake\",\"User\":\"lake\",\"Password\":\"${input.DBPassword}\"},\"AutoConnect\":true,\"Description\":\"Auto-provisioned lake (Postgres) connection — clones land here.\"},{\"BeaconName\":\"opdb-databeacon\",\"ConnectionName\":\"opdb-main\",\"Type\":\"MySQL\",\"Config\":{\"Server\":\"mysql\",\"Port\":3306,\"Database\":\"opdb\",\"User\":\"root\",\"Password\":\"${input.DBPassword}\"},\"AutoConnect\":true,\"Description\":\"Auto-provisioned opdb (MySQL) connection — operational mapping outputs (e.g. CustomerSummary) land here.\"},{\"BeaconName\":\"dashboard-databeacon\",\"ConnectionName\":\"dashboard-main\",\"Type\":\"MySQL\",\"Config\":{\"Server\":\"dashboard-mysql\",\"Port\":3306,\"Database\":\"dashboard\",\"User\":\"root\",\"Password\":\"${input.DBPassword}\"},\"AutoConnect\":true,\"Description\":\"Auto-provisioned dashboard (MySQL) connection — typed-op CachedView_* outputs land here so dashboard reads don't compete with lake writes.\"}]"
+				"RETOLD_DATA_MAPPER_BOOTSTRAP_CONNECTIONS": "[{\"BeaconName\":\"lake-databeacon\",\"ConnectionName\":\"lake-main\",\"Type\":\"PostgreSQL\",\"Config\":{\"Server\":\"postgres\",\"Port\":5432,\"Database\":\"lake\",\"User\":\"lake\",\"Password\":\"${input.DBPassword}\"},\"AutoConnect\":true,\"Description\":\"Auto-provisioned lake (Postgres) connection — clones land here.\"},{\"BeaconName\":\"opdb-databeacon\",\"ConnectionName\":\"opdb-main\",\"Type\":\"MySQL\",\"Config\":{\"Server\":\"mysql\",\"Port\":3306,\"Database\":\"opdb\",\"User\":\"root\",\"Password\":\"${input.DBPassword}\"},\"AutoConnect\":true,\"Description\":\"Auto-provisioned opdb (MySQL) connection — operational mapping outputs (e.g. CustomerSummary) land here.\"},{\"BeaconName\":\"dashboard-databeacon\",\"ConnectionName\":\"dashboard-main\",\"Type\":\"MySQL\",\"Config\":{\"Server\":\"dashboard-mysql\",\"Port\":3306,\"Database\":\"dashboard\",\"User\":\"root\",\"Password\":\"${input.DBPassword}\"},\"AutoConnect\":true,\"Description\":\"Auto-provisioned dashboard (MySQL) connection — typed-op CachedView_* outputs land here so dashboard reads don't compete with lake writes.\"},{\"BeaconName\":\"customer-acme-databeacon\",\"ConnectionName\":\"customer-main\",\"Type\":\"MySQL\",\"Config\":{\"Server\":\"customer-mysql\",\"Port\":3306,\"Database\":\"customer\",\"User\":\"root\",\"Password\":\"${input.DBPassword}\"},\"AutoConnect\":true,\"Description\":\"Auto-provisioned customer-side (MySQL) connection — represents the customer's own database that lives next to their installed databeacon.\"}]"
 			},
 			"Command": [
 				"node",
@@ -362,7 +362,8 @@
 				"retold-databeacon-configs",
 				"retold-databeacon-lake",
 				"retold-databeacon-opdb",
-				"dashboard-databeacon"
+				"dashboard-databeacon",
+				"customer-databeacon"
 			]
 		},
 		{
@@ -405,11 +406,11 @@
 				}
 			],
 			"Environment": {
-				"MYSQL_ROOT_PASSWORD": "1234567890",
-				"MYSQL_DATABASE": "weather_stations"
+				"MYSQL_ROOT_PASSWORD": "${input.DBPassword}",
+				"MYSQL_DATABASE": "customer"
 			},
 			"HealthCheck": {
-				"Command": "mysqladmin ping -h localhost -uroot -p1234567890",
+				"Command": "mysqladmin ping -h localhost -uroot -p${input.DBPassword}",
 				"IntervalSec": 5,
 				"TimeoutSec": 3,
 				"RetriesBeforeFail": 12
@@ -519,7 +520,9 @@
 				"MAPPER_BASE": "http://retold-data-mapper:8395",
 				"SEED_SCOPE": "synth-demo",
 				"SEED_RETRIES": "90",
-				"SEED_DELAY_MS": "2000"
+				"SEED_DELAY_MS": "2000",
+				"SEED_AUTO_RUN_OPS": "true",
+				"SEED_AUTO_RUN_MAPPINGS": "true"
 			},
 			"Command": [
 				"node",
