@@ -88,7 +88,7 @@ const _ViewConfiguration =
 	align-items: center;
 	justify-content: center;
 }
-.lab-danger a.lab-danger-btn:hover { background: var(--theme-color-status-error, #7f1d1d); border-color: var(--theme-color-status-error, #7f1d1d); }
+.lab-danger a.lab-danger-btn:hover { background: var(--theme-color-status-error, #dc2626); border-color: var(--theme-color-status-error, #dc2626); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-danger .lab-danger-progress
 {
 	display: inline-flex;

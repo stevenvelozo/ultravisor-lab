@@ -55,8 +55,8 @@ code
 }
 .lab-log-content
 {
-	background: var(--theme-color-editor-line-number-background, #0f172a);
-	color: var(--theme-color-background-tertiary, #e2e8f0);
+	background: var(--theme-color-background-tertiary, #e4e7ec);
+	color: var(--theme-color-text-primary, #2d3748);
 	padding: 12px 14px; border-radius: 6px;
 	font-family: var(--theme-typography-family-mono, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace);
 	font-size: 12.5px; line-height: 1.45;

@@ -114,13 +114,13 @@ const _ViewConfiguration =
 
 .lab-btn
 {
-	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-background-panel, #ffffff); border: 1px solid var(--theme-color-brand-primary-hover, #1d4ed8);
+	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-text-onbrand, #ffffff); border: 1px solid var(--theme-color-brand-primary-hover, #1d4ed8);
 	border-radius: 6px; padding: 6px 14px; font-size: 13px;
 	font-weight: 500; cursor: pointer;
 }
 a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .lab-btn:hover { background: var(--theme-color-brand-primary-hover, #1e40af); border-color: var(--theme-color-brand-primary-hover, #1e40af); }
-.lab-btn.secondary { background: transparent; color: var(--theme-color-text-primary, #0f172a); border-color: var(--theme-color-border-strong, #cbd5e1); }
+.lab-btn.secondary { background: transparent; color: var(--theme-color-text-primary, #0f172a); border-color: var(--theme-color-text-primary, #2d3748); }
 .lab-btn.secondary:hover { background: var(--theme-color-background-primary, #f1f5f9); border-color: var(--theme-color-text-muted, #94a3b8); }
 .lab-btn.small { padding: 4px 10px; font-size: 12px; }
 .lab-btn:disabled,

@@ -34,7 +34,7 @@ const _ViewConfiguration =
 .lab-btn
 {
 	background: var(--theme-color-brand-primary-hover, #1d4ed8);
-	color: var(--theme-color-background-panel, #ffffff);
+	color: var(--theme-color-text-onbrand, #ffffff);
 	border: 1px solid var(--theme-color-brand-primary-hover, #1d4ed8);
 	border-radius: 6px;
 	padding: 6px 14px;
@@ -59,7 +59,7 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	color: var(--theme-color-status-error, #b91c1c);
 	border: 1px solid var(--theme-color-status-error, #fecaca);
 }
-.lab-btn.danger:hover { background: var(--theme-color-status-error, #fef2f2); border-color: var(--theme-color-status-error, #f87171); }
+.lab-btn.danger:hover { background: var(--theme-color-status-error, #ef4444); border-color: var(--theme-color-status-error, #ef4444); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-btn.small { padding: 4px 10px; font-size: 12px; }
 .lab-btn:disabled,
 .lab-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
@@ -143,11 +143,11 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	color: var(--theme-color-brand-primary-hover, #1e40af);
 	font-weight: 600;
 }
-.lab-engine-type-badge.mysql    { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-status-warning, #92400e); }
-.lab-engine-type-badge.mssql    { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-status-success, #166534); }
+.lab-engine-type-badge.mysql    { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-text-onbrand, #ffffff); }
+.lab-engine-type-badge.mssql    { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-engine-type-badge.postgres { background: var(--theme-color-selection-background, #dbeafe); color: #1e3a8a; }
 .lab-engine-type-badge.mongodb  { background: var(--theme-color-status-success, #ecfccb); color: #3f6212; }
-.lab-engine-type-badge.solr     { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-status-error, #991b1b); }
+.lab-engine-type-badge.solr     { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-engine-type-badge.dgraph   { background: var(--theme-color-status-info, #f3e8ff); color: #6b21a8; }
 .lab-engine-status
 {
@@ -158,13 +158,13 @@ a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 	border-radius: 10px;
 	font-weight: 600;
 }
-.lab-engine-status.running       { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-status-success, #166534); }
+.lab-engine-status.running       { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-engine-status.stopped       { background: var(--theme-color-border-default, #e2e8f0); color: var(--theme-color-text-secondary, #475569); }
 .lab-engine-status.provisioning,
-.lab-engine-status.starting      { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-status-warning, #92400e); }
-.lab-engine-status.stopping      { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-status-warning, #92400e); }
+.lab-engine-status.starting      { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-text-onbrand, #ffffff); }
+.lab-engine-status.stopping      { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-engine-status.failed,
-.lab-engine-status.missing       { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-status-error, #991b1b); }
+.lab-engine-status.missing       { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-engine-actions { margin-left: auto; display: flex; gap: 8px; }
 
 .lab-engine-details

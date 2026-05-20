@@ -73,12 +73,12 @@ const _ViewConfiguration =
 	font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
 	padding: 2px 8px; border-radius: 10px; font-weight: 600;
 }
-.lab-uv-status.running       { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-status-success, #166534); }
+.lab-uv-status.running       { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-uv-status.stopped       { background: var(--theme-color-border-default, #e2e8f0); color: var(--theme-color-text-secondary, #475569); }
 .lab-uv-status.provisioning,
 .lab-uv-status.starting,
-.lab-uv-status.stopping      { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-status-warning, #92400e); }
-.lab-uv-status.failed        { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-status-error, #991b1b); }
+.lab-uv-status.stopping      { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-text-onbrand, #ffffff); }
+.lab-uv-status.failed        { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-text-onbrand, #ffffff); }
 
 .lab-uv-actions { margin-left: auto; display: flex; gap: 8px; }
 .lab-uv-details
@@ -103,12 +103,12 @@ const _ViewConfiguration =
 {
 	font-size: 11px; padding: 2px 8px; border-radius: 10px;
 	font-weight: 600; letter-spacing: 0.3px;
-	background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-status-warning, #92400e);
+	background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-text-onbrand, #ffffff);
 	border: 1px solid var(--theme-color-status-warning, #fde68a);
 }
 .lab-uv-secure-badge.bootstrapped
 {
-	background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-status-success, #166534); border-color: var(--theme-color-status-success, #86efac);
+	background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-text-onbrand, #ffffff); border-color: var(--theme-color-status-success, #86efac);
 }
 .lab-uv-security-actions
 {
@@ -130,10 +130,10 @@ const _ViewConfiguration =
 	white-space: nowrap; font-weight: 500;
 }
 .lab-uv-persistence-pill.unassigned         { background: var(--theme-color-border-default, #e2e8f0); color: var(--theme-color-text-secondary, #475569); }
-.lab-uv-persistence-pill.waiting-for-beacon { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-status-warning, #92400e); }
+.lab-uv-persistence-pill.waiting-for-beacon { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-uv-persistence-pill.bootstrapping      { background: var(--theme-color-selection-background, #dbeafe); color: var(--theme-color-brand-primary-hover, #1e40af); }
-.lab-uv-persistence-pill.bootstrapped       { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-status-success, #166534); }
-.lab-uv-persistence-pill.error              { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-status-error, #991b1b); cursor: help; }
+.lab-uv-persistence-pill.bootstrapped       { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-text-onbrand, #ffffff); }
+.lab-uv-persistence-pill.error              { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-text-onbrand, #ffffff); cursor: help; }
 
 .lab-uv-empty
 {
@@ -143,16 +143,16 @@ const _ViewConfiguration =
 
 .lab-btn
 {
-	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-background-panel, #ffffff); border: 1px solid var(--theme-color-brand-primary-hover, #1d4ed8);
+	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-text-onbrand, #ffffff); border: 1px solid var(--theme-color-brand-primary-hover, #1d4ed8);
 	border-radius: 6px; padding: 6px 14px; font-size: 13px;
 	font-weight: 500; cursor: pointer;
 }
 a.lab-btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .lab-btn:hover { background: var(--theme-color-brand-primary-hover, #1e40af); border-color: var(--theme-color-brand-primary-hover, #1e40af); }
-.lab-btn.secondary { background: transparent; color: var(--theme-color-text-primary, #0f172a); border-color: var(--theme-color-border-strong, #cbd5e1); }
+.lab-btn.secondary { background: transparent; color: var(--theme-color-text-primary, #0f172a); border-color: var(--theme-color-text-primary, #2d3748); }
 .lab-btn.secondary:hover { background: var(--theme-color-background-primary, #f1f5f9); border-color: var(--theme-color-text-muted, #94a3b8); }
 .lab-btn.danger { background: transparent; color: var(--theme-color-status-error, #b91c1c); border-color: var(--theme-color-status-error, #fecaca); }
-.lab-btn.danger:hover { background: var(--theme-color-status-error, #fef2f2); border-color: var(--theme-color-status-error, #f87171); }
+.lab-btn.danger:hover { background: var(--theme-color-status-error, #ef4444); border-color: var(--theme-color-status-error, #ef4444); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-btn.small { padding: 4px 10px; font-size: 12px; }
 .lab-btn:disabled,
 .lab-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }

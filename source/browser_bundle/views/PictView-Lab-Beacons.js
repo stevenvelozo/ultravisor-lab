@@ -89,8 +89,7 @@ const _ViewConfiguration =
 	border: 1px solid var(--theme-color-status-warning, #fcd34d);
 	border-radius: 6px;
 	padding: 8px 12px;
-	font-size: 12px;
-	color: var(--theme-color-status-warning, #78350f);
+	font-size: 12px; color: var(--theme-color-text-onbrand, #ffffff);
 }
 .lab-beacons-form-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
 .lab-beacons-form-error { grid-column: 1 / -1; color: var(--theme-color-status-error, #b91c1c); font-size: 13px; }
@@ -155,10 +154,10 @@ const _ViewConfiguration =
 	margin-left: auto; padding: 2px 10px; border-radius: 12px;
 	font-size: 12px; font-weight: 600; background: var(--theme-color-background-primary, #f1f5f9); color: var(--theme-color-text-secondary, #475569);
 }
-.lab-beacon-status.running     { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-status-success, #166534); }
+.lab-beacon-status.running     { background: var(--theme-color-status-success, #dcfce7); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-beacon-status.starting    { background: var(--theme-color-status-warning, #fef9c3); color: #854d0e; }
-.lab-beacon-status.provisioning { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-status-warning, #92400e); }
-.lab-beacon-status.failed      { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-status-error, #991b1b); }
+.lab-beacon-status.provisioning { background: var(--theme-color-status-warning, #fef3c7); color: var(--theme-color-text-onbrand, #ffffff); }
+.lab-beacon-status.failed      { background: var(--theme-color-status-error, #fee2e2); color: var(--theme-color-text-onbrand, #ffffff); }
 .lab-beacon-status-detail
 {
 	font-size: 12px; color: var(--theme-color-text-secondary, #475569); font-style: italic;
@@ -196,7 +195,7 @@ const _ViewConfiguration =
 .lab-chip:hover { background: var(--theme-color-border-default, #e2e8f0); color: var(--theme-color-text-primary, #0f172a); }
 .lab-chip.active
 {
-	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-background-panel, #ffffff); border-color: var(--theme-color-brand-primary-hover, #1d4ed8);
+	background: var(--theme-color-brand-primary-hover, #1d4ed8); color: var(--theme-color-text-onbrand, #ffffff); border-color: var(--theme-color-brand-primary-hover, #1d4ed8);
 	cursor: default; pointer-events: none;
 }
 `,
