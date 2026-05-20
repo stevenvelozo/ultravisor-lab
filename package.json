@@ -37,7 +37,7 @@
 	],
 	"dependencies": {
 		"chance": "^1.1.13",
-		"fable": "^3.1.72",
+		"fable": "^3.1.73",
 		"fable-serviceproviderbase": "^3.0.19",
 		"meadow": "^2.0.39",
 		"meadow-connection-sqlite": "^1.0.20",
@@ -47,11 +47,11 @@
 		"orator": "^6.1.2",
 		"orator-conversion": "^1.0.13",
 		"orator-serviceserver-restify": "^2.0.11",
-		"pict": "^1.0.368",
+		"pict": "^1.0.369",
 		"pict-application": "^1.0.34",
 		"pict-provider-theme": "file:../../pict/pict-provider-theme",
 		"pict-router": "^1.0.10",
-		"pict-section-code": "^1.0.7",
+		"pict-section-code": "^1.0.11",
 		"pict-section-modal": "^1.1.1",
 		"pict-section-theme": "file:../../pict/pict-section-theme",
 		"pict-view": "^1.0.68",
@@ -61,8 +61,7 @@
 	},
 	"devDependencies": {
 		"gulp": "^4.0.2",
-		"quackage": "^1.2.3",
-		"sharp": "^0.34.5"
+		"quackage": "^1.2.3"
 	},
 	"license": "MIT",
 	"author": "Steven Velozo <steven@velozo.com>",
