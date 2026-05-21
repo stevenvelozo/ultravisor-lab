@@ -1,0 +1,86 @@
+{
+	"Hash": "preset-ultravisor-secured-internal",
+	"Name": "Ultravisor — Secured (internal user management)",
+	"Description": "Ultravisor + ultravisor-auth-beacon running the built-in MemoryAuthProvider.  The web UI requires login; the in-app user management views (list / edit / password change) are visible because the provider implements `supportsUserManagement() === true`.  Default sign-in: admin / admin (override via UVAdminPassword to seed your own).  Good for local dev, smoke testing the full login flow, and demoing the user-admin UX without bringing up an external identity backend.",
+	"SchemaVersion": 1,
+	"Inputs":
+	{
+		"DataRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/ultravisor-secured-internal",
+			"Description": "Where Ultravisor + auth-beacon state persist on the host."
+		},
+		"MonorepoRoot":
+		{
+			"Type": "folder",
+			"Default": "${env.RETOLD_MONOREPO_ROOT}",
+			"Description": "Path to your retold monorepo checkout. Ultravisor + auth-beacon are built from sibling checkouts at launch."
+		},
+		"UVAdminPassword":
+		{
+			"Type": "secret",
+			"Default": "admin",
+			"Description": "Admin password seeded into MemoryAuthProvider.  Username is `admin`.  Default is `admin` for dev; set something stronger for shared environments."
+		},
+		"UVPort":
+		{
+			"Type": "port",
+			"Default": 54321,
+			"Description": "Host port for the Ultravisor API + web UI."
+		}
+	},
+	"Components":
+	[
+		{
+			"Hash": "ultravisor",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.UVPort}", "Container": 54321 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/uv/data", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_LOG_LEVEL": "info"
+			},
+			"HealthCheck":
+			{
+				"Command": "node -e \"const h=require('http');h.get('http://localhost:54321/status',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\"",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "ultravisor-auth-beacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor-auth-beacon",
+			"Dockerfile": "Dockerfile",
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/auth-beacon/config", "Container": "/app/config", "Mode": "rw" }
+			],
+			"Files":
+			[
+				{
+					"Path": "/app/config/auth-beacon.json",
+					"Content": "{\n\t\"BeaconName\": \"auth-beacon\",\n\t\"UltravisorURL\": \"http://ultravisor:54321\",\n\t\"ProviderConfig\":\n\t{\n\t\t\"Permissive\": false,\n\t\t\"Users\":\n\t\t[\n\t\t\t{ \"Username\": \"admin\", \"Password\": \"${input.UVAdminPassword}\", \"Roles\": [\"admin\"] }\n\t\t]\n\t}\n}\n"
+				}
+			],
+			"Command":
+			[
+				"node",
+				"bin/ultravisor-auth-beacon.js",
+				"--config",
+				"/app/config/auth-beacon.json",
+				"--provider",
+				"memory"
+			],
+			"DependsOn": [ "ultravisor" ]
+		}
+	]
+}

@@ -1,0 +1,53 @@
+{
+	"Hash": "preset-ultravisor-promiscuous",
+	"Name": "Ultravisor — Promiscuous (no login)",
+	"Description": "Bare-minimum stack: a single Ultravisor with no auth beacon attached.  The web UI loads straight to the dashboard with no login screen — session-gated routes synthesize anonymous sessions because no provider could possibly mint a real one.  Useful for local development, automation testing, and as a smoke check that the UI works without an auth backend at all.",
+	"SchemaVersion": 1,
+	"Inputs":
+	{
+		"DataRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/ultravisor-promiscuous",
+			"Description": "Where Ultravisor state (operation library, manifest store) persists on the host."
+		},
+		"MonorepoRoot":
+		{
+			"Type": "folder",
+			"Default": "${env.RETOLD_MONOREPO_ROOT}",
+			"Description": "Path to your retold monorepo checkout. Ultravisor is built from MonorepoRoot/modules/apps/ultravisor at launch."
+		},
+		"UVPort":
+		{
+			"Type": "port",
+			"Default": 54321,
+			"Description": "Host port for the Ultravisor API + web UI."
+		}
+	},
+	"Components":
+	[
+		{
+			"Hash": "ultravisor",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.UVPort}", "Container": 54321 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/uv/data", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_LOG_LEVEL": "info"
+			},
+			"HealthCheck":
+			{
+				"Command": "node -e \"const h=require('http');h.get('http://localhost:54321/status',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\"",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		}
+	]
+}

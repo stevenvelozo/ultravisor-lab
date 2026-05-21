@@ -1,0 +1,92 @@
+{
+	"Hash": "preset-ultravisor-secured-external",
+	"Name": "Ultravisor — Secured (external auth, no in-app user mgmt)",
+	"Description": "Ultravisor + ultravisor-auth-beacon running the ExternalDirectoryAuthProvider.  Simulates a deployment whose user store lives outside Ultravisor (LDAP, OIDC, in-house IAM): the beacon validates credentials and mints sessions, but the in-app user management views are HIDDEN because the provider advertises `UserManagement: external` at registration.  Use this preset as a fixture for the third login mode — verify that login works, the dashboard renders, AND the Users tab is absent from the top nav.",
+	"SchemaVersion": 1,
+	"Inputs":
+	{
+		"DataRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/ultravisor-secured-external",
+			"Description": "Where Ultravisor + auth-beacon state persist on the host."
+		},
+		"MonorepoRoot":
+		{
+			"Type": "folder",
+			"Default": "${env.RETOLD_MONOREPO_ROOT}",
+			"Description": "Path to your retold monorepo checkout. Ultravisor + auth-beacon are built from sibling checkouts at launch."
+		},
+		"DirectoryUser":
+		{
+			"Type": "string",
+			"Default": "alice",
+			"Description": "Username for the simulated external directory's seed account."
+		},
+		"DirectoryPassword":
+		{
+			"Type": "secret",
+			"Default": "alice",
+			"Description": "Password for the seed external-directory account.  Username/password pairs are validated against this in-memory directory but treated as if they came from a remote IdP."
+		},
+		"UVPort":
+		{
+			"Type": "port",
+			"Default": 54321,
+			"Description": "Host port for the Ultravisor API + web UI."
+		}
+	},
+	"Components":
+	[
+		{
+			"Hash": "ultravisor",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.UVPort}", "Container": 54321 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/uv/data", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_LOG_LEVEL": "info"
+			},
+			"HealthCheck":
+			{
+				"Command": "node -e \"const h=require('http');h.get('http://localhost:54321/status',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\"",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "ultravisor-auth-beacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor-auth-beacon",
+			"Dockerfile": "Dockerfile",
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/auth-beacon/config", "Container": "/app/config", "Mode": "rw" }
+			],
+			"Files":
+			[
+				{
+					"Path": "/app/config/auth-beacon.json",
+					"Content": "{\n\t\"BeaconName\": \"auth-beacon\",\n\t\"UltravisorURL\": \"http://ultravisor:54321\",\n\t\"ProviderConfig\":\n\t{\n\t\t\"Users\":\n\t\t[\n\t\t\t{ \"Username\": \"${input.DirectoryUser}\", \"Password\": \"${input.DirectoryPassword}\", \"Roles\": [\"user\"], \"FullName\": \"Directory User\" }\n\t\t]\n\t}\n}\n"
+				}
+			],
+			"Command":
+			[
+				"node",
+				"bin/ultravisor-auth-beacon.js",
+				"--config",
+				"/app/config/auth-beacon.json",
+				"--provider",
+				"external-directory"
+			],
+			"DependsOn": [ "ultravisor" ]
+		}
+	]
+}
