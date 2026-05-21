@@ -1,0 +1,259 @@
+{
+	"Hash": "preset-full-beacon-smoke",
+	"Name": "Full-Beacon Smoke Test (one of each)",
+	"Description": "Comprehensive smoke stack: brings up ultravisor + ultravisor-auth-beacon (memory provider, admin login) PLUS exactly one of every web-UI beacon (retold-databeacon, retold-facto, retold-content-system, retold-remote, retold-data-mapper) and one of every worker beacon (retold-synth-databeacon for source data, meadow-integration for parse/transform).  retold-remote also auto-registers orator-conversion as a sibling beacon, so the MediaConversion capability shows up on the mesh without an extra component.  All beacons are pre-wired to log in as `admin` / UVAdminPassword.\n\nUse this preset to verify: (a) every beacon image builds, (b) every beacon registers with UV's auth beacon, (c) every beacon's web UI loads the login overlay, (d) the cross-beacon data-mapping pipeline runs end-to-end.\n\nIntegration walkthrough after `Up`:\n  1. Open the data-mapper UI at http://127.0.0.1:${DataMapperPort}, sign in as admin.\n  2. The 'smoke-databeacon' connection is pre-bootstrapped — the mapper's BeaconBrowser shows synth-databeacon (source) + smoke-databeacon (target).\n  3. Pick synth-databeacon ▸ Company as Source.  Pick smoke-databeacon ▸ Company as Target (will be auto-created on first write).\n  4. Map IDCompany, Name, City, StateCode, CreateDate 1:1.\n  5. Save the mapping + click Run.  ~25 rows flow through synth → meadow-integration's TabularTransform → databeacon's MeadowProxy.Create.\n  6. Confirm rows landed: open databeacon UI at http://127.0.0.1:${DataBeaconPort}, browse the Company table.",
+	"SchemaVersion": 1,
+	"Inputs":
+	{
+		"DataRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/full-beacon-smoke",
+			"Description": "Base directory for all volume mounts (UV state + each beacon's data dir).  Subdirectories created on first launch."
+		},
+		"MonorepoRoot":
+		{
+			"Type": "folder",
+			"Default": "${env.RETOLD_MONOREPO_ROOT}",
+			"Description": "Path to your retold monorepo checkout.  All retold-* and meadow-integration images are built from MonorepoRoot/modules/... at launch."
+		},
+		"UVAdminPassword":
+		{
+			"Type": "secret",
+			"Default": "admin",
+			"Description": "Bootstrap admin password.  Used as the login credential across every beacon web UI in this stack AND as the bearer password every beacon presents at registration."
+		},
+		"UVPort":
+		{
+			"Type": "port",
+			"Default": 54321,
+			"Description": "Host port for the Ultravisor API + web UI."
+		},
+		"DataBeaconPort":
+		{
+			"Type": "port",
+			"Default": 8389,
+			"Description": "Host port for retold-databeacon (smoke target — SQLite-backed; the mapper writes Company rows here)."
+		},
+		"FactoPort":
+		{
+			"Type": "port",
+			"Default": 8386,
+			"Description": "Host port for retold-facto (registers + login overlay; no role in the integration)."
+		},
+		"ContentSystemPort":
+		{
+			"Type": "port",
+			"Default": 7780,
+			"Description": "Host port for retold-content-system (registers + login overlay; serves an empty content dir)."
+		},
+		"RemotePort":
+		{
+			"Type": "port",
+			"Default": 7777,
+			"Description": "Host port for retold-remote (registers + auto-registers orator-conversion alongside; serves an empty content dir)."
+		},
+		"DataMapperPort":
+		{
+			"Type": "port",
+			"Default": 18401,
+			"Description": "Host port for retold-data-mapper (where the smoke integration is configured + run from the UI)."
+		},
+		"SynthBeaconPort":
+		{
+			"Type": "port",
+			"Default": 8390,
+			"Description": "Host port for retold-synth-databeacon (source of the smoke dataset)."
+		}
+	},
+	"Components":
+	[
+		{
+			"Hash": "ultravisor",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.UVPort}", "Container": 54321 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/uv/data", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_LOG_LEVEL": "info"
+			},
+			"HealthCheck":
+			{
+				"Command": "node -e \"const h=require('http');h.get('http://localhost:54321/status',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\"",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+
+		{
+			"Hash": "ultravisor-auth-beacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor-auth-beacon",
+			"Dockerfile": "Dockerfile",
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/auth-beacon/config", "Container": "/app/config", "Mode": "rw" }
+			],
+			"Files":
+			[
+				{
+					"Path": "/app/config/auth-beacon.json",
+					"Content": "{\n\t\"BeaconName\": \"auth-beacon\",\n\t\"UltravisorURL\": \"http://ultravisor:54321\",\n\t\"ProviderConfig\":\n\t{\n\t\t\"Permissive\": false,\n\t\t\"Users\":\n\t\t[\n\t\t\t{ \"Username\": \"admin\", \"Password\": \"${input.UVAdminPassword}\", \"Roles\": [\"admin\"] }\n\t\t]\n\t}\n}\n"
+				}
+			],
+			"Command":
+			[
+				"node",
+				"bin/ultravisor-auth-beacon.js",
+				"--config",
+				"/app/config/auth-beacon.json",
+				"--provider",
+				"memory"
+			],
+			"DependsOn": [ "ultravisor" ]
+		},
+
+		{
+			"Hash": "retold-databeacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.DataBeaconPort}", "Container": 8389 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/databeacon", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"DATABEACON_ULTRAVISOR_URL":  "http://${component.ultravisor.host}:54321",
+				"DATABEACON_BEACON_NAME":     "smoke-databeacon",
+				"DATABEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"DATABEACON_MAX_CONCURRENT":  "3"
+			},
+			"DependsOn": [ "ultravisor", "ultravisor-auth-beacon" ]
+		},
+
+		{
+			"Hash": "retold-facto",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-facto",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.FactoPort}", "Container": 8386 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/facto", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"FACTO_ULTRAVISOR_URL":  "http://${component.ultravisor.host}:54321",
+				"FACTO_BEACON_NAME":     "smoke-facto",
+				"FACTO_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"FACTO_MAX_CONCURRENT":  "2"
+			},
+			"DependsOn": [ "ultravisor", "ultravisor-auth-beacon" ]
+		},
+
+		{
+			"Hash": "retold-content-system",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-content-system",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.ContentSystemPort}", "Container": 7780 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/content-system/data",    "Container": "/app/data",    "Mode": "rw" },
+				{ "Host": "${input.DataRoot}/content-system/content", "Container": "/app/content", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"CONTENT_ULTRAVISOR_URL":  "http://${component.ultravisor.host}:54321",
+				"CONTENT_BEACON_NAME":     "smoke-content-system",
+				"CONTENT_BEACON_PASSWORD": "${input.UVAdminPassword}"
+			},
+			"DependsOn": [ "ultravisor", "ultravisor-auth-beacon" ]
+		},
+
+		{
+			"Hash": "retold-remote",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-remote",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.RemotePort}", "Container": 7777 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/remote/data",    "Container": "/app/data",    "Mode": "rw" },
+				{ "Host": "${input.DataRoot}/remote/content", "Container": "/app/content", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"REMOTE_ULTRAVISOR_URL":  "http://${component.ultravisor.host}:54321",
+				"REMOTE_BEACON_NAME":     "smoke-remote",
+				"REMOTE_BEACON_PASSWORD": "${input.UVAdminPassword}"
+			},
+			"DependsOn": [ "ultravisor", "ultravisor-auth-beacon" ]
+		},
+
+		{
+			"Hash": "retold-data-mapper",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-data-mapper",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.DataMapperPort}", "Container": 18401 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/data-mapper", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"RETOLD_DATA_MAPPER_ULTRAVISOR_URL":  "http://${component.ultravisor.host}:54321",
+				"RETOLD_DATA_MAPPER_BEACON_NAME":     "smoke-data-mapper",
+				"RETOLD_DATA_MAPPER_BEACON_PASSWORD": "${input.UVAdminPassword}"
+			},
+			"DependsOn": [ "ultravisor", "ultravisor-auth-beacon", "retold-databeacon" ]
+		},
+
+		{
+			"Hash": "retold-synth-databeacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-synth-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.SynthBeaconPort}", "Container": 8390 } ],
+			"Environment":
+			{
+				"SYNTHBEACON_ULTRAVISOR_URL":  "http://${component.ultravisor.host}:54321",
+				"SYNTHBEACON_BEACON_NAME":     "synth-databeacon",
+				"SYNTHBEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"SYNTHBEACON_MAX_CONCURRENT":  "3"
+			},
+			"Files":
+			[
+				{
+					"Path": "/app/source/specs/smoke-company-v1.json",
+					"Content": "{\n\t\"Name\": \"smoke-company-v1\",\n\t\"GlobalSeed\": \"smoke-company-v1\",\n\t\"Description\": \"Tiny Company-only dataset for the full-beacon smoke test.  25 rows.  Deterministic.\",\n\t\"Entities\":\n\t[\n\t\t{\n\t\t\t\"Entity\": \"Company\",\n\t\t\t\"Count\": 25,\n\t\t\t\"Description\": \"Smoke-test Companies.\",\n\t\t\t\"Fields\":\n\t\t\t[\n\t\t\t\t{ \"Column\": \"IDCompany\",   \"Expression\": \"RecordIndex + 1\" },\n\t\t\t\t{ \"Column\": \"GUIDCompany\", \"Expression\": \"synth_guid()\" },\n\t\t\t\t{ \"Column\": \"Name\",        \"Expression\": \"synth_company()\" },\n\t\t\t\t{ \"Column\": \"City\",        \"Expression\": \"synth_city()\" },\n\t\t\t\t{ \"Column\": \"StateCode\",   \"Expression\": \"synth_stateCode()\" },\n\t\t\t\t{ \"Column\": \"CreateDate\",  \"Expression\": \"synth_dateBetween(\\\"2020-01-01\\\", \\\"2024-12-31\\\")\" },\n\t\t\t\t{ \"Column\": \"Deleted\",     \"Expression\": \"0\" }\n\t\t\t]\n\t\t}\n\t]\n}\n"
+				}
+			],
+			"DependsOn": [ "ultravisor", "ultravisor-auth-beacon" ]
+		},
+
+		{
+			"Hash": "meadow-integration",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/meadow/meadow-integration",
+			"Dockerfile": "Dockerfile",
+			"Environment":
+			{
+				"MEADOW_INTEGRATION_ULTRAVISOR_URL":  "http://${component.ultravisor.host}:54321",
+				"MEADOW_INTEGRATION_BEACON_NAME":     "smoke-meadow-integration",
+				"MEADOW_INTEGRATION_BEACON_PASSWORD": "${input.UVAdminPassword}"
+			},
+			"DependsOn": [ "ultravisor", "ultravisor-auth-beacon" ]
+		}
+	]
+}
