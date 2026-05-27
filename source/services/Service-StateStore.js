@@ -5,25 +5,44 @@
  *
  * Schema covers every entity the lab supervises: dockerized DB engines,
  * databases inside them, ultravisor instances, databeacons, facto instances,
- * ingestion jobs, and a flat infrastructure event log for the UI timeline.
+ * ingestion jobs, stacks, and a flat infrastructure event log for the UI
+ * timeline.
  *
- * Backed by the meadow DAL — schema lives in `model/MeadowModel-Lab.json`
- * and is the single source of truth. Bootstrap runs:
+ * Backed by `meadow-connection-sqlite` (the retold SQLite provider, now
+ * itself sitting on node:sqlite's DatabaseSync). We use mcs for two things:
  *
- *   1. `Meadow.loadFromPackageObject(...)` per table → DAL handles
- *   2. The connector's `createTables` (idempotent CREATE TABLE IF NOT EXISTS)
- *   3. `meadow-migrationmanager` (introspect → diff → forward-only filter →
- *      generate ALTER → execute) for incremental ADD COLUMN
+ *   1. Connection lifecycle — mcs constructs the DatabaseSync handle,
+ *      issues the WAL pragma, and exposes the handle as `provider.db`.
+ *      If mcs ever switches drivers again (libsql, back to better-sqlite3,
+ *      …), the lab follows for free.
  *
- * No more drift between a hand-written `CREATE TABLE` template and a
- * separate `_applyColumnMigrations` array. Adding a column is one edit
- * to the JSON model.
+ *   2. DDL generation — `schemaProvider.generateCreateTableStatement` and
+ *      `generateCreateIndexStatements` are pure string builders that own
+ *      the canonical retold DataType -> DDL mapping. We call them to get
+ *      the SQL, then `exec` it on the handle ourselves.
+ *
+ * What we deliberately do NOT use:
+ *
+ *   - `meadow` (the DAL). meadow's _CreateBehavior step 0 schedules a
+ *     `setImmediate` between its pre-flight and the actual INSERT to keep
+ *     long synchronous chains of Creates from blowing the stack. That
+ *     defer is fine for normal consumers but breaks the lab's historical
+ *     "insert returns the new ID on the next line" idiom and would force
+ *     a callsite-wide rewrite for no actual gain (twelve small tables,
+ *     low-thousand row counts).
+ *
+ *   - `meadow-migrationmanager`. Same story — its introspect path goes
+ *     through `async.eachLimit`, which defers via setImmediate even when
+ *     every iteratee is sync. We do forward-only ADD COLUMN migrations
+ *     ourselves via PRAGMA table_info, which is comfortably scoped to the
+ *     lab's needs.
+ *
+ *   - `schemaProvider.createTables` / `createAllIndices` — same eachLimit
+ *     deferral problem. We call the underlying `generate…Statement`
+ *     methods directly and exec the SQL ourselves.
  *
  * The public `list / getById / insert / update / remove / recordEvent /
- * listEvents` API stays synchronous (returns values, not callbacks) —
- * meadow's SQLite path resolves callbacks before the call returns
- * (better-sqlite3 is sync), so the wrappers capture results into a
- * local var and return them. Existing call sites need no churn.
+ * listEvents` API stays synchronous and the call shapes are unchanged.
  */
 'use strict';
 
@@ -31,14 +50,38 @@ const libPath = require('path');
 const libFs = require('fs');
 const libFableServiceProviderBase = require('fable-serviceproviderbase');
 const libMeadowConnectionSQLite = require('meadow-connection-sqlite');
-const libMeadow = require('meadow');
-const libMeadowMigrationManager = require('meadow-migrationmanager');
 
 const MODEL_PATH = libPath.resolve(__dirname, '..', '..', 'model', 'MeadowModel-Lab.json');
 
 // Reads cap. Lab tables are small; a 1000-row default is comfortably
 // above any real-world count and avoids paging in the generic helpers.
 const DEFAULT_READS_CAP = 1000;
+
+// Convert the model's high-level Schema entries (AutoIdentity / Integer /
+// Boolean / String / Text / DateTime / CreateDate / UpdateDate /
+// ForeignKey) to the lower-level meadow connector vocabulary the SQLite
+// schemaProvider expects (ID / Numeric / Boolean / String / Text /
+// DateTime / ForeignKey). mcs is the canonical source for the DataType
+// -> DDL mapping; we just translate the model's higher-level Types into
+// mcs's vocabulary.
+const TYPE_TO_DATATYPE =
+{
+	AutoIdentity: 'ID',
+	AutoGUID:     'GUID',
+	ForeignKey:   'ForeignKey',
+	Integer:      'Numeric',
+	Float:        'Decimal',
+	Decimal:      'Decimal',
+	Boolean:      'Boolean',
+	Deleted:      'Boolean',
+	CreateDate:   'DateTime',
+	UpdateDate:   'DateTime',
+	DeleteDate:   'DateTime',
+	DateTime:     'DateTime',
+	String:       'String',
+	Text:         'Text',
+	JSON:         'Text'
+};
 
 class ServiceStateStore extends libFableServiceProviderBase
 {
@@ -48,17 +91,14 @@ class ServiceStateStore extends libFableServiceProviderBase
 
 		this.serviceType = 'LabStateStore';
 
-		this.dataDir  = (pOptions && pOptions.DataDir)  ? pOptions.DataDir  : libPath.resolve(__dirname, '..', '..', 'data');
-		this.dbPath   = libPath.join(this.dataDir, 'lab.db');
+		this.dataDir = (pOptions && pOptions.DataDir)  ? pOptions.DataDir  : libPath.resolve(__dirname, '..', '..', 'data');
+		this.dbPath  = libPath.join(this.dataDir, 'lab.db');
 
-		// Direct better-sqlite3 handle — kept around for the migration
-		// manager's ALTER execution path and as a debug escape hatch.
-		// All CRUD goes through the meadow DAL.
+		// DatabaseSync handle, set in initialize() once mcs connects.
 		this.db = null;
 
-		// Map<TableName, MeadowDAL>
-		this._DAL = {};
 		this._Model = null;
+		this._TableMeta = null;
 	}
 
 	initialize(fCallback)
@@ -72,13 +112,14 @@ class ServiceStateStore extends libFableServiceProviderBase
 			return fCallback(pMkdirError);
 		}
 
+		// Point mcs at our lab.db. The provider reads SQLiteFilePath from
+		// fable.settings.SQLite on construction; setting it before
+		// instantiation is how every other retold consumer wires it up.
 		if (!this.fable.settings.SQLite)
 		{
 			this.fable.settings.SQLite = {};
 		}
 		this.fable.settings.SQLite.SQLiteFilePath = this.dbPath;
-		// Tell meadow which provider DALs should target.
-		this.fable.settings.MeadowProvider = 'SQLite';
 
 		this.fable.addAndInstantiateServiceTypeIfNotExists('MeadowSQLiteProvider', libMeadowConnectionSQLite);
 
@@ -90,36 +131,25 @@ class ServiceStateStore extends libFableServiceProviderBase
 					this.fable.log.error(`LabStateStore: SQLite connect failed -- ${pConnectError.message}`);
 					return fCallback(pConnectError);
 				}
-
 				this.db = this.fable.MeadowSQLiteProvider.db;
-
 				try
 				{
 					this._loadModel();
-					this._instantiateDALs();
+					this._buildTableMeta();
+					this._bootstrapSchema();
+					this.fable.log.info(`LabStateStore: ready at [${this.dbPath}]`);
+					return fCallback(null);
 				}
-				catch (pLoadErr)
+				catch (pBootErr)
 				{
-					this.fable.log.error(`LabStateStore: model load failed -- ${pLoadErr.message}`);
-					return fCallback(pLoadErr);
+					this.fable.log.error(`LabStateStore: schema bootstrap failed -- ${pBootErr.message}`);
+					return fCallback(pBootErr);
 				}
-
-				this._bootstrapSchema(
-					(pSchemaErr) =>
-					{
-						if (pSchemaErr)
-						{
-							this.fable.log.error(`LabStateStore: schema bootstrap failed -- ${pSchemaErr.message}`);
-							return fCallback(pSchemaErr);
-						}
-						this.fable.log.info(`LabStateStore: ready at [${this.dbPath}]`);
-						return fCallback(null);
-					});
 			});
 	}
 
 	// ====================================================================
-	// Model + DAL bootstrap
+	// Model + schema bootstrap
 	// ====================================================================
 
 	_loadModel()
@@ -133,341 +163,358 @@ class ServiceStateStore extends libFableServiceProviderBase
 	}
 
 	/**
-	 * For each table in the model, build a meadow DAL pointed at SQLite.
-	 * The DALs share the live MeadowSQLiteProvider — meadow's setProvider
-	 * picks up `fable.settings.MeadowProvider` (set above) and routes
-	 * doCreate/doReads/doUpdate/doDelete through better-sqlite3.
+	 * Pre-walk the model and stash per-table metadata every CRUD call
+	 * needs. We do this once at boot rather than rewalking the Schema
+	 * array on every insert — the reconcile loop drives thousands of
+	 * inserts per lab session.
+	 *
+	 * We also pre-build the mcs-shape table descriptor here so the
+	 * schemaProvider's DDL generators can be called without re-translating
+	 * on every boot.
 	 */
-	_instantiateDALs()
+	_buildTableMeta()
 	{
-		let tmpTableNames = Object.keys(this._Model.Tables);
-		for (let i = 0; i < tmpTableNames.length; i++)
-		{
-			let tmpName = tmpTableNames[i];
-			let tmpEntry = this._Model.Tables[tmpName];
-			let tmpMeadowSchema = tmpEntry.MeadowSchema;
-			if (!tmpMeadowSchema)
-			{
-				throw new Error(`LabStateStore: model entry [${tmpName}] missing MeadowSchema.`);
-			}
-			let tmpDAL = libMeadow.new(this.fable).loadFromPackageObject(tmpMeadowSchema);
-			tmpDAL.setProvider('SQLite');
-			this._DAL[tmpName] = tmpDAL;
-		}
-		// Expose under fable.DAL — convenience for any future caller that
-		// wants to drive meadow directly. Keep it scoped to lab tables;
-		// other modules' DALs live on their own fable.
-		if (!this.fable.DAL) { this.fable.DAL = {}; }
-		Object.assign(this.fable.DAL, this._DAL);
-	}
-
-	/**
-	 * Two-step: (1) idempotent createTables on every supported table,
-	 * (2) meadow-migrationmanager forward-only ADD COLUMN for any
-	 * descriptor changes since the table last existed.
-	 */
-	_bootstrapSchema(fCallback)
-	{
-		let tmpSchemaProvider = this.fable.MeadowSQLiteProvider.schemaProvider
-			|| this.fable.MeadowSQLiteProvider._SchemaProvider;
-		if (!tmpSchemaProvider || typeof tmpSchemaProvider.createTables !== 'function')
-		{
-			return fCallback(new Error('LabStateStore: SQLite schemaProvider not exposed by connector.'));
-		}
-
-		// Build the meadow-shape schema (TableName/Columns) the connector
-		// expects from each table descriptor.
-		let tmpMeadowSchema = { Tables: this._collectMeadowTables() };
-
-		tmpSchemaProvider.createTables(tmpMeadowSchema,
-			(pCreateErr) =>
-			{
-				if (pCreateErr) { return fCallback(pCreateErr); }
-				tmpSchemaProvider.createAllIndices(tmpMeadowSchema,
-					(pIdxErr) =>
-					{
-						if (pIdxErr) { return fCallback(pIdxErr); }
-						this._runForwardMigrations(tmpSchemaProvider, tmpMeadowSchema, fCallback);
-					});
-			});
-	}
-
-	/**
-	 * Convert the model's high-level Schema entries (AutoIdentity / Integer /
-	 * Boolean / String / Text / DateTime / CreateDate / UpdateDate /
-	 * ForeignKey) to the lower-level meadow connector vocabulary the
-	 * SQLite schemaProvider expects (ID / Numeric / Boolean / String /
-	 * Text / DateTime / ForeignKey).
-	 */
-	_collectMeadowTables()
-	{
-		const TYPE_TO_DATATYPE =
-		{
-			AutoIdentity: 'ID',
-			AutoGUID:     'GUID',
-			ForeignKey:   'ForeignKey',
-			Integer:      'Numeric',
-			Float:        'Decimal',
-			Decimal:      'Decimal',
-			Boolean:      'Boolean',
-			Deleted:      'Boolean',
-			CreateDate:   'DateTime',
-			UpdateDate:   'DateTime',
-			DeleteDate:   'DateTime',
-			DateTime:     'DateTime',
-			String:       'String',
-			Text:         'Text',
-			JSON:         'Text'
-		};
-		let tmpTables = [];
+		this._TableMeta = {};
 		let tmpNames = Object.keys(this._Model.Tables);
 		for (let i = 0; i < tmpNames.length; i++)
 		{
-			let tmpEntry = this._Model.Tables[tmpNames[i]];
+			let tmpName = tmpNames[i];
+			let tmpEntry = this._Model.Tables[tmpName];
 			let tmpSchema = tmpEntry.MeadowSchema && tmpEntry.MeadowSchema.Schema;
 			if (!Array.isArray(tmpSchema)) { continue; }
-			let tmpColumns = tmpSchema.map((pC) =>
+			let tmpKnown = new Set();
+			let tmpCreateDateCol = null;
+			let tmpUpdateDateCol = null;
+			let tmpProviderCols = [];
+			for (let j = 0; j < tmpSchema.length; j++)
 			{
-				let tmpDT = TYPE_TO_DATATYPE[pC.Type] || 'Text';
-				let tmpCol = { Column: pC.Column, DataType: tmpDT };
-				if (pC.Size && pC.Size !== 'Default' && pC.Size !== 'int')
+				let tmpCol = tmpSchema[j];
+				tmpKnown.add(tmpCol.Column);
+				if (tmpCol.Type === 'CreateDate') { tmpCreateDateCol = tmpCol.Column; }
+				if (tmpCol.Type === 'UpdateDate') { tmpUpdateDateCol = tmpCol.Column; }
+				let tmpProviderCol = { Column: tmpCol.Column, DataType: TYPE_TO_DATATYPE[tmpCol.Type] || 'Text' };
+				if (tmpCol.Size && tmpCol.Size !== 'Default' && tmpCol.Size !== 'int')
 				{
-					tmpCol.Size = pC.Size;
+					tmpProviderCol.Size = tmpCol.Size;
 				}
-				if (pC.Indexed) { tmpCol.Indexed = pC.Indexed; }
-				if (pC.IndexName) { tmpCol.IndexName = pC.IndexName; }
-				return tmpCol;
-			});
-			tmpTables.push({ TableName: tmpEntry.TableName, Columns: tmpColumns });
+				if (tmpCol.Indexed)   { tmpProviderCol.Indexed   = tmpCol.Indexed;   }
+				if (tmpCol.IndexName) { tmpProviderCol.IndexName = tmpCol.IndexName; }
+				tmpProviderCols.push(tmpProviderCol);
+			}
+			this._TableMeta[tmpName] =
+			{
+				TableName:     tmpEntry.TableName,
+				IDColumn:      (tmpEntry.MeadowSchema && tmpEntry.MeadowSchema.DefaultIdentifier) || null,
+				Schema:        tmpSchema,
+				KnownColumns:  tmpKnown,
+				CreateDateCol: tmpCreateDateCol,
+				UpdateDateCol: tmpUpdateDateCol,
+				DefaultObject: (tmpEntry.MeadowSchema && tmpEntry.MeadowSchema.DefaultObject) || {},
+				// mcs-shape descriptor: passed to schemaProvider for DDL generation.
+				ProviderSchema: { TableName: tmpEntry.TableName, Columns: tmpProviderCols }
+			};
 		}
-		return tmpTables;
 	}
 
 	/**
-	 * Lazy-init meadow-migrationmanager and run introspect → diff →
-	 * forward-only filter → generate → execute. Mirror of the path
-	 * retold-databeacon's DataBeacon-SchemaManager uses (Session 4 work),
-	 * scoped to the lab's tables only.
+	 * Walk every Tables entry in the model and ensure the corresponding
+	 * SQLite table + columns + indices are present. All three steps are
+	 * idempotent (IF NOT EXISTS / introspect-then-ADD), so re-runs on an
+	 * existing lab.db are no-ops.
+	 *
+	 * We deliberately don't call mcs's `schemaProvider.createTables` /
+	 * `createAllIndices` — those wrap each step in `async.eachLimit`,
+	 * which defers via setImmediate even with all-sync iteratees. Instead
+	 * we ask the schemaProvider to *generate* the DDL (pure sync string
+	 * builders) and exec it on the handle ourselves.
 	 */
-	_runForwardMigrations(pSchemaProvider, pMeadowSchema, fCallback)
+	_bootstrapSchema()
 	{
-		if (!this._MM)
+		let tmpSchemaProvider = this.fable.MeadowSQLiteProvider.schemaProvider
+			|| this.fable.MeadowSQLiteProvider._SchemaProvider;
+		if (!tmpSchemaProvider
+			|| typeof tmpSchemaProvider.generateCreateTableStatement !== 'function'
+			|| typeof tmpSchemaProvider.generateCreateIndexStatements !== 'function')
 		{
-			this._MM = new libMeadowMigrationManager(
-				{
-					Product: 'LabStateStore',
-					LogStreams: (this.fable.settings && this.fable.settings.LogStreams) || [{ streamtype: 'console', level: 'warn' }]
-				});
-			this._SchemaIntrospector = this._MM.instantiateServiceProvider('SchemaIntrospector');
-			this._SchemaDiff         = this._MM.instantiateServiceProvider('SchemaDiff');
-			this._MigrationGenerator = this._MM.instantiateServiceProvider('MigrationGenerator');
+			throw new Error('LabStateStore: mcs schemaProvider missing the DDL generators we need.');
 		}
 
-		this._SchemaIntrospector.introspectDatabase(pSchemaProvider, (pIntErr, pIntrospected) =>
+		let tmpNames = Object.keys(this._TableMeta);
+		for (let i = 0; i < tmpNames.length; i++)
 		{
-			if (pIntErr) { return fCallback(pIntErr); }
-			let tmpIntrospected = pIntrospected || { Tables: [] };
+			let tmpMeta = this._TableMeta[tmpNames[i]];
+			this._ensureTable(tmpSchemaProvider, tmpMeta);
+			this._ensureColumns(tmpSchemaProvider, tmpMeta);
+			this._ensureIndices(tmpSchemaProvider, tmpMeta);
+		}
+	}
 
-			// Restrict the introspected snapshot to the tables we own —
-			// otherwise unrelated tables in lab.db would surface as
-			// drops we'd skip but still log noise about.
-			let tmpOwn = new Set(pMeadowSchema.Tables.map((pT) => pT.TableName));
-			let tmpFilteredSource =
+	/**
+	 * Have mcs generate the CREATE TABLE statement, then exec it. mcs
+	 * already emits `CREATE TABLE IF NOT EXISTS`, so this is idempotent
+	 * on a repeat boot.
+	 */
+	_ensureTable(pSchemaProvider, pMeta)
+	{
+		let tmpStatement = pSchemaProvider.generateCreateTableStatement(pMeta.ProviderSchema);
+		this.db.exec(tmpStatement);
+	}
+
+	/**
+	 * Forward-only ADD COLUMN migration. PRAGMA table_info surfaces the
+	 * columns already on disk; anything in the model that's missing gets
+	 * ALTERed in. We deliberately do NOT drop, rename, or retype — every
+	 * schema evolution has to be expressed as an ADD so older lab.db files
+	 * survive a column rename without losing data.
+	 *
+	 * mcs doesn't ship a "generate ALTER ADD COLUMN" helper, so we build
+	 * a single-column meadow-shape table descriptor and feed it through
+	 * `generateCreateTableStatement`, then snip the column line out of the
+	 * resulting `CREATE TABLE … ( <col> <ddl> )`. This keeps the DDL type
+	 * mapping in one place (mcs) instead of duplicating it here.
+	 *
+	 * SQLite's ALTER TABLE ADD COLUMN cannot create a PRIMARY KEY, so
+	 * AutoIdentity columns are skipped (they would only ever fire on a
+	 * brand-new table, already covered by _ensureTable above).
+	 */
+	_ensureColumns(pSchemaProvider, pMeta)
+	{
+		let tmpRows = this.db.prepare(`PRAGMA table_info(${pMeta.TableName})`).all();
+		let tmpExisting = new Set();
+		for (let i = 0; i < tmpRows.length; i++)
+		{
+			tmpExisting.add(tmpRows[i].name);
+		}
+		let tmpProviderCols = pMeta.ProviderSchema.Columns;
+		for (let i = 0; i < tmpProviderCols.length; i++)
+		{
+			let tmpProviderCol = tmpProviderCols[i];
+			if (tmpProviderCol.DataType === 'ID') { continue; }
+			if (tmpExisting.has(tmpProviderCol.Column)) { continue; }
+			let tmpFragment = this._columnDDL(pSchemaProvider, tmpProviderCol);
+			if (!tmpFragment)
 			{
-				Tables: (tmpIntrospected.Tables || []).filter((pT) => tmpOwn.has(pT.TableName))
-			};
-
-			let tmpDiff;
-			try { tmpDiff = this._SchemaDiff.diffSchemas(tmpFilteredSource, pMeadowSchema); }
-			catch (pDiffErr) { return fCallback(pDiffErr); }
-
-			// Forward-only filter — keep ColumnsAdded / IndicesAdded only,
-			// drop ColumnsRemoved / ColumnsModified / IndicesRemoved / TablesRemoved.
-			let tmpModified = (tmpDiff.TablesModified || []).map((pM) => (
-				{
-					TableName: pM.TableName,
-					ColumnsAdded: pM.ColumnsAdded || [],
-					ColumnsRemoved: [], ColumnsModified: [],
-					IndicesAdded: pM.IndicesAdded || [],
-					IndicesRemoved: [],
-					ForeignKeysAdded: pM.ForeignKeysAdded || [],
-					ForeignKeysRemoved: []
-				})).filter((pM) => pM.ColumnsAdded.length > 0 || pM.IndicesAdded.length > 0);
-
-			if (tmpModified.length === 0) { return fCallback(null); }
-
-			let tmpStatements = this._MigrationGenerator.generateMigrationStatements(
-				{ TablesAdded: [], TablesRemoved: [], TablesModified: tmpModified }, 'SQLite');
-
-			for (let i = 0; i < tmpStatements.length; i++)
+				throw new Error(`LabStateStore: could not derive DDL for ${pMeta.TableName}.${tmpProviderCol.Column} (${tmpProviderCol.DataType})`);
+			}
+			try
 			{
-				let tmpSql = tmpStatements[i];
-				if (!tmpSql || tmpSql.trim().length === 0 || tmpSql.trim().indexOf('--') === 0) { continue; }
-				try
+				this.db.exec(`ALTER TABLE ${pMeta.TableName} ADD COLUMN ${tmpFragment}`);
+				this.fable.log.info(`LabStateStore: migrated ${pMeta.TableName}.${tmpProviderCol.Column} (${tmpProviderCol.DataType})`);
+			}
+			catch (pExecErr)
+			{
+				// Tolerate the race where the column was added between
+				// PRAGMA and ALTER (only happens if a second process is
+				// attached to the same lab.db, which is developer-bench).
+				if (!/duplicate column|already exists/i.test(pExecErr.message || ''))
 				{
-					this.db.exec(tmpSql);
-					this.fable.log.info(`LabStateStore: migrated ${tmpSql.replace(/\s+/g, ' ').slice(0, 120)}`);
-				}
-				catch (pExecErr)
-				{
-					if (/duplicate column|already exists/i.test(pExecErr.message || ''))
-					{
-						continue;
-					}
-					return fCallback(pExecErr);
+					throw pExecErr;
 				}
 			}
-			return fCallback(null);
-		});
+		}
 	}
-
-	// ====================================================================
-	// Sync wrappers around the meadow DAL
-	//
-	// meadow-connection-sqlite is synchronous (better-sqlite3); the
-	// callbacks fire before the doX function returns. We exploit that to
-	// keep the legacy sync API while routing every read/write through
-	// the DAL underneath.
-	// ====================================================================
 
 	/**
-	 * Run a meadow doX call and capture its result + error synchronously.
-	 * Throws if the callback didn't fire (which would mean the underlying
-	 * driver isn't actually sync — bug worth surfacing immediately).
+	 * Derive the `<colname> <ddl>` fragment for a single column by feeding
+	 * mcs a one-column table descriptor and reading the generated CREATE
+	 * TABLE statement back. We strip the surrounding boilerplate and
+	 * return just the column line — exactly what ALTER TABLE ADD COLUMN
+	 * needs after the column name. Keeps mcs as the single source of
+	 * truth for the DataType -> DDL mapping.
 	 */
-	_runSync(pAction)
+	_columnDDL(pSchemaProvider, pProviderCol)
 	{
-		let tmpResult = { fired: false, error: null, args: null };
-		pAction((pErr, ...pRest) =>
+		let tmpStatement = pSchemaProvider.generateCreateTableStatement(
+			{ TableName: '__alter_probe__', Columns: [pProviderCol] });
+		// mcs emits a multi-line CREATE TABLE statement with one column;
+		// pull the single non-comment, non-paren line. Format example:
+		//   --   [ __alter_probe__ ]
+		//   CREATE TABLE IF NOT EXISTS __alter_probe__
+		//       (
+		//           <Column> <DDL>
+		//       );
+		let tmpLines = tmpStatement.split('\n');
+		for (let i = 0; i < tmpLines.length; i++)
 		{
-			tmpResult.fired = true;
-			tmpResult.error = pErr || null;
-			tmpResult.args = pRest;
-		});
-		if (!tmpResult.fired)
-		{
-			throw new Error('LabStateStore: meadow callback did not fire synchronously (driver is not better-sqlite3?).');
+			let tmpLine = tmpLines[i].trim();
+			if (!tmpLine || tmpLine.startsWith('--') || tmpLine.startsWith('CREATE') || tmpLine === '(' || tmpLine === ');')
+			{
+				continue;
+			}
+			return tmpLine.replace(/,$/, '');
 		}
-		if (tmpResult.error) { throw tmpResult.error; }
-		return tmpResult.args;
+		return null;
 	}
 
-	_dal(pTable)
+	/**
+	 * Ask mcs to generate the per-column index statements, then exec each
+	 * one as CREATE [UNIQUE] INDEX IF NOT EXISTS. mcs's
+	 * `generateCreateIndexStatements` emits `CREATE [UNIQUE] INDEX` (no IF
+	 * NOT EXISTS — that's added at exec time by mcs's `createIndex` wrapper,
+	 * which we're bypassing). We inject the IF NOT EXISTS ourselves.
+	 */
+	_ensureIndices(pSchemaProvider, pMeta)
 	{
-		let tmpDAL = this._DAL[pTable];
-		if (!tmpDAL) { throw new Error(`Unknown table [${pTable}]`); }
-		return tmpDAL;
+		let tmpStatements = pSchemaProvider.generateCreateIndexStatements(pMeta.ProviderSchema);
+		for (let i = 0; i < tmpStatements.length; i++)
+		{
+			let tmpSql = tmpStatements[i].Statement
+				.replace('CREATE UNIQUE INDEX ', 'CREATE UNIQUE INDEX IF NOT EXISTS ')
+				.replace('CREATE INDEX ', 'CREATE INDEX IF NOT EXISTS ');
+			this.db.exec(tmpSql);
+		}
 	}
 
-	_idColumn(pTable)
+	_meta(pTable)
 	{
-		let tmpEntry = this._Model && this._Model.Tables[pTable];
-		return tmpEntry && tmpEntry.MeadowSchema && tmpEntry.MeadowSchema.DefaultIdentifier;
+		let tmpMeta = this._TableMeta && this._TableMeta[pTable];
+		if (!tmpMeta) { throw new Error(`Unknown table [${pTable}]`); }
+		return tmpMeta;
 	}
+
+	// ====================================================================
+	// CRUD — synchronous wrappers over the mcs DatabaseSync handle.
+	//
+	// node:sqlite (DatabaseSync) is fully synchronous: `db.prepare(...).run`
+	// blocks until the statement completes, and the lab's reconcile loop
+	// relies on that — every supervisor service calls insert/update and
+	// reads the result on the next line. Anything async here would force
+	// a callsite-wide rewrite for no actual gain (the lab is single-tenant
+	// and lab.db tops out at low-thousands of rows).
+	// ====================================================================
 
 	list(pTable, pWhere)
 	{
 		if (!this.db) { return []; }
-		let tmpDAL = this._dal(pTable);
-		let tmpQuery = tmpDAL.query.clone()
-			.setBegin(0)
-			.setCap(DEFAULT_READS_CAP);
-		// Newest first by primary key — matches the previous "ORDER BY rowid DESC" semantics.
-		let tmpIDCol = this._idColumn(pTable);
-		if (tmpIDCol)
-		{
-			tmpQuery.addSort({ Column: tmpIDCol, Direction: 'Descending' });
-		}
+		let tmpMeta = this._meta(pTable);
+		let tmpParams = [];
+		let tmpSql = `SELECT * FROM ${tmpMeta.TableName}`;
 		if (pWhere && typeof pWhere === 'object')
 		{
 			let tmpKeys = Object.keys(pWhere);
-			for (let i = 0; i < tmpKeys.length; i++)
+			if (tmpKeys.length > 0)
 			{
-				tmpQuery.addFilter(tmpKeys[i], pWhere[tmpKeys[i]]);
+				let tmpClauses = [];
+				for (let i = 0; i < tmpKeys.length; i++)
+				{
+					if (!tmpMeta.KnownColumns.has(tmpKeys[i]))
+					{
+						throw new Error(`LabStateStore.list: unknown column [${tmpKeys[i]}] on [${pTable}]`);
+					}
+					tmpClauses.push(`${tmpKeys[i]} = ?`);
+					tmpParams.push(this._bindable(pWhere[tmpKeys[i]]));
+				}
+				tmpSql += ' WHERE ' + tmpClauses.join(' AND ');
 			}
 		}
-		// doReads callback signature is (err, query, records).
-		let tmpArgs = this._runSync((cb) => tmpDAL.doReads(tmpQuery, cb));
-		return tmpArgs[1] || [];
+		// Newest first by primary key — matches the previous "ORDER BY rowid DESC" semantics.
+		if (tmpMeta.IDColumn)
+		{
+			tmpSql += ` ORDER BY ${tmpMeta.IDColumn} DESC`;
+		}
+		tmpSql += ` LIMIT ${DEFAULT_READS_CAP}`;
+		return this.db.prepare(tmpSql).all(...tmpParams);
 	}
 
 	getById(pTable, pIDColumn, pID)
 	{
 		if (!this.db) { return null; }
-		let tmpDAL = this._dal(pTable);
-		let tmpQuery = tmpDAL.query.clone().addFilter(pIDColumn, pID);
-		let tmpArgs = this._runSync((cb) => tmpDAL.doReads(tmpQuery, cb));
-		let tmpRecords = tmpArgs[1] || [];
-		return tmpRecords.length > 0 ? tmpRecords[0] : null;
+		let tmpMeta = this._meta(pTable);
+		if (!tmpMeta.KnownColumns.has(pIDColumn))
+		{
+			throw new Error(`LabStateStore.getById: unknown column [${pIDColumn}] on [${pTable}]`);
+		}
+		let tmpRow = this.db.prepare(`SELECT * FROM ${tmpMeta.TableName} WHERE ${pIDColumn} = ?`).get(this._bindable(pID));
+		return tmpRow || null;
 	}
 
 	insert(pTable, pRecord)
 	{
 		if (!this.db) { throw new Error('LabStateStore not initialized'); }
-		let tmpDAL = this._dal(pTable);
-		// Coerce booleans to 0/1 — meadow's SQLite path passes values
-		// through to better-sqlite3, which still rejects booleans.
-		let tmpClean = this._coerceRecord(pRecord);
-		let tmpQuery = tmpDAL.query.clone().setIDUser(0).addRecord(tmpClean);
-		// doCreate callback: (err, query, queryRead, inserted).
-		let tmpArgs = this._runSync((cb) => tmpDAL.doCreate(tmpQuery, cb));
-		let tmpInserted = tmpArgs[2];
-		let tmpIDCol = this._idColumn(pTable);
-		return (tmpInserted && tmpIDCol) ? tmpInserted[tmpIDCol] : null;
+		let tmpMeta = this._meta(pTable);
+
+		// Merge schema defaults UNDER the caller's record so columns the
+		// caller didn't pass land at their declared default (e.g. Status
+		// defaults to 'pending', not ''). Caller-supplied values win.
+		let tmpMerged = Object.assign({}, tmpMeta.DefaultObject, pRecord || {});
+		let tmpClean = this._coerceRecord(tmpMerged);
+
+		// Auto-populate CreateDate / UpdateDate when the model declares the
+		// column and neither the caller nor the schema default set one.
+		// Mirrors meadow's CreateDate / UpdateDate behavior so existing
+		// callsites need no churn.
+		let tmpNow = new Date().toISOString();
+		if (tmpMeta.CreateDateCol && tmpClean[tmpMeta.CreateDateCol] == null) { tmpClean[tmpMeta.CreateDateCol] = tmpNow; }
+		if (tmpMeta.UpdateDateCol && tmpClean[tmpMeta.UpdateDateCol] == null) { tmpClean[tmpMeta.UpdateDateCol] = tmpNow; }
+
+		// Restrict to columns the model knows; skip the AutoIdentity column
+		// so SQLite assigns the next ID.
+		let tmpCols = [];
+		let tmpValues = [];
+		for (let i = 0; i < tmpMeta.Schema.length; i++)
+		{
+			let tmpCol = tmpMeta.Schema[i];
+			if (tmpCol.Type === 'AutoIdentity') { continue; }
+			if (!Object.prototype.hasOwnProperty.call(tmpClean, tmpCol.Column)) { continue; }
+			tmpCols.push(tmpCol.Column);
+			tmpValues.push(tmpClean[tmpCol.Column]);
+		}
+		if (tmpCols.length === 0)
+		{
+			throw new Error(`LabStateStore.insert: no recognizable columns supplied for [${pTable}]`);
+		}
+		let tmpPlaceholders = tmpCols.map(() => '?').join(', ');
+		let tmpSql = `INSERT INTO ${tmpMeta.TableName} (${tmpCols.join(', ')}) VALUES (${tmpPlaceholders})`;
+		let tmpResult = this.db.prepare(tmpSql).run(...tmpValues);
+		return tmpMeta.IDColumn ? Number(tmpResult.lastInsertRowid) : null;
 	}
 
 	update(pTable, pIDColumn, pID, pChanges)
 	{
 		if (!this.db) { throw new Error('LabStateStore not initialized'); }
-		let tmpDAL = this._dal(pTable);
-		// meadow's update needs the ID inside the record. Read-modify-
-		// write style: pull existing row, merge changes, doUpdate.
-		// Without the merge, meadow's UPDATE clobbers the columns we
-		// didn't pass with their schema defaults.
-		let tmpExisting = this.getById(pTable, pIDColumn, pID);
-		if (!tmpExisting) { return 0; }
-		let tmpMerged = Object.assign({}, tmpExisting, this._coerceRecord(pChanges));
-		tmpMerged[pIDColumn] = pID;
-		let tmpQuery = tmpDAL.query.clone().setIDUser(0).addRecord(tmpMerged);
-		this._runSync((cb) => tmpDAL.doUpdate(tmpQuery, cb));
-		return 1;
+		let tmpMeta = this._meta(pTable);
+		if (!tmpMeta.KnownColumns.has(pIDColumn))
+		{
+			throw new Error(`LabStateStore.update: unknown ID column [${pIDColumn}] on [${pTable}]`);
+		}
+		let tmpClean = this._coerceRecord(pChanges || {});
+
+		// Auto-bump UpdateDate when the model declares one — matches meadow's
+		// UpdateDate behavior. CreateDate stays untouched on update.
+		if (tmpMeta.UpdateDateCol && tmpClean[tmpMeta.UpdateDateCol] == null)
+		{
+			tmpClean[tmpMeta.UpdateDateCol] = new Date().toISOString();
+		}
+
+		let tmpAssigns = [];
+		let tmpValues = [];
+		for (let i = 0; i < tmpMeta.Schema.length; i++)
+		{
+			let tmpCol = tmpMeta.Schema[i];
+			if (tmpCol.Column === pIDColumn) { continue; }
+			if (tmpCol.Type === 'AutoIdentity') { continue; }
+			if (!Object.prototype.hasOwnProperty.call(tmpClean, tmpCol.Column)) { continue; }
+			tmpAssigns.push(`${tmpCol.Column} = ?`);
+			tmpValues.push(tmpClean[tmpCol.Column]);
+		}
+		if (tmpAssigns.length === 0) { return 0; }
+		tmpValues.push(this._bindable(pID));
+		let tmpResult = this.db.prepare(
+			`UPDATE ${tmpMeta.TableName} SET ${tmpAssigns.join(', ')} WHERE ${pIDColumn} = ?`).run(...tmpValues);
+		return tmpResult.changes || 0;
 	}
 
 	remove(pTable, pIDColumn, pID)
 	{
 		if (!this.db) { throw new Error('LabStateStore not initialized'); }
-		let tmpDAL = this._dal(pTable);
-		let tmpQuery = tmpDAL.query.clone().setIDUser(0).addFilter(pIDColumn, pID);
-		// doDelete callback: (err, query, deletedCount). Tables without
-		// a Deleted column hard-delete; ours don't, so this works.
-		let tmpArgs = this._runSync((cb) => tmpDAL.doDelete(tmpQuery, cb));
-		return tmpArgs[1] || 0;
-	}
-
-	/**
-	 * Coerce JS values into shapes the SQLite provider can bind. Boolean
-	 * → 0/1; undefined → null; objects → JSON-stringified. Same rationale
-	 * as the previous raw-SQL `_bindable` helper but applied before the
-	 * value enters the DAL pipeline.
-	 */
-	_coerceRecord(pRecord)
-	{
-		let tmpClean = {};
-		let tmpKeys = Object.keys(pRecord || {});
-		for (let i = 0; i < tmpKeys.length; i++)
+		let tmpMeta = this._meta(pTable);
+		if (!tmpMeta.KnownColumns.has(pIDColumn))
 		{
-			let tmpV = pRecord[tmpKeys[i]];
-			if (tmpV === undefined || tmpV === null) { tmpClean[tmpKeys[i]] = null; continue; }
-			if (typeof tmpV === 'boolean') { tmpClean[tmpKeys[i]] = tmpV ? 1 : 0; continue; }
-			if (typeof tmpV === 'number' || typeof tmpV === 'string'
-				|| typeof tmpV === 'bigint' || Buffer.isBuffer(tmpV))
-			{
-				tmpClean[tmpKeys[i]] = tmpV;
-				continue;
-			}
-			tmpClean[tmpKeys[i]] = JSON.stringify(tmpV);
+			throw new Error(`LabStateStore.remove: unknown ID column [${pIDColumn}] on [${pTable}]`);
 		}
-		return tmpClean;
+		let tmpResult = this.db.prepare(
+			`DELETE FROM ${tmpMeta.TableName} WHERE ${pIDColumn} = ?`).run(this._bindable(pID));
+		return tmpResult.changes || 0;
 	}
 
 	// ====================================================================
@@ -496,13 +543,41 @@ class ServiceStateStore extends libFableServiceProviderBase
 	{
 		if (!this.db) { return []; }
 		let tmpLimit = (pLimit && pLimit > 0) ? pLimit : 200;
-		let tmpDAL = this._dal('InfrastructureEvent');
-		let tmpQuery = tmpDAL.query.clone()
-			.setBegin(0)
-			.setCap(tmpLimit)
-			.addSort({ Column: 'IDInfrastructureEvent', Direction: 'Descending' });
-		let tmpArgs = this._runSync((cb) => tmpDAL.doReads(tmpQuery, cb));
-		return tmpArgs[1] || [];
+		return this.db.prepare(
+			'SELECT * FROM InfrastructureEvent ORDER BY IDInfrastructureEvent DESC LIMIT ?').all(tmpLimit);
+	}
+
+	// ====================================================================
+	// Value coercion — kept compatible with the meadow-backed predecessor
+	// ====================================================================
+
+	/**
+	 * Coerce a single JS value into a SQLite-bindable form. node:sqlite
+	 * accepts numbers, strings, BigInts, Buffers, and null — not booleans,
+	 * not plain objects. Booleans go to 0/1; objects (including arrays)
+	 * are JSON-stringified, matching what callers got out of meadow.
+	 */
+	_bindable(pValue)
+	{
+		if (pValue === undefined || pValue === null) { return null; }
+		if (typeof pValue === 'boolean') { return pValue ? 1 : 0; }
+		if (typeof pValue === 'number' || typeof pValue === 'string'
+			|| typeof pValue === 'bigint' || Buffer.isBuffer(pValue))
+		{
+			return pValue;
+		}
+		return JSON.stringify(pValue);
+	}
+
+	_coerceRecord(pRecord)
+	{
+		let tmpClean = {};
+		let tmpKeys = Object.keys(pRecord || {});
+		for (let i = 0; i < tmpKeys.length; i++)
+		{
+			tmpClean[tmpKeys[i]] = this._bindable(pRecord[tmpKeys[i]]);
+		}
+		return tmpClean;
 	}
 
 	// ====================================================================
