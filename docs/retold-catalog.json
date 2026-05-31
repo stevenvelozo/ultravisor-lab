@@ -1,0 +1,121 @@
+{
+	"Generated": "2026-05-30T22:31:46.015Z",
+	"Mode": "module",
+	"GitHubOrg": "stevenvelozo",
+	"DefaultBranch": "master",
+	"Module": {
+		"Name": "ultravisor-lab",
+		"Repo": "ultravisor-lab",
+		"Group": "",
+		"Branch": "master",
+		"HasDocs": true,
+		"HasCover": true,
+		"Sidebar": [
+			{
+				"Title": "Getting Started",
+				"Children": [
+					{
+						"Title": "Overview",
+						"Path": "README.md"
+					},
+					{
+						"Title": "Quick Start",
+						"Path": "quickstart.md"
+					},
+					{
+						"Title": "Configuration",
+						"Path": "configuration.md"
+					}
+				]
+			},
+			{
+				"Title": "Reference",
+				"Children": [
+					{
+						"Title": "Architecture",
+						"Path": "architecture.md"
+					},
+					{
+						"Title": "DB Engines",
+						"Path": "db-engines.md"
+					},
+					{
+						"Title": "Ultravisor & Beacons",
+						"Path": "ultravisor-beacons.md"
+					},
+					{
+						"Title": "Stacks",
+						"Path": "stacks.md"
+					},
+					{
+						"Title": "Web UI",
+						"Path": "web-ui.md"
+					},
+					{
+						"Title": "Seed Data & Exercises",
+						"Path": "seed-data-and-exercises.md"
+					},
+					{
+						"Title": "REST API",
+						"Path": "api.md"
+					}
+				]
+			},
+			{
+				"Title": "Retold Ecosystem",
+				"Children": [
+					{
+						"Title": "Ultravisor",
+						"Path": "https://stevenvelozo.github.io/ultravisor/README.md"
+					},
+					{
+						"Title": "Ultravisor Beacon",
+						"Path": "https://stevenvelozo.github.io/ultravisor-beacon/README.md"
+					},
+					{
+						"Title": "Retold Facto",
+						"Path": "https://fable-retold.github.io/retold-facto/README.md"
+					},
+					{
+						"Title": "Retold DataBeacon",
+						"Path": "https://fable-retold.github.io/retold-databeacon/README.md"
+					},
+					{
+						"Title": "Meadow",
+						"Path": "https://fable-retold.github.io/meadow/README.md"
+					},
+					{
+						"Title": "Orator",
+						"Path": "https://fable-retold.github.io/orator/README.md"
+					},
+					{
+						"Title": "Pict",
+						"Path": "https://fable-retold.github.io/pict/README.md"
+					},
+					{
+						"Title": "Fable",
+						"Path": "https://fable-retold.github.io/fable/README.md"
+					}
+				]
+			}
+		],
+		"DocFiles": [
+			"Plan-Dockerized-Beacons.md",
+			"README.md",
+			"_brand.json",
+			"_cover.md",
+			"_sidebar.md",
+			"_topbar.md",
+			"api.md",
+			"architecture.md",
+			"configuration.md",
+			"db-engines.md",
+			"quickstart.md",
+			"seed-data-and-exercises.md",
+			"stacks.md",
+			"ultravisor-beacons.md",
+			"web-ui.md"
+		]
+	},
+	"Groups": []
+}

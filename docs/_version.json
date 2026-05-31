@@ -1,0 +1,7 @@
+{
+	"Name": "ultravisor-lab",
+	"Version": "1.0.2",
+	"Description": "Web-based orchestration and monitoring for dockerized DB engines, retold-databeacons, Ultravisor, and Facto instances",
+	"GeneratedAt": "2026-05-30T22:31:46.299Z",
+	"GitCommit": "8dc426a"
+}
