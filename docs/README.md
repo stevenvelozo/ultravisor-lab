@@ -10,7 +10,7 @@ The lab process runs on the host as a Node.js application. Everything it *manage
 
 Building a Retold data platform means running several independently-versioned services together - an Ultravisor coordinating work, beacons exposing capabilities and databases, and the database engines behind them. Wiring those up by hand (right image, right port, right config, right network, right order) is tedious and error-prone. The lab turns each of those steps into a button, tracks what is running, and tears it all down cleanly when you are done.
 
-It is the interactive counterpart to the [Ultravisor Suite Harness](https://github.com/stevenvelozo/ultravisor-suite-harness): the harness runs a fixed end-to-end pipeline headless and exits; the lab is a bench you keep open while you provision, iterate, and observe.
+It is the interactive counterpart to the [Ultravisor Suite Harness](https://stevenvelozo.github.io/ultravisor-suite-harness/): the harness runs a fixed end-to-end pipeline headless and exits; the lab is a bench you keep open while you provision, iterate, and observe.
 
 ## What You Can Do
 
