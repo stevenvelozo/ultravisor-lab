@@ -10,12 +10,12 @@ The bundled datasets:
 
 | Dataset | What it is |
 |---|---|
-| **People** | A flat 60-person directory — the simplest fixture, one entity, no foreign keys. |
-| **Books & Authors** | A small literary catalog — 8 authors and 12 books linked by `IDAuthor`; a minimal two-entity fixture. |
+| **People** | A flat 60-person directory - the simplest fixture, one entity, no foreign keys. |
+| **Books & Authors** | A small literary catalog - 8 authors and 12 books linked by `IDAuthor`; a minimal two-entity fixture. |
 | **City Demographics** | A 50-city demographic profile (population, density, median age/income, region) that correlates with the transit and weather datasets. |
 | **Weather Stations** | 50 city weather stations with ~12 monthly readings each. |
-| **Transit Systems** | 50 transit agencies with 3–5 routes each. |
-| **City Dashboard** | An empty target entity — an ETL destination for the correlated city data. |
+| **Transit Systems** | 50 transit agencies with 3-5 routes each. |
+| **City Dashboard** | An empty target entity - an ETL destination for the correlated city data. |
 
 ### How loading works
 
@@ -34,7 +34,7 @@ When an Ultravisor instance is created, the lab automatically writes each datase
 
 Both exercise families are driven by a **synthetic worker beacon** that lives inside the lab (not a published package), under `source/synthetic-beacon/`. It is a configurable sleep-N-milliseconds beacon: it registers with an Ultravisor, advertises a capability and a set of actions, and "processes" each work item by sleeping for a configured duration. That makes it a controllable load source for testing the queue and operation machinery without needing real workloads.
 
-It is exposed as a lab-local beacon type (`lab-synthetic-beacon`) and is spawned two ways with the same argv shape: as a direct child process by the exercise managers, or as a container via the synthetic-beacon image. It is explicitly **not for production** — only for the harness.
+It is exposed as a lab-local beacon type (`lab-synthetic-beacon`) and is spawned two ways with the same argv shape: as a direct child process by the exercise managers, or as a container via the synthetic-beacon image. It is explicitly **not for production** - only for the harness.
 
 ## Beacon Exercises
 
@@ -65,7 +65,7 @@ Assertions can check maximum drain time, minimum observed concurrency per capabi
 
 ## Operation Exercises
 
-Operation exercises are **operation-graph** load-test scenarios, managed by `LabOperationExerciseManager`. Multi-phase operation graphs live under `operation_library/<name>/operation.json` and exercise definitions under `operation_exercises/<name>/exercise.json`. Unlike beacon exercises (which each provision their own beacons), operation exercises share a single synthetic-beacon **fleet** declared in `operation_exercises/_suite.json` — provisioned once per Ultravisor per lab session and reused across runs, torn down only when the lab exits.
+Operation exercises are **operation-graph** load-test scenarios, managed by `LabOperationExerciseManager`. Multi-phase operation graphs live under `operation_library/<name>/operation.json` and exercise definitions under `operation_exercises/<name>/exercise.json`. Unlike beacon exercises (which each provision their own beacons), operation exercises share a single synthetic-beacon **fleet** declared in `operation_exercises/_suite.json` - provisioned once per Ultravisor per lab session and reused across runs, torn down only when the lab exits.
 
 The fleet covers a spread of capabilities (Parser, Transformer, Validator, Loader, DataIntegration, VideoTranscode, FileTransfer, plus direct-transport and poll-only variants) so exercises can assemble realistic ETL-style pipelines. The manager registers each exercise's operations with the target Ultravisor, kicks them at the declared cadence, polls `/Manifest/<RunHash>` to track per-run lifecycle, and evaluates assertions (`OperationExerciseRun` / `OperationExerciseEvent`).
 

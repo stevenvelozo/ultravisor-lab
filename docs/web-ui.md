@@ -8,7 +8,7 @@ The application chrome is built on `pict-section-modal`'s shell. One layout view
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Top bar (fixed)  — brand · active-view label · Docker badge,  │
+│  Top bar (fixed)  - brand - active-view label - Docker badge,  │
 │                     Refresh button, settings gear              │
 ├────────────┬───────────────────────────────────────────────────┤
 │  Sidebar   │  Content area                                     │
@@ -29,7 +29,7 @@ The top bar's user slot hosts:
 
 ### Settings panel
 
-The settings panel hosts **Appearance** controls from `pict-section-theme` — a theme picker, a light/dark mode toggle, and a UI scale selector. Theme state is owned by `pict-section-theme` in its own storage scope.
+The settings panel hosts **Appearance** controls from `pict-section-theme` - a theme picker, a light/dark mode toggle, and a UI scale selector. Theme state is owned by `pict-section-theme` in its own storage scope.
 
 ## Navigation
 
@@ -37,24 +37,24 @@ The sidebar groups the views; each link is a `#/view/...` hash that the router r
 
 **Top level**
 
-- **Overview** — the dashboard: Docker status, entity counts, and the latest reconcile.
-- **Stacks** — list, create-from-preset, edit, preflight, launch, and tear down [stacks](stacks.md).
+- **Overview** - the dashboard: Docker status, entity counts, and the latest reconcile.
+- **Stacks** - list, create-from-preset, edit, preflight, launch, and tear down [stacks](stacks.md).
 
 **Services**
 
-- **Ultravisor** — create and supervise [Ultravisor instances](ultravisor-beacons.md#ultravisor-instances); manage operations, runs, and persistence-beacon assignment.
-- **Ultravisor Beacons** — create and supervise [beacons](ultravisor-beacons.md#beacons); rebuild images and switch build sources.
-- **DB Engines** — create and supervise [database engines](db-engines.md) and the databases inside them.
+- **Ultravisor** - create and supervise [Ultravisor instances](ultravisor-beacons.md#ultravisor-instances); manage operations, runs, and persistence-beacon assignment.
+- **Ultravisor Beacons** - create and supervise [beacons](ultravisor-beacons.md#beacons); rebuild images and switch build sources.
+- **DB Engines** - create and supervise [database engines](db-engines.md) and the databases inside them.
 
 **Experiments**
 
-- **Seed Data** — browse and run packaged [seed datasets](seed-data-and-exercises.md#seed-datasets).
-- **Beacon Exercises** — run [queue load-test fixtures](seed-data-and-exercises.md#beacon-exercises) and inspect their runs.
-- **Operation Exercises** — run [operation-graph load-test fixtures](seed-data-and-exercises.md#operation-exercises).
+- **Seed Data** - browse and run packaged [seed datasets](seed-data-and-exercises.md#seed-datasets).
+- **Beacon Exercises** - run [queue load-test fixtures](seed-data-and-exercises.md#beacon-exercises) and inspect their runs.
+- **Operation Exercises** - run [operation-graph load-test fixtures](seed-data-and-exercises.md#operation-exercises).
 
 **Activity**
 
-- **Events** — the infrastructure event timeline, fed by the `InfrastructureEvent` table.
+- **Events** - the infrastructure event timeline, fed by the `InfrastructureEvent` table.
 
 ## Common Interactions
 

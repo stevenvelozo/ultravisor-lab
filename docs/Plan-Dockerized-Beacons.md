@@ -1,8 +1,8 @@
-# Dockerized Beacons — Plan
+# Dockerized Beacons - Plan
 
 Move supervised beacon processes (and, by symmetry, Ultravisor instances)
 off the host-node lifecycle and into Docker containers. Each container
-installs its package directly from the public npm registry — no bind
+installs its package directly from the public npm registry - no bind
 mounts, no monorepo paths, no shared `node_modules`.
 
 ## Goals
@@ -10,7 +10,7 @@ mounts, no monorepo paths, no shared `node_modules`.
 1. **Clean shutdown.** `docker stop` is authoritative. Killing the lab no
    longer leaves orphaned node processes listening on their ports.
 2. **Published-module provenance.** A beacon runs the exact published
-   version users could `npm install` themselves — no "works on my tree"
+   version users could `npm install` themselves - no "works on my tree"
    drift.
 3. **Port/filesystem isolation.** Each beacon sees only its own data
    volume; ports are mapped explicitly.
@@ -78,7 +78,7 @@ is a thin wrapper: FROM node, `npm install <package>@<version>`, run.
 | `retold-remote` | `retold-remote` | standalone bin |
 | `retold-beacon-host` | `ultravisor-beacon` + one or more `retold-beacon-provider-*` | capability-provider host |
 
-The `retold-beacon-host` image hosts any number of CapabilityProviders —
+The `retold-beacon-host` image hosts any number of CapabilityProviders -
 installs them via `npm install <provider-package>@<version>` at image
 build time. The lab picks an image tag by beacon type; the `retoldBeacon`
 stanza in each provider's published `package.json` tells the lab which
@@ -91,7 +91,7 @@ image to pull.
 builds and pushes on `npm publish`.
 
 For local development against an un-published change, the lab exposes a
-`docker.imageOverride` per beacon type in the UI — "use
+`docker.imageOverride` per beacon type in the UI - "use
 `retold-databeacon:local` instead of the registry tag". The developer
 runs `docker build -t retold-databeacon:local .` once, and the lab picks
 it up.
@@ -105,23 +105,23 @@ it up.
 | Column | Was | Is |
 |---|---|---|
 | `PID` | host process id | **remove** |
-| `ContainerID` | — | docker container id |
-| `ImageName` | — | `retold-databeacon` |
-| `ImageVersion` | — | `0.0.7` (tag pulled) |
-| `ContainerName` | — | `beacon-<id>` (stable, used for DNS) |
-| `NetworkName` | — | `ultravisor-lab` (constant today, reserved for future multi-network) |
+| `ContainerID` | - | docker container id |
+| `ImageName` | - | `retold-databeacon` |
+| `ImageVersion` | - | `0.0.7` (tag pulled) |
+| `ContainerName` | - | `beacon-<id>` (stable, used for DNS) |
+| `NetworkName` | - | `ultravisor-lab` (constant today, reserved for future multi-network) |
 
 `Status` semantics unchanged (`running` / `stopped` / `error`), sourced
 from `docker inspect` now rather than `kill(pid, 0)`.
 
 ### UltravisorInstance table
 
-Same treatment. `PID` → `ContainerID`, image is `ultravisor` published
+Same treatment. `PID` -> `ContainerID`, image is `ultravisor` published
 package, listens on its configured port.
 
 ### DBEngine table
 
-Unchanged — already container-backed.
+Unchanged - already container-backed.
 
 ---
 
@@ -132,15 +132,15 @@ Unchanged — already container-backed.
 Mirrors the surface of `LabDockerManager` already used for DB engines.
 Methods:
 
-- `create(pBeaconRow, fCallback)` — `docker create` with the right image,
+- `create(pBeaconRow, fCallback)` - `docker create` with the right image,
   ports, volume, env, network. Stores `ContainerID` on the Beacon row.
-- `start(pContainerID, fCallback)` — `docker start`.
-- `stop(pContainerID, fCallback)` — `docker stop --time=10`.
-- `remove(pContainerID, fCallback)` — `docker rm`. Called when the user
+- `start(pContainerID, fCallback)` - `docker start`.
+- `stop(pContainerID, fCallback)` - `docker stop --time=10`.
+- `remove(pContainerID, fCallback)` - `docker rm`. Called when the user
   deletes the beacon.
-- `inspect(pContainerID, fCallback)` — `docker inspect` → status,
+- `inspect(pContainerID, fCallback)` - `docker inspect` -> status,
   started-at, exit code. Used by the reconciler.
-- `logs(pContainerID, pTailN, fCallback)` — `docker logs --tail=N`.
+- `logs(pContainerID, pTailN, fCallback)` - `docker logs --tail=N`.
   Replaces reading `data/logs/Beacon-N.log`.
 
 ### Changed: `Service-BeaconManager`
@@ -172,7 +172,7 @@ const CONTAINER_SUPERVISED = [
 ```
 
 The container path is what's already proven for DB engines. Drift
-reporting becomes uniform — all three entity types report via the same
+reporting becomes uniform - all three entity types report via the same
 `docker inspect` code path.
 
 ### Changed: `BeaconTypeRegistry`
@@ -198,7 +198,7 @@ The `retoldBeacon` stanza in each published package grows a docker block:
 ```
 
 The lab-local `LOCAL_REGISTRY_ENTRIES` in
-`Service-BeaconTypeRegistry.js` goes away — the lab-local
+`Service-BeaconTypeRegistry.js` goes away - the lab-local
 `Lab-MeadowIntegration-BeaconProvider.js` becomes a real published
 package (`retold-beacon-provider-meadow-integration`) with its own
 `retoldBeacon` stanza pointing at the generic `retold-beacon-host`
@@ -208,7 +208,7 @@ image.
 
 Becomes a `retold-beacon-host` npm package with a `bin`. Its CLI stays
 the same, but `--provider label:path` is replaced with `--provider
-<npm-package-name>` — the host `require()`s the installed package. No
+<npm-package-name>` - the host `require()`s the installed package. No
 more host-filesystem paths in argv.
 
 The lab no longer ships this binary. Image build:
@@ -235,7 +235,7 @@ CMD ["--provider", "retold-beacon-provider-meadow-integration"]
 ### Network
 
 One docker network `ultravisor-lab`, created at first use
-(`docker network create ultravisor-lab` — idempotent, guarded by
+(`docker network create ultravisor-lab` - idempotent, guarded by
 `LabDockerManager.ensureNetwork`).
 
 Container DNS names are stable: `beacon-<id>`, `ultravisor-<id>`,
@@ -266,7 +266,7 @@ Named volumes per entity, lifecycle-tied to the row:
 
 Lab code writes config once, into `/app/data/config.json` inside the
 container, via `docker cp` at create time (or an init-container step).
-No bind-mount into the host filesystem — the lab reaches into the
+No bind-mount into the host filesystem - the lab reaches into the
 container when it needs to update config.
 
 ### Seed dataset files
@@ -306,33 +306,33 @@ fresh"). Ingestion jobs + seed definitions survive.
 Ordered for smallest-possible reviewable chunks. Each chunk leaves the
 lab in a working state.
 
-### Phase 1 — infrastructure (no UI change visible)
+### Phase 1 - infrastructure (no UI change visible)
 - [ ] Publish `retold-beacon-host` package (today's `bin/lab-beacon-host.js` plus a tiny CLI adapter for the new `--provider <npm-name>` arg)
 - [ ] Publish `retold-beacon-provider-meadow-integration` (today's `Lab-MeadowIntegration-BeaconProvider.js`, lifted verbatim)
 - [ ] Dockerfiles + publish images: `retold-beacon-host`, `retold-databeacon` (databeacon adds one)
 - [ ] Add `docker` block to each module's `retoldBeacon` stanza in their published `package.json`
 - [ ] Smoke test each image standalone: `docker run --rm retold-databeacon:latest serve --port 8500`
 
-### Phase 2 — container manager (lab-side, beacons only)
+### Phase 2 - container manager (lab-side, beacons only)
 - [ ] Add `LabBeaconContainerManager` mirroring `LabDockerManager` patterns; reuse the latter's probe / network / run helpers
 - [ ] Extend `LabDockerManager` with `ensureNetwork`, `createContainer`, `attachToNetwork` helpers shared by engines and beacons
 - [ ] Swap `Service-BeaconManager` to call `LabBeaconContainerManager`
 - [ ] Update `Beacon` table schema; wipe-on-upgrade migration
 - [ ] Update `Service-ReconcileLoop` to move `Beacon` into the container-supervised bucket
 
-### Phase 3 — Ultravisor symmetric treatment
+### Phase 3 - Ultravisor symmetric treatment
 - [ ] Publish `ultravisor` image (wrapper of the already-published `ultravisor` npm module)
 - [ ] Add `UltravisorInstance.ContainerID` / remove `PID`
 - [ ] New `LabUltravisorContainerManager` or fold into the beacon one
 - [ ] Wipe-and-recreate migration
 
-### Phase 4 — UI + dev ergonomics
+### Phase 4 - UI + dev ergonomics
 - [ ] "Image" column + tag picker in the per-beacon-type create form (read default from `retoldBeacon.docker`, allow override)
 - [ ] `imageOverride` setting per beacon type: use `retold-databeacon:local` when set
 - [ ] `docker logs` wired into the Beacon detail page (replaces reading `data/logs/Beacon-N.log`)
 - [ ] Auto-pull on start: `docker pull <image>:<tag>` before `docker run` if image absent or `latest`
 
-### Phase 5 — cleanup
+### Phase 5 - cleanup
 - [ ] Delete `LabProcessSupervisor` once Ultravisor + Beacons are fully container-backed
 - [ ] Delete sibling-checkout / local provider-path plumbing in `BeaconTypeRegistry`
 - [ ] Delete `bin/lab-beacon-host.js` and `source/beacon_providers/` from the lab repo
@@ -373,9 +373,9 @@ script that does all three in one shot, plus a lab UI checkbox "always
 prefer :local tag when available" so the image-override flip is
 permanent during an iteration session.
 
-Is this worse for the inner dev loop? Yes, by ~5–10 seconds per
+Is this worse for the inner dev loop? Yes, by ~5-10 seconds per
 iteration. It's the price of published provenance. Acceptable once
-beacon modules are past early-iteration — not acceptable while a new
+beacon modules are past early-iteration - not acceptable while a new
 provider is being authored, which is why the `:local` override path
 exists.
 
@@ -397,7 +397,7 @@ exists.
 4. **Native modules**. `better-sqlite3` and friends are built per-arch
    inside the image, so `npm install` inside an alpine image Just
    Works. But base image choice (alpine musl vs debian-slim) matters
-   for any module that ships precompiled binaries — keep an eye on
+   for any module that ships precompiled binaries - keep an eye on
    this during phase 1 smoke tests.
 
 ---

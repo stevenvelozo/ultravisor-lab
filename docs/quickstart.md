@@ -5,8 +5,8 @@ Launch Ultravisor Lab and bring up your first database engine, Ultravisor instan
 ## Prerequisites
 
 - **Node.js** with the built-in `node:sqlite` module (the lab persists its state through `meadow-connection-sqlite`, which sits on `node:sqlite`).
-- **Docker** — the `docker` CLI on your `PATH`, with the daemon running. The lab boots without Docker but cannot provision anything until the daemon is reachable.
-- **Docker Compose** — the `docker compose` v2 plugin (preferred) or the `docker-compose` v1 standalone, required only for the [Stacks](stacks.md) feature.
+- **Docker** - the `docker` CLI on your `PATH`, with the daemon running. The lab boots without Docker but cannot provision anything until the daemon is reachable.
+- **Docker Compose** - the `docker compose` v2 plugin (preferred) or the `docker-compose` v1 standalone, required only for the [Stacks](stacks.md) feature.
 - A **Retold monorepo checkout** if you intend to launch stacks or beacons that build images from local source. See [Configuration](configuration.md#monorepo-root) for how the checkout root is resolved.
 
 ## Install
@@ -72,7 +72,7 @@ Once the instance is `running`, its web UI is reachable at the host port you cho
 ## Attach A Beacon
 
 1. Open **Ultravisor Beacons** in the sidebar.
-2. Choose a beacon type. The lab lists every Retold module on your system that publishes a `retoldBeacon` stanza — for example **Retold DataBeacon**.
+2. Choose a beacon type. The lab lists every Retold module on your system that publishes a `retoldBeacon` stanza - for example **Retold DataBeacon**.
 3. Fill in the name, port, and target Ultravisor, then submit. The lab builds the beacon's container image, runs it on the shared network wired to the Ultravisor, and waits for it to come up.
 
 See [Ultravisor & Beacons](ultravisor-beacons.md) for beacon types, container vs. host-process runtime, and the rebuild / source-build controls.
@@ -81,7 +81,7 @@ See [Ultravisor & Beacons](ultravisor-beacons.md) for beacon types, container vs
 
 Rather than wiring services one at a time, launch a complete topology:
 
-1. Open **Stacks** in the sidebar and start a new stack from a preset. Nine presets ship in the box — from a single promiscuous Ultravisor to a full data platform with databases, an auth beacon, multiple databeacons, and a mapper UI.
+1. Open **Stacks** in the sidebar and start a new stack from a preset. Nine presets ship in the box - from a single promiscuous Ultravisor to a full data platform with databases, an auth beacon, multiple databeacons, and a mapper UI.
 2. Fill in the stack's inputs (data directory, monorepo root, secrets, ports). Required secrets must be non-empty or preflight will block the launch.
 3. Run **preflight** to check host ports, folders, build contexts, and images, then **launch**. The lab resolves the spec, compiles it to a `docker-compose.yml`, and runs `docker compose up -d --build`.
 4. Watch the stack's status roll up from `starting` to `running` as containers become healthy.
@@ -94,7 +94,7 @@ When you are done, the lab can tear down everything it manages in dependency ord
 
 ## Next Steps
 
-- [Configuration](configuration.md) — change the port, data directory, or monorepo root
-- [Architecture](architecture.md) — understand the services and the reconcile loop
-- [Stacks](stacks.md) — the declarative deployment system and presets
-- [REST API](api.md) — drive the lab from scripts
+- [Configuration](configuration.md) - change the port, data directory, or monorepo root
+- [Architecture](architecture.md) - understand the services and the reconcile loop
+- [Stacks](stacks.md) - the declarative deployment system and presets
+- [REST API](api.md) - drive the lab from scripts

@@ -8,13 +8,13 @@ Ultravisor Lab is configured mostly through command-line flags and a couple of e
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--port <N>` | `44443` | Bind the web server to port N. Validated to `1–65535`. |
+| `--port <N>` | `44443` | Bind the web server to port N. Validated to `1-65535`. |
 | `--host <ADDR>` | `127.0.0.1` | Bind to interface ADDR. Use `0.0.0.0` to expose on the network. |
-| `--no-open` | — | Do not auto-open the browser on start. |
+| `--no-open` | - | Do not auto-open the browser on start. |
 | `--open` | (default) | Auto-open the browser. |
-| `--help`, `-h` | — | Print usage and exit. |
+| `--help`, `-h` | - | Print usage and exit. |
 
-`--port=N` and `--host=ADDR` (with `=`) are also accepted. `--web` is accepted and ignored — the web server is the only mode today; a TUI mode is noted as a future possibility, at which point the lab would dispatch on `--web` the way `retold-manager` does.
+`--port=N` and `--host=ADDR` (with `=`) are also accepted. `--web` is accepted and ignored - the web server is the only mode today; a TUI mode is noted as a future possibility, at which point the lab would dispatch on `--web` the way `retold-manager` does.
 
 ```bash
 node lab.js --port 5555 --host 0.0.0.0 --no-open
@@ -36,7 +36,7 @@ Lab state lives in a `data/` directory next to `lab.js`. The CLI entry passes th
 | `data/pids/` | PID files for host-process beacons (so a fresh lab can adopt them on boot). |
 | `data/crash-<timestamp>.log` | Stack trace written on an uncaught exception before exit. |
 
-The SQLite schema is created and migrated automatically on boot from `model/MeadowModel-Lab.json` — there is no manual migration step.
+The SQLite schema is created and migrated automatically on boot from `model/MeadowModel-Lab.json` - there is no manual migration step.
 
 ## Monorepo Root
 
@@ -60,7 +60,7 @@ Independently, the [beacon type registry](ultravisor-beacons.md#beacon-types) re
 
 | Command | What it does |
 |---|---|
-| `npm start` | `node lab.js` — start the web server. |
+| `npm start` | `node lab.js` - start the web server. |
 | `npm run brand` | Generate the brand block + favicons via `pict-section-theme`. |
 | `npm run build-bundle` | Run `npm run brand`, then `npx quack build && npx quack copy` to produce `web/dist/`. |
 

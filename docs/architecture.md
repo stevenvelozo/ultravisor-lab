@@ -36,11 +36,11 @@ Stacks are different: each launched stack is its own `docker compose` project (`
 
 `lab.js` is the entry point. It parses argv, auto-detects the monorepo root, installs crash logging, and calls `setupLabServer()` (`source/web_server/Lab-Server-Setup.js`), which composes the runtime in this order:
 
-1. **Fable** — the service-provider / dependency-injection core. Product identity and log streams are configured here.
-2. **Orator (Restify)** — the HTTP server. The lab registers the Restify body parser and query parser, adds an `X-Ultravisor-Lab` version header, and binds explicitly to the configured host.
-3. **Lab services** — every manager and store is registered as a Fable service and collected into a `Core` bag.
-4. **REST routes** — ten route modules register their endpoints against Orator's server.
-5. **Static bundle** — the built `web/dist` bundle is served if present; otherwise the `web/html` source tree is served as a development fallback.
+1. **Fable** - the service-provider / dependency-injection core. Product identity and log streams are configured here.
+2. **Orator (Restify)** - the HTTP server. The lab registers the Restify body parser and query parser, adds an `X-Ultravisor-Lab` version header, and binds explicitly to the configured host.
+3. **Lab services** - every manager and store is registered as a Fable service and collected into a `Core` bag.
+4. **REST routes** - ten route modules register their endpoints against Orator's server.
+5. **Static bundle** - the built `web/dist` bundle is served if present; otherwise the `web/html` source tree is served as a development fallback.
 
 `setupLabServer()` is also exported from the package (`require('ultravisor-lab').setupLabServer`) so a downstream app can embed the lab with its own branding, extra stack-preset directories, or extra operation directories. See [Configuration](configuration.md#embedding-the-lab).
 
@@ -118,11 +118,11 @@ Lab state is internal, so the schema deliberately omits the usual Retold audit c
 
 Beyond the database, the lab writes to the data directory:
 
-- `data/beacons/<id>/` — rendered `config.json` (bind-mounted into container-mode beacons) and process logs.
-- `data/ultravisors/<id>/` — rendered `.ultravisor.json`, the `operations/` library, the file store, and run staging; bind-mounted to `/app/data` in the container.
-- `data/stacks/<Hash>.json` and `data/stacks/<Hash>/docker-compose.yml` — stack mirror and generated compose file.
-- `data/pids/` — PID files for host-process beacons.
-- `data/crash-<timestamp>.log` — written on an uncaught exception or unhandled rejection before the process exits.
+- `data/beacons/<id>/` - rendered `config.json` (bind-mounted into container-mode beacons) and process logs.
+- `data/ultravisors/<id>/` - rendered `.ultravisor.json`, the `operations/` library, the file store, and run staging; bind-mounted to `/app/data` in the container.
+- `data/stacks/<Hash>.json` and `data/stacks/<Hash>/docker-compose.yml` - stack mirror and generated compose file.
+- `data/pids/` - PID files for host-process beacons.
+- `data/crash-<timestamp>.log` - written on an uncaught exception or unhandled rejection before the process exits.
 
 ## Boot Sequence & The Reconcile Loop
 
@@ -134,16 +134,16 @@ On startup `setupLabServer()`:
 4. Snapshots which rows claimed `running` before the previous shutdown.
 5. Probes Docker; if available, ensures the `ultravisor-lab` network exists and re-attaches existing containers to it.
 6. Runs the reconcile loop once so the first UI render is fresh, then starts it on an interval.
-7. Auto-restarts everything that was running before shutdown, in dependency order — DB engines first, then Ultravisor instances, then beacons.
+7. Auto-restarts everything that was running before shutdown, in dependency order - DB engines first, then Ultravisor instances, then beacons.
 
-The **reconcile loop** (`LabReconcileLoop`) runs once at boot and then every 15 seconds. It compares each tracked row's recorded status against reality — `docker inspect` for container-backed entities, PID liveness for host-process ones. Drift (a row says `running` but the container or process is gone) is recorded as a `warning` infrastructure event; the loop never silently mutates rows out from under the UI. Its last result is exposed at `GET /api/lab/status` and can be triggered on demand with `POST /api/lab/reconcile`.
+The **reconcile loop** (`LabReconcileLoop`) runs once at boot and then every 15 seconds. It compares each tracked row's recorded status against reality - `docker inspect` for container-backed entities, PID liveness for host-process ones. Drift (a row says `running` but the container or process is gone) is recorded as a `warning` infrastructure event; the loop never silently mutates rows out from under the UI. Its last result is exposed at `GET /api/lab/status` and can be triggered on demand with `POST /api/lab/reconcile`.
 
 ## Crash Handling
 
-The lab installs `uncaughtException` and `unhandledRejection` handlers that write the stack trace to `data/crash-<timestamp>.log` and exit with code `70`. The rationale is explicit in the code: Node's contract after an uncaught exception is that the process is in an undefined state, so limping on risks corrupted DB writes or zombie state — a visible crash with a log file next to it is the safer outcome.
+The lab installs `uncaughtException` and `unhandledRejection` handlers that write the stack trace to `data/crash-<timestamp>.log` and exit with code `70`. The rationale is explicit in the code: Node's contract after an uncaught exception is that the process is in an undefined state, so limping on risks corrupted DB writes or zombie state - a visible crash with a log file next to it is the safer outcome.
 
 ## See Also
 
-- [Configuration](configuration.md) — the knobs `setupLabServer()` accepts
-- [DB Engines](db-engines.md), [Ultravisor & Beacons](ultravisor-beacons.md), [Stacks](stacks.md) — the entity managers in depth
-- [REST API](api.md) — the endpoints the route layer registers
+- [Configuration](configuration.md) - the knobs `setupLabServer()` accepts
+- [DB Engines](db-engines.md), [Ultravisor & Beacons](ultravisor-beacons.md), [Stacks](stacks.md) - the entity managers in depth
+- [REST API](api.md) - the endpoints the route layer registers

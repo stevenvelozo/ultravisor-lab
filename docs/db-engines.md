@@ -18,7 +18,7 @@ Each engine type is an adapter registered in `Engine-Registry.js`. The defaults 
 Notes:
 
 - **DGraph** exposes a single graph rather than multiple databases, so its create-database form is hidden in the UI (`SupportsMultipleDatabases: false`). Solr labels its databases "cores" rather than "databases" (`DatabaseNoun: 'core'`).
-- **SQLite and RocksDB are intentionally absent** — they are embedded libraries with no server process to provision. There is nothing for a DB-engine container to manage.
+- **SQLite and RocksDB are intentionally absent** - they are embedded libraries with no server process to provision. There is nothing for a DB-engine container to manage.
 - The image tag is overridable per engine at create time; the suggested host port is just a starting point for the [port allocator](architecture.md#the-service-layer).
 
 ## Engine Lifecycle
@@ -27,12 +27,12 @@ Notes:
 
 When you add an engine, the manager:
 
-1. Validates the request (engine type, non-empty name, port in `1–65535`) and validates or defaults the root password via the adapter.
+1. Validates the request (engine type, non-empty name, port in `1-65535`) and validates or defaults the root password via the adapter.
 2. Inserts a `DBEngine` row in `provisioning` state so the UI shows a pending card immediately, and records an `engine-create-started` event.
 3. Ensures the shared `ultravisor-lab` docker network exists.
 4. Pulls the image (a no-op if already present).
-5. Runs the container on that network with a stable hostname (`lab-<type>-<name>`, sanitized), the chosen host→internal port mapping, and the adapter's environment and extra run args.
-6. Records the container id, then **polls for health in the background** by running the adapter's health-check command via `docker exec` (up to 60 attempts, every 2 seconds — about a two-minute budget). The API responds right away in `provisioning`; the card flips to `running` when the health check passes, or `failed` on timeout or any earlier error.
+5. Runs the container on that network with a stable hostname (`lab-<type>-<name>`, sanitized), the chosen host->internal port mapping, and the adapter's environment and extra run args.
+6. Records the container id, then **polls for health in the background** by running the adapter's health-check command via `docker exec` (up to 60 attempts, every 2 seconds - about a two-minute budget). The API responds right away in `provisioning`; the card flips to `running` when the health check passes, or `failed` on timeout or any earlier error.
 
 ### Start / Stop / Remove
 
@@ -50,7 +50,7 @@ With an engine `running`, you can create a database from its card. The manager v
 
 ## Connection Info
 
-Each engine card exposes connection info computed by the adapter — host (`127.0.0.1`), the host port, the root username and password, and a ready-to-paste connection string. For example, MySQL returns `mysql://root:<password>@127.0.0.1:<port>` and PostgreSQL returns `postgres://postgres:<password>@127.0.0.1:<port>/postgres`. Other containers on the `ultravisor-lab` network reach the engine by its container name instead of `127.0.0.1`.
+Each engine card exposes connection info computed by the adapter - host (`127.0.0.1`), the host port, the root username and password, and a ready-to-paste connection string. For example, MySQL returns `mysql://root:<password>@127.0.0.1:<port>` and PostgreSQL returns `postgres://postgres:<password>@127.0.0.1:<port>/postgres`. Other containers on the `ultravisor-lab` network reach the engine by its container name instead of `127.0.0.1`.
 
 ## Container Logs
 

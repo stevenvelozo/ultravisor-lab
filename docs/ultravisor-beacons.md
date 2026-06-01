@@ -6,13 +6,13 @@ For provisioning a whole topology of these at once, see [Stacks](stacks.md). Thi
 
 ## Ultravisor Instances
 
-An Ultravisor instance is one container running the published [`ultravisor`](https://stevenvelozo.github.io/ultravisor/) package's CLI. The lab does not bake a startup script into the image — it renders a config file and the container runs `ultravisor start -c /app/data/.ultravisor.json`. Managed by `LabUltravisorManager`.
+An Ultravisor instance is one container running the published [`ultravisor`](https://stevenvelozo.github.io/ultravisor/) package's CLI. The lab does not bake a startup script into the image - it renders a config file and the container runs `ultravisor start -c /app/data/.ultravisor.json`. Managed by `LabUltravisorManager`.
 
 ### Create
 
 When you add an instance, the manager:
 
-1. Validates the request (non-empty name, port `1–65535`) and inserts an `UltravisorInstance` row in `provisioning`.
+1. Validates the request (non-empty name, port `1-65535`) and inserts an `UltravisorInstance` row in `provisioning`.
 2. Creates the instance's host directory `data/ultravisors/<id>/` and its `operations/` library.
 3. Renders `.ultravisor.json` into that directory. All paths in the config are the *inside-container* view (`/app/data/...`) because the lab bind-mounts the host directory to `/app/data` at run time. The config sets the API port (`54321`), file-store and staging paths, the operation-library path, and Ultravisor's beacon-mesh timeouts.
 4. Provisions the bundled [seed-dataset](seed-data-and-exercises.md) operations into the library.
@@ -22,17 +22,17 @@ When you add an instance, the manager:
 
 ### Secured mode
 
-Creating an instance with `Secure: true` flips the Ultravisor into non-promiscuous mode and mints a per-instance bootstrap auth secret (32 random bytes, hex-encoded). The secret is persisted on the row but **never returned through the public API** — read accessors scrub it before sending to the browser. It is used internally by the auth-beacon spawn flow and the first-user provisioning flow. Once an admin user is provisioned (via `POST /api/lab/ultravisor-instances/:id/bootstrap-admin`), the lab no longer needs the secret.
+Creating an instance with `Secure: true` flips the Ultravisor into non-promiscuous mode and mints a per-instance bootstrap auth secret (32 random bytes, hex-encoded). The secret is persisted on the row but **never returned through the public API** - read accessors scrub it before sending to the browser. It is used internally by the auth-beacon spawn flow and the first-user provisioning flow. Once an admin user is provisioned (via `POST /api/lab/ultravisor-instances/:id/bootstrap-admin`), the lab no longer needs the secret.
 
 ### Start / Stop / Remove
 
 - **Start** re-renders the config (so stanza changes flow into existing instances), then `docker start`s the recorded container. If the stored container is gone (manual `docker rm`, lab DB moved between machines), the manager rebuilds the image and runs a fresh container.
 - **Stop** runs `docker stop` and marks the row `stopped`.
-- **Remove** cascades first — beacons registered with this Ultravisor are removed before the Ultravisor itself — then `docker rm -f`s the container and deletes the instance directory.
+- **Remove** cascades first - beacons registered with this Ultravisor are removed before the Ultravisor itself - then `docker rm -f`s the container and deletes the instance directory.
 
 ### Operations, runs, and persistence
 
-`LabUltravisorManager` also exposes helpers the UI and other services use against a running instance: register an operation (`POST /Operation`), trigger an operation asynchronously, fetch a run manifest, list operations, and manage **persistence-beacon assignment** — routing an Ultravisor's queue / manifest persistence to a chosen databeacon connection and reflecting the live bootstrap state back as a status pill.
+`LabUltravisorManager` also exposes helpers the UI and other services use against a running instance: register an operation (`POST /Operation`), trigger an operation asynchronously, fetch a run manifest, list operations, and manage **persistence-beacon assignment** - routing an Ultravisor's queue / manifest persistence to a chosen databeacon connection and reflecting the live bootstrap state back as a status pill.
 
 ## Beacons
 
@@ -52,12 +52,12 @@ The registry scans a fixed set of modules for a `retoldBeacon` stanza. A module 
 | [`retold-remote`](https://fable-retold.github.io/retold-remote/) | stevenvelozo |
 | `ultravisor-auth-beacon` | stevenvelozo |
 
-A module is resolved from your monorepo checkout first (so the lab picks up local edits) and falls back to its installed `node_modules` copy. One **lab-local** type — the synthetic worker beacon used by the queue exercises — is hand-defined inside the lab and merged in; see [Seed Data & Exercises](seed-data-and-exercises.md).
+A module is resolved from your monorepo checkout first (so the lab picks up local edits) and falls back to its installed `node_modules` copy. One **lab-local** type - the synthetic worker beacon used by the queue exercises - is hand-defined inside the lab and merged in; see [Seed Data & Exercises](seed-data-and-exercises.md).
 
 Each stanza declares a `mode`:
 
-- **`standalone-service`** — the module ships a bin the lab supervises (e.g. `retold-databeacon serve --config <path>`).
-- **`capability-provider`** — the lab runs a generic `retold-beacon-host` container that loads a capability-provider class the module exports.
+- **`standalone-service`** - the module ships a bin the lab supervises (e.g. `retold-databeacon serve --config <path>`).
+- **`capability-provider`** - the lab runs a generic `retold-beacon-host` container that loads a capability-provider class the module exports.
 
 The stanza also carries the display name, category, default port, health-check path, an optional `pict-section-form` config schema for the per-type create form, an optional config template, and (when present) a `docker` block that tells the lab how to image the beacon.
 
@@ -66,25 +66,25 @@ The stanza also carries the display name, category, default port, health-check p
 A beacon's `Runtime` is frozen on its row at create time:
 
 - If the type's stanza carries a **`docker` block**, the beacon runs as a **container** via `LabBeaconContainerManager` on the shared network.
-- Otherwise it falls back to the **host-process** path via `LabProcessSupervisor`. Capability-provider beacons are container-only — there is no host-process fallback for them.
+- Otherwise it falls back to the **host-process** path via `LabProcessSupervisor`. Capability-provider beacons are container-only - there is no host-process fallback for them.
 
 On boot the lab migrates any legacy rows whose type now has a docker block to container runtime.
 
 ### Create
 
-The manager validates the request, inserts a `Beacon` row in `provisioning`, creates `data/beacons/<id>/`, and renders a `config.json` from the type's config template (substituting lab-computed tokens — port, beacon name, data dir, Ultravisor URL — then overlaying the user's form values). For container beacons that config is bind-mounted into the container; the manager builds the image, runs the container wired to the Ultravisor, and polls the health path until ready. For host-process beacons it builds a spawn command from the stanza's arg template and supervises the child.
+The manager validates the request, inserts a `Beacon` row in `provisioning`, creates `data/beacons/<id>/`, and renders a `config.json` from the type's config template (substituting lab-computed tokens - port, beacon name, data dir, Ultravisor URL - then overlaying the user's form values). For container beacons that config is bind-mounted into the container; the manager builds the image, runs the container wired to the Ultravisor, and polls the health path until ready. For host-process beacons it builds a spawn command from the stanza's arg template and supervises the child.
 
 ### Image tags and build sources
 
 Container beacons are tagged under the `ultravisor-lab/` namespace:
 
-- **npm build** — `ultravisor-lab/<image>:<version>`, built from the module's published version.
-- **source build** — `ultravisor-lab/<image>:source-b<IDBeacon>`, built from a fresh `npm pack` of your sibling monorepo checkout so the image reflects in-flight edits. The per-beacon tag suffix means toggling one beacon's source build never disturbs siblings.
+- **npm build** - `ultravisor-lab/<image>:<version>`, built from the module's published version.
+- **source build** - `ultravisor-lab/<image>:source-b<IDBeacon>`, built from a fresh `npm pack` of your sibling monorepo checkout so the image reflects in-flight edits. The per-beacon tag suffix means toggling one beacon's source build never disturbs siblings.
 
 Two controls let you iterate without recreating a beacon:
 
-- **Rebuild image** — stops and removes the container, best-effort `docker rmi`s the cached tag, and rebuilds fresh. Useful after bumping a module's published version.
-- **Switch build source** — flips a beacon between npm-built and source-built images (source builds require a docker block plus a sibling checkout).
+- **Rebuild image** - stops and removes the container, best-effort `docker rmi`s the cached tag, and rebuilds fresh. Useful after bumping a module's published version.
+- **Switch build source** - flips a beacon between npm-built and source-built images (source builds require a docker block plus a sibling checkout).
 
 ### Start / Stop / Remove
 
@@ -123,7 +123,7 @@ For container beacons the lab tails `docker logs`; the same logs modal serves en
 | `POST` | `/api/lab/beacons` | Create |
 | `POST` | `/api/lab/beacons/:id/start` / `/stop` | Start / stop |
 | `POST` | `/api/lab/beacons/:id/rebuild` | Rebuild the container image |
-| `POST` | `/api/lab/beacons/:id/build-source` | Switch npm ↔ source build |
+| `POST` | `/api/lab/beacons/:id/build-source` | Switch npm <-> source build |
 | `DELETE` | `/api/lab/beacons/:id` | Remove |
 | `GET` | `/api/lab/beacons/:id/logs` | Tail container logs |
 

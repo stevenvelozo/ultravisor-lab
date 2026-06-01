@@ -8,17 +8,17 @@ The lab process runs on the host as a Node.js application. Everything it *manage
 
 ## Why It Exists
 
-Building a Retold data platform means running several independently-versioned services together — an Ultravisor coordinating work, beacons exposing capabilities and databases, and the database engines behind them. Wiring those up by hand (right image, right port, right config, right network, right order) is tedious and error-prone. The lab turns each of those steps into a button, tracks what is running, and tears it all down cleanly when you are done.
+Building a Retold data platform means running several independently-versioned services together - an Ultravisor coordinating work, beacons exposing capabilities and databases, and the database engines behind them. Wiring those up by hand (right image, right port, right config, right network, right order) is tedious and error-prone. The lab turns each of those steps into a button, tracks what is running, and tears it all down cleanly when you are done.
 
 It is the interactive counterpart to the [Ultravisor Suite Harness](https://github.com/stevenvelozo/ultravisor-suite-harness): the harness runs a fixed end-to-end pipeline headless and exits; the lab is a bench you keep open while you provision, iterate, and observe.
 
 ## What You Can Do
 
-- **Spin up DB engines** — MySQL, PostgreSQL, SQL Server, MongoDB, Apache Solr, or DGraph, each in its own container with health polling and per-engine database management.
-- **Run Ultravisor instances** — built on demand from the published `ultravisor` package, with a rendered config, bind-mounted state, an auto-loaded operation library, and an optional secured mode.
-- **Attach beacons** — any Retold module that publishes a `retoldBeacon` stanza becomes a provisionable beacon type, built into a container image and wired to a chosen Ultravisor.
-- **Launch stacks** — declarative multi-container topologies compiled to `docker-compose.yml`, with templated inputs, host preflight checks, and nine bundled presets.
-- **Drive workloads** — load packaged seed datasets through a running Ultravisor, or run queue / operation load-test exercises that assert on concurrency and drain behavior.
+- **Spin up DB engines** - MySQL, PostgreSQL, SQL Server, MongoDB, Apache Solr, or DGraph, each in its own container with health polling and per-engine database management.
+- **Run Ultravisor instances** - built on demand from the published `ultravisor` package, with a rendered config, bind-mounted state, an auto-loaded operation library, and an optional secured mode.
+- **Attach beacons** - any Retold module that publishes a `retoldBeacon` stanza becomes a provisionable beacon type, built into a container image and wired to a chosen Ultravisor.
+- **Launch stacks** - declarative multi-container topologies compiled to `docker-compose.yml`, with templated inputs, host preflight checks, and nine bundled presets.
+- **Drive workloads** - load packaged seed datasets through a running Ultravisor, or run queue / operation load-test exercises that assert on concurrency and drain behavior.
 
 ## Two Ways To Provision
 
@@ -33,15 +33,15 @@ Both write their state to the same SQLite store and surface in the same UI. See 
 
 ## Learn More
 
-- [Quick Start](quickstart.md) — launch the lab and bring up your first engine, Ultravisor, and stack
-- [Configuration](configuration.md) — ports, the data directory, the monorepo root, and embedding the lab
-- [Architecture](architecture.md) — process topology, the service layer, the state model, and the reconcile loop
-- [DB Engines](db-engines.md) — the six supported engines and their container lifecycle
-- [Ultravisor & Beacons](ultravisor-beacons.md) — how instances and beacons are built, run, and supervised
-- [Stacks](stacks.md) — the compose-backed deployment system, the spec format, and the bundled presets
-- [Web UI](web-ui.md) — the navigation, views, and chrome
-- [Seed Data & Exercises](seed-data-and-exercises.md) — packaged datasets and load-test fixtures
-- [REST API](api.md) — every HTTP endpoint the UI consumes
+- [Quick Start](quickstart.md) - launch the lab and bring up your first engine, Ultravisor, and stack
+- [Configuration](configuration.md) - ports, the data directory, the monorepo root, and embedding the lab
+- [Architecture](architecture.md) - process topology, the service layer, the state model, and the reconcile loop
+- [DB Engines](db-engines.md) - the six supported engines and their container lifecycle
+- [Ultravisor & Beacons](ultravisor-beacons.md) - how instances and beacons are built, run, and supervised
+- [Stacks](stacks.md) - the compose-backed deployment system, the spec format, and the bundled presets
+- [Web UI](web-ui.md) - the navigation, views, and chrome
+- [Seed Data & Exercises](seed-data-and-exercises.md) - packaged datasets and load-test fixtures
+- [REST API](api.md) - every HTTP endpoint the UI consumes
 
 ## Related Modules
 
