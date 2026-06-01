@@ -83,15 +83,15 @@ Ultravisor Lab is part of the [Retold](https://github.com/fable-retold) ecosyste
 
 | Module | Owner | Role in the lab |
 |---|---|---|
-| [Ultravisor](https://stevenvelozo.github.io/ultravisor/) | stevenvelozo | Workflow / operation supervisor the lab builds, runs, and seeds |
-| [Ultravisor Beacon](https://stevenvelozo.github.io/ultravisor-beacon/) | stevenvelozo | Capability-provider host the lab uses for provider-mode beacons |
+| [Ultravisor](https://github.com/stevenvelozo/ultravisor) | stevenvelozo | Workflow / operation supervisor the lab builds, runs, and seeds |
+| [Ultravisor Beacon](https://github.com/stevenvelozo/ultravisor-beacon) | stevenvelozo | Capability-provider host the lab uses for provider-mode beacons |
 | [Retold Facto](https://fable-retold.github.io/retold-facto/) | stevenvelozo | A beacon type the lab can provision (data-movement / ETL) |
 | [Retold Remote](https://fable-retold.github.io/retold-remote/) | stevenvelozo | A beacon type the lab can provision (file browse / serve) |
-| [Retold DataBeacon](https://fable-retold.github.io/retold-databeacon/) | fable-retold | A beacon type the lab can provision (REST over remote databases) |
-| [Meadow](https://fable-retold.github.io/meadow/) | fable-retold | Data-access layer; `meadow-connection-sqlite` backs lab state |
-| [Orator](https://fable-retold.github.io/orator/) | fable-retold | The HTTP server (Restify) hosting the lab's REST API + static bundle |
-| [Pict](https://fable-retold.github.io/pict/) | fable-retold | MVC framework powering the browser application |
-| [Fable](https://fable-retold.github.io/fable/) | fable-retold | Service-provider / DI core every lab service extends |
+| [Retold DataBeacon](https://github.com/fable-retold/retold-databeacon) | fable-retold | A beacon type the lab can provision (REST over remote databases) |
+| [Meadow](https://github.com/fable-retold/meadow) | fable-retold | Data-access layer; `meadow-connection-sqlite` backs lab state |
+| [Orator](https://github.com/fable-retold/orator) | fable-retold | The HTTP server (Restify) hosting the lab's REST API + static bundle |
+| [Pict](https://github.com/fable-retold/pict) | fable-retold | MVC framework powering the browser application |
+| [Fable](https://github.com/fable-retold/fable) | fable-retold | Service-provider / DI core every lab service extends |
 
 ## License
 
