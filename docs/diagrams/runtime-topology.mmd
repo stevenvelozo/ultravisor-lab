@@ -1,0 +1,11 @@
+graph TD
+    subgraph Host["host"]
+        Lab["ultravisor-lab (node, port 44443)"]
+        subgraph DockerNet["docker network: ultravisor-lab"]
+            MySQL["mysql-&lt;id&gt; (DB engine, already containerized)<br/>ports: 33306 → 3306"]
+            UV["ultravisor-&lt;id&gt; (new)<br/>ports: 54321 → 54321"]
+            Beacon1["beacon-&lt;id&gt; (new)<br/>ports: 8500 → 8500<br/>volumes: beacon-&lt;id&gt;-data → /app/data"]
+            Beacon2["beacon-&lt;id&gt; (new)<br/>ports: 54400 → 54400"]
+        end
+    end
+    Lab -->|docker CLI| DockerNet

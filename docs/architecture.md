@@ -6,27 +6,8 @@ How Ultravisor Lab is put together: the process topology, the service layer, the
 
 The lab runs as a single Node.js process on the host. It does not run inside Docker. Everything it *manages* runs in Docker containers that the lab creates by shelling out to the `docker` CLI.
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│ host                                                          │
-│                                                               │
-│  ultravisor-lab  (node lab.js, http://127.0.0.1:44443)        │
-│     │  Fable → Orator (Restify) → lab services → REST + UI    │
-│     │  state: data/lab.db (SQLite)                            │
-│     │                                                         │
-│     │  docker CLI                                             │
-│     ▼                                                         │
-│  ┌──────────── docker network: ultravisor-lab ────────────┐  │
-│  │                                                         │  │
-│  │   mysql-…  /  postgres-…   (DB engine containers)       │  │
-│  │   lab-ultravisor-<id>      (Ultravisor containers)      │  │
-│  │   <beacon>-…               (beacon containers)          │  │
-│  │                                                         │  │
-│  │   …plus, for Stacks, a compose project per stack with   │  │
-│  │   its own network: stack-<hash>                         │  │
-│  └─────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────┘
-```
+<!-- bespoke diagram: edit diagrams/process-topology.mmd or .hints.json, then: npx pict-renderer-graph build modules/apps/ultravisor-lab/docs -->
+![Process Topology](diagrams/process-topology.svg)
 
 Containers on the shared `ultravisor-lab` network resolve each other by container name via Docker's embedded DNS, so a beacon can reach an Ultravisor container at `http://lab-ultravisor-5:54321`. Every service is also mapped to a host port so the browser UI and external tools can reach it on `127.0.0.1`.
 

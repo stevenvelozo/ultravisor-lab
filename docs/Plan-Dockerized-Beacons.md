@@ -33,33 +33,8 @@ mounts, no monorepo paths, no shared `node_modules`.
 
 ### Runtime topology
 
-```
-┌────────────────────────────────────────────────────────┐
-│ host                                                   │
-│                                                        │
-│  ultravisor-lab (node, port 44443)                     │
-│     │                                                  │
-│     │ docker CLI                                       │
-│     ▼                                                  │
-│  ┌──────────────── docker network: ultravisor-lab ──┐  │
-│  │                                                  │  │
-│  │  ┌─ mysql-<id>          (DB engine, already      │  │
-│  │  │     ports: 33306 → 3306         containerized)│  │
-│  │  │                                               │  │
-│  │  ├─ ultravisor-<id>     (new)                    │  │
-│  │  │     ports: 54321 → 54321                      │  │
-│  │  │                                               │  │
-│  │  ├─ beacon-<id>         (new)                    │  │
-│  │  │     ports: 8500  →  8500                      │  │
-│  │  │     volumes: beacon-<id>-data → /app/data     │  │
-│  │  │                                               │  │
-│  │  └─ beacon-<id>         (new)                    │  │
-│  │        ports: 54400 →  54400                     │  │
-│  │                                                  │  │
-│  └──────────────────────────────────────────────────┘  │
-│                                                        │
-└────────────────────────────────────────────────────────┘
-```
+<!-- bespoke diagram: edit diagrams/runtime-topology.mmd or .hints.json, then: npx pict-renderer-graph build modules/apps/ultravisor-lab/docs -->
+![Runtime topology](diagrams/runtime-topology.svg)
 
 Containers resolve each other by container name via docker's embedded
 DNS. A beacon pointed at `http://ultravisor-5:54321` works from any

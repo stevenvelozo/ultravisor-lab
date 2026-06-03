@@ -1,0 +1,11 @@
+graph TD
+    subgraph Host["host"]
+        Lab["ultravisor-lab (node lab.js, http://127.0.0.1:44443)<br/>Fable → Orator (Restify) → lab services → REST + UI<br/>state: data/lab.db (SQLite)"]
+        subgraph DockerNet["docker network: ultravisor-lab"]
+            DBEngines["mysql-… / postgres-… (DB engine containers)"]
+            UVContainers["lab-ultravisor-&lt;id&gt; (Ultravisor containers)"]
+            BeaconContainers["&lt;beacon&gt;-… (beacon containers)"]
+            StackNets["…plus, for Stacks, a compose project per stack<br/>with its own network: stack-&lt;hash&gt;"]
+        end
+    end
+    Lab -->|docker CLI| DockerNet
