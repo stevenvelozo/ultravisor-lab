@@ -1,0 +1,13 @@
+{
+	"name": "ultravisor-auth-gate-tester",
+	"version": "1.0.0",
+	"private": true,
+	"description": "One-shot assertion runner for the ultravisor-lab 'auth-gate-test' stack. Verifies Ultravisor's secured-mode auth gates (HTTP management surface + WebSocket subscriptions + login round-trip) end-to-end against a live secured Ultravisor + ultravisor-auth-beacon.",
+	"main": "auth-gate-test.js",
+	"scripts": {
+		"start": "node auth-gate-test.js"
+	},
+	"dependencies": {
+		"ws": "^8.21.0"
+	}
+}

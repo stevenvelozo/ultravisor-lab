@@ -109,13 +109,14 @@ A stack spec may carry an optional `InitOperation` that configures the stack aft
 
 ## Bundled Presets
 
-Nine presets ship under `source/stacks/presets/`. Cloning a preset produces an editable stack with a fresh hash and `PresetSource` set; you then fill in inputs and launch.
+Ten presets ship under `source/stacks/presets/`. Cloning a preset produces an editable stack with a fresh hash and `PresetSource` set; you then fill in inputs and launch.
 
 | Preset | What it brings up |
 |---|---|
 | `preset-ultravisor-promiscuous` | A single Ultravisor with no auth beacon - the web UI loads straight to the dashboard with no login. Plus one of each web-UI beacon (databeacon, facto, content-system, remote, data-mapper, synth) for a no-auth smoke. |
 | `preset-ultravisor-secured-internal` | Ultravisor + `ultravisor-auth-beacon` running the built-in memory auth provider; the UI requires login and exposes in-app user management. |
 | `preset-ultravisor-secured-external` | Ultravisor + `ultravisor-auth-beacon` running the external-directory auth provider; simulates a deployment whose user store lives outside Ultravisor (LDAP / OIDC). |
+| `preset-ultravisor-auth-gate-test` | **Self-asserting** security stack: a secured Ultravisor (`UltravisorNonPromiscuous=true` + bootstrap secret — gate hard-armed by the flag) + `ultravisor-auth-beacon`, plus a one-shot `auth-gate-tester` that proves the gate end-to-end (management read 401 without a session, WS subscribe rejected, login round-trip, then 200 + WS subscribe accepted) and exits 0/1. Minimal — no extra beacons. Read the verdict with `docker logs <project>-auth-gate-tester-1`. |
 | `preset-full-beacon-smoke` | Ultravisor + auth beacon plus exactly one of every web-UI beacon - a comprehensive smoke test. |
 | `preset-retold-facto` | Single-node data movement: MySQL + meadow-integration syncing from a remote Meadow API + a databeacon registered with Ultravisor. |
 | `preset-retold-remote` | File-server + content-conversion: Ultravisor coordinating `retold-remote` (browse / serve files) and `orator-conversion`, backed by MariaDB. |

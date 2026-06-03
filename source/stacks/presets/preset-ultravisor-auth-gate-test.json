@@ -1,0 +1,110 @@
+{
+	"Hash": "preset-ultravisor-auth-gate-test",
+	"Name": "Ultravisor — Auth Gate Test (self-asserting)",
+	"Description": "Self-testing security stack.  Brings up a SECURED Ultravisor (UltravisorNonPromiscuous=true + bootstrap secret — so the auth gate is hard-armed by the flag, not merely by the presence of an auth-beacon) plus an ultravisor-auth-beacon that joins with the bootstrap secret and serves a single `admin` login.  A one-shot `auth-gate-tester` container then asserts the whole gate end-to-end and exits 0 (pass) or 1 (fail):\n\n  1. /status reports AuthMode=authenticated (flag honoured).\n  2. GET /Beacon is 401 with no session.\n  3. A WebSocket Subscribe is rejected (execution.auth_required + close 1008) with no session.\n  4. POST /1.0/Authenticate (admin / UVAdminPassword) returns a session cookie.\n  5. GET /Beacon is 200 with that cookie.\n  6. A WebSocket Subscribe is accepted with that cookie.\n\nWatch the result:  docker logs <project>-auth-gate-tester-1  (look for 'ALL CHECKS PASSED').  The Ultravisor UI is published on UVPort if you want to eyeball the login lock in a browser (sign in as admin / UVAdminPassword).  Minimal by design — no databeacon/facto/etc — so it builds fast and isolates the auth surface.",
+	"SchemaVersion": 1,
+	"Inputs":
+	{
+		"MonorepoRoot":
+		{
+			"Type": "folder",
+			"Default": "${env.RETOLD_MONOREPO_ROOT}",
+			"Description": "Path to your retold monorepo checkout. Ultravisor, the auth-beacon, and the tester image are built from it at launch."
+		},
+		"UVAdminPassword":
+		{
+			"Type": "secret",
+			"Default": "admin",
+			"Description": "Password for the seeded `admin` user.  The tester logs in with admin / this value; you can use the same to sign into the UI."
+		},
+		"BootstrapSecret":
+		{
+			"Type": "secret",
+			"Default": "lab-auth-gate-bootstrap",
+			"Description": "Shared bootstrap secret.  Set as UltravisorBootstrapAuthSecret on the UV and presented by the auth-beacon via --join-secret so it can join the secured (non-promiscuous) mesh.  Both sides must match — they are templated from this single input."
+		},
+		"UVPort":
+		{
+			"Type": "port",
+			"Default": 54321,
+			"Description": "Host port for the Ultravisor API + web UI.  Open http://127.0.0.1:<UVPort> to see the login lock in a browser."
+		}
+	},
+	"Components":
+	[
+		{
+			"Hash": "ultravisor",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.UVPort}", "Container": 54321 } ],
+			"Files":
+			[
+				{
+					"Path": "/service_root/config/ultravisor.json",
+					"Content": "{\n\t\"UltravisorNonPromiscuous\": true,\n\t\"UltravisorBootstrapAuthSecret\": \"${input.BootstrapSecret}\"\n}\n"
+				}
+			],
+			"Command":
+			[
+				"node",
+				"source/cli/Ultravisor-Run.cjs",
+				"start",
+				"--config",
+				"/service_root/config/ultravisor.json"
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_LOG_LEVEL": "info"
+			},
+			"HealthCheck":
+			{
+				"Command": "node -e \"const h=require('http');h.get('http://localhost:54321/status',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\"",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 24
+			},
+			"DependsOn": []
+		},
+		{
+			"Hash": "ultravisor-auth-beacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor-auth-beacon",
+			"Dockerfile": "Dockerfile",
+			"Files":
+			[
+				{
+					"Path": "/app/config/auth-beacon.json",
+					"Content": "{\n\t\"BeaconName\": \"auth-beacon\",\n\t\"UltravisorURL\": \"http://ultravisor:54321\",\n\t\"ProviderConfig\":\n\t{\n\t\t\"Permissive\": false,\n\t\t\"Users\":\n\t\t[\n\t\t\t{ \"Username\": \"admin\", \"Password\": \"${input.UVAdminPassword}\", \"Roles\": [\"admin\"] }\n\t\t]\n\t}\n}\n"
+				}
+			],
+			"Command":
+			[
+				"node",
+				"bin/ultravisor-auth-beacon.js",
+				"--config",
+				"/app/config/auth-beacon.json",
+				"--provider",
+				"memory",
+				"--join-secret",
+				"${input.BootstrapSecret}"
+			],
+			"DependsOn": [ "ultravisor" ]
+		},
+		{
+			"Hash": "auth-gate-tester",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor-lab/source/stacks/assets/auth-gate-tester",
+			"Dockerfile": "Dockerfile",
+			"RestartPolicy": "no",
+			"Environment":
+			{
+				"UV_URL":  "http://${component.ultravisor.host}:54321",
+				"UV_USER": "admin",
+				"UV_PASS": "${input.UVAdminPassword}",
+				"UV_RETRIES": "40"
+			},
+			"DependsOn": [ "ultravisor", "ultravisor-auth-beacon" ]
+		}
+	]
+}
