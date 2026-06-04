@@ -1,0 +1,267 @@
+{
+	"Hash": "preset-bookstore-clone",
+	"Name": "Bookstore Clone-to-Lake (raw, no unique IDs)",
+	"Description": "Demonstrates a 'clone' that pulls the RAW records from a customer data beacon into a Postgres lake WITHOUT the source needing unique identifiers.\n\nTopology: ultravisor + auth-beacon, a customer retold-databeacon (MySQL-backed, pre-loaded with a deliberately awkward bookstore-sales schema), a lake retold-databeacon (Postgres-backed), retold-data-mapper (hosts the customer + lake connections and runs the clone tasks), and a one-shot seed-bookstore-clone container.\n\nThe customer DB (modelling a customer's existing database) has seven tables — Cashier, City, Bookstore, Book, Price, Author, Sale — with NO integer surrogate keys: some use plain string keys (City.CityName, Author.AuthorName, Bookstore.BookstoreCode, Cashier.CashierCode), some need a combinatorial key (Book = Title+AuthorName), and some have no unique identifier at all with intentional duplicates (Price, and Sale whose 'key' is the three strings BookstoreCode+Title+SaleDate — several rows collide on all three, a couple byte-for-byte).\n\nThe seeder enables read endpoints on the customer tables, creates RAW_<Table> archive tables on the lake, then runs one Ultravisor operation per table: pull → buildcomprehension (keyless rows keyed positionally record-N) → writerecordsraw. Each source row lands in the lake verbatim as { Identity, RawJSON, RecordMD5, IngestedAt, SourceTable } — duplicates preserved, RecordMD5 flags exact copies. No source unique identifier is ever required.\n\nWalkthrough after `Up` (the seeder runs automatically):\n  1. Browse the customer beacon at http://127.0.0.1:${input.CustomerBeaconPort} — the 7 keyless tables, incl. duplicate Sale rows.\n  2. Browse the lake beacon at http://127.0.0.1:${input.LakeBeaconPort} — the RAW_* archive tables; every customer row is preserved with its RawJSON + RecordMD5 + SourceTable.\n  3. Inspect the clone operations in the data-mapper / Ultravisor at http://127.0.0.1:${input.MapperPort} and http://127.0.0.1:${input.UVPort}.",
+	"SchemaVersion": 1,
+	"Inputs":
+	{
+		"DataRoot":
+		{
+			"Type": "folder",
+			"Default": "${HOME}/retold-stacks/bookstore-clone",
+			"Description": "Base directory for all volume mounts (mysql + postgres + ultravisor + each beacon + mapper data). Subdirectories created on first launch."
+		},
+		"MonorepoRoot":
+		{
+			"Type": "folder",
+			"Default": "${env.RETOLD_MONOREPO_ROOT}",
+			"Description": "Path to your retold monorepo checkout. All retold-* images are built from MonorepoRoot/modules/... at launch, and the customer seed SQL + seeder script are mounted from MonorepoRoot/modules/apps/ultravisor-lab/source/stacks/seeders/bookstore-clone/."
+		},
+		"UVAdminPassword":
+		{
+			"Type": "secret",
+			"Default": "admin",
+			"Description": "Bootstrap admin password for Ultravisor; also the bearer password every beacon (customer, lake, data-mapper) presents at registration."
+		},
+		"DBPassword":
+		{
+			"Type": "secret",
+			"Default": "retold1234567890",
+			"Description": "Root password for both the customer MySQL and the lake Postgres. Same secret for both is fine in the lab."
+		},
+		"UVPort":
+		{
+			"Type": "port",
+			"Default": 54321,
+			"Description": "Host port for the Ultravisor API + web UI."
+		},
+		"MapperPort":
+		{
+			"Type": "port",
+			"Default": 8395,
+			"Description": "Host port for retold-data-mapper's REST + web UI."
+		},
+		"CustomerBeaconPort":
+		{
+			"Type": "port",
+			"Default": 8393,
+			"Description": "Host port for the customer retold-databeacon (the source we clone from — browse its 7 keyless tables here)."
+		},
+		"LakeBeaconPort":
+		{
+			"Type": "port",
+			"Default": 8391,
+			"Description": "Host port for the lake retold-databeacon (the clone target — browse the RAW_* archive tables here)."
+		},
+		"CustomerMysqlPort":
+		{
+			"Type": "port",
+			"Default": 3307,
+			"Description": "Host port for the customer MySQL listener (backs the customer beacon; seeded on first boot from customer-init.sql)."
+		},
+		"PostgresPort":
+		{
+			"Type": "port",
+			"Default": 5432,
+			"Description": "Host port for the lake Postgres listener (backs the lake beacon)."
+		}
+	},
+	"Components":
+	[
+		{
+			"Hash": "customer-mysql",
+			"Type": "docker-service",
+			"Image": "mysql:8.0",
+			"Ports": [ { "Host": "${input.CustomerMysqlPort}", "Container": 3306 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/customer-mysql/data", "Container": "/var/lib/mysql", "Mode": "rw" },
+				{ "Host": "${input.MonorepoRoot}/modules/apps/ultravisor-lab/source/stacks/seeders/bookstore-clone/customer-init.sql", "Container": "/docker-entrypoint-initdb.d/01-bookstore.sql", "Mode": "ro" }
+			],
+			"Environment":
+			{
+				"MYSQL_ROOT_PASSWORD": "${input.DBPassword}",
+				"MYSQL_DATABASE": "customer"
+			},
+			"HealthCheck":
+			{
+				"Command": "mysqladmin ping -h localhost -uroot -p${input.DBPassword}",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 18
+			},
+			"DependsOn": []
+		},
+
+		{
+			"Hash": "lake-postgres",
+			"Type": "docker-service",
+			"Image": "postgres:16",
+			"Ports": [ { "Host": "${input.PostgresPort}", "Container": 5432 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/lake-postgres/data", "Container": "/var/lib/postgresql/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"POSTGRES_PASSWORD": "${input.DBPassword}",
+				"POSTGRES_DB": "lake",
+				"POSTGRES_USER": "lake"
+			},
+			"HealthCheck":
+			{
+				"Command": "pg_isready -U lake -d lake",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+
+		{
+			"Hash": "ultravisor",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.UVPort}", "Container": 54321 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/ultravisor/data", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"ULTRAVISOR_LOG_LEVEL": "info",
+				"ULTRAVISOR_BOOTSTRAP_USER": "admin",
+				"ULTRAVISOR_BOOTSTRAP_PASSWORD": "${input.UVAdminPassword}",
+				"UltravisorBeaconHeartbeatMs": "600000",
+				"UltravisorWebSocketMaxPayloadMB": "768",
+				"UltravisorBeaconWebSocketMaxPayloadMB": "768",
+				"UltravisorBeaconWorkItemTimeoutMs": "1800000"
+			},
+			"HealthCheck":
+			{
+				"Command": "node -e \"const h=require('http');h.get('http://localhost:54321/status',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\"",
+				"IntervalSec": 5,
+				"TimeoutSec": 3,
+				"RetriesBeforeFail": 12
+			},
+			"DependsOn": []
+		},
+
+		{
+			"Hash": "ultravisor-auth-beacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/ultravisor-auth-beacon",
+			"Dockerfile": "Dockerfile",
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/auth-beacon/config", "Container": "/app/config", "Mode": "rw" }
+			],
+			"Command":
+			[
+				"node",
+				"bin/ultravisor-auth-beacon.js",
+				"--ultravisor",
+				"http://ultravisor:54321",
+				"--name",
+				"auth-beacon"
+			],
+			"DependsOn": [ "ultravisor" ]
+		},
+
+		{
+			"Hash": "customer-databeacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.CustomerBeaconPort}", "Container": 8389 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/databeacon/customer", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"DATABEACON_ULTRAVISOR_URL": "http://${component.ultravisor.host}:54321",
+				"DATABEACON_BEACON_NAME": "customer-databeacon",
+				"DATABEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"DATABEACON_MAX_CONCURRENT": "3"
+			},
+			"DependsOn": [ "ultravisor", "customer-mysql" ]
+		},
+
+		{
+			"Hash": "lake-databeacon",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-databeacon",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.LakeBeaconPort}", "Container": 8389 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/databeacon/lake", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"DATABEACON_ULTRAVISOR_URL": "http://${component.ultravisor.host}:54321",
+				"DATABEACON_BEACON_NAME": "lake-databeacon",
+				"DATABEACON_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"DATABEACON_MAX_CONCURRENT": "5"
+			},
+			"DependsOn": [ "ultravisor", "lake-postgres" ]
+		},
+
+		{
+			"Hash": "retold-data-mapper",
+			"Type": "docker-build-from-folder",
+			"BuildContext": "${input.MonorepoRoot}/modules/apps/retold-data-mapper",
+			"Dockerfile": "Dockerfile",
+			"Ports": [ { "Host": "${input.MapperPort}", "Container": 8395 } ],
+			"Volumes":
+			[
+				{ "Host": "${input.DataRoot}/data-mapper", "Container": "/app/data", "Mode": "rw" }
+			],
+			"Environment":
+			{
+				"RETOLD_DATA_MAPPER_BEACON_USER": "admin",
+				"RETOLD_DATA_MAPPER_BEACON_PASSWORD": "${input.UVAdminPassword}",
+				"DATA_MAPPER_MAX_INMEMORY_ROWS": "250000",
+				"UltravisorBeaconWebSocketMaxPayloadMB": "768",
+				"UltravisorBeaconWorkItemTimeoutMs": "1800000",
+				"RETOLD_DATA_MAPPER_BOOTSTRAP_CONNECTIONS": "[{\"BeaconName\":\"customer-databeacon\",\"ConnectionName\":\"customer-main\",\"Type\":\"MySQL\",\"Config\":{\"Server\":\"customer-mysql\",\"Port\":3306,\"Database\":\"customer\",\"User\":\"root\",\"Password\":\"${input.DBPassword}\"},\"AutoConnect\":true,\"Description\":\"Customer source (MySQL) — the clone PullRecords reads raw rows from here.\"},{\"BeaconName\":\"lake-databeacon\",\"ConnectionName\":\"lake-main\",\"Type\":\"PostgreSQL\",\"Config\":{\"Server\":\"lake-postgres\",\"Port\":5432,\"Database\":\"lake\",\"User\":\"lake\",\"Password\":\"${input.DBPassword}\"},\"AutoConnect\":true,\"Description\":\"Lake (Postgres) — raw-archive clones land here.\"}]"
+			},
+			"Command":
+			[
+				"node",
+				"bin/retold-data-mapper.js",
+				"serve",
+				"--ultravisor",
+				"http://ultravisor:54321",
+				"--name",
+				"data-mapper"
+			],
+			"DependsOn": [ "ultravisor", "customer-databeacon", "lake-databeacon" ]
+		},
+
+		{
+			"Hash": "seed-bookstore-clone",
+			"Type": "docker-service",
+			"Image": "node:20-alpine",
+			"RestartPolicy": "no",
+			"Volumes":
+			[
+				{ "Host": "${input.MonorepoRoot}/modules/apps/ultravisor-lab/source/stacks/seeders/bookstore-clone", "Container": "/app", "Mode": "ro" }
+			],
+			"Environment":
+			{
+				"MAPPER_BASE": "http://retold-data-mapper:8395",
+				"UV_BASE": "http://ultravisor:54321",
+				"SEED_SCOPE": "bookstore-clone"
+			},
+			"Command":
+			[
+				"node",
+				"/app/seed-bookstore-clone.js"
+			],
+			"DependsOn": [ "retold-data-mapper", "customer-databeacon", "lake-databeacon" ]
+		}
+	]
+}
